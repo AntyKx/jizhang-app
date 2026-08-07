@@ -1,11 +1,16 @@
-import { addDays, addMonths, addWeeks, addYears, format } from "date-fns";
+import { addDays, addMonths, addWeeks, addYears } from "date-fns";
 import { and, eq, isNull, or } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, recurringRules } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
+import { listAccounts } from "@/lib/account";
 import { CreateRuleDialog } from "@/components/subscriptions/create-rule-dialog";
+import { RuleRow } from "@/components/subscriptions/rule-row";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StaggerList } from "@/components/motion/stagger-list";
+import { CountUpNumber } from "@/components/motion/count-up-number";
+import { BearIllustration } from "@/components/bear-illustration";
+import { getTodayInTaipei } from "@/lib/date";
 
 function expandOccurrences(
   start: string,
@@ -40,18 +45,33 @@ function expandOccurrences(
 export default async function SubscriptionsPage() {
   const userId = await requireUserId();
 
-  const [expenseCategories, rules] = await Promise.all([
+  // Despite the old variable name, this was never actually filtered to
+  // expense-only — a recurring rule can be income or expense (see the
+  // type Select in create/edit-rule-dialog), so both need to be fetched.
+  // Which subset is offered for a given rule is filtered client-side by
+  // the dialogs based on the currently selected type, same pattern as
+  // edit-transaction-dialog.tsx.
+  const [allCategories, accountRows, rules] = await Promise.all([
     db
-      .select({ id: categories.id, name: categories.name })
+      .select({ id: categories.id, name: categories.name, icon: categories.icon, type: categories.type })
       .from(categories)
-      .where(or(isNull(categories.userId), eq(categories.userId, userId))),
+      .where(or(isNull(categories.userId), eq(categories.userId, userId)))
+      .orderBy(categories.sortOrder),
+    listAccounts(userId),
     db
       .select()
       .from(recurringRules)
       .where(and(eq(recurringRules.userId, userId), eq(recurringRules.isActive, true))),
   ]);
 
-  const rangeEnd = addDays(new Date(), 30);
+  // Same exclusion as every other "pick an account to post against" surface
+  // (see getQuickAddContext) — a fixed-deposit-style account isn't a valid
+  // destination for a recurring bill either.
+  const pickableAccounts = accountRows
+    .filter((a) => !a.excludeFromNetWorth)
+    .map((a) => ({ id: a.id, name: a.name, type: a.type }));
+
+  const rangeEnd = addDays(getTodayInTaipei(), 30);
 
   let projectedNet = 0;
   for (const r of rules) {
@@ -77,7 +97,7 @@ export default async function SubscriptionsPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">訂閱 / 定期收支</h1>
-        <CreateRuleDialog categories={expenseCategories} />
+        <CreateRuleDialog categories={allCategories} accounts={pickableAccounts} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -95,8 +115,7 @@ export default async function SubscriptionsPage() {
                   : "text-2xl font-semibold text-destructive"
               }
             >
-              {projectedNet >= 0 ? "+" : ""}
-              {Math.round(projectedNet).toLocaleString("zh-TW")}
+              <CountUpNumber value={projectedNet} prefix={projectedNet >= 0 ? "+" : ""} />
             </span>
           </CardContent>
         </Card>
@@ -107,33 +126,40 @@ export default async function SubscriptionsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold text-destructive">
-            {monthlySubscriptionCost.toLocaleString("zh-TW", { maximumFractionDigits: 0 })}
+            <CountUpNumber value={monthlySubscriptionCost} />
           </CardContent>
         </Card>
       </div>
 
       {rules.length === 0 ? (
-        <p className="text-muted-foreground text-sm">還沒有設定任何定期收支項目。</p>
-      ) : (
-        <div className="flex flex-col divide-y rounded-2xl border bg-card">
-          {rules.map((r) => (
-            <div key={r.id} className="flex items-center justify-between px-4 py-3">
-              <div className="flex items-center gap-2">
-                <span className="font-medium">{r.name}</span>
-                {r.isSubscription && <Badge variant="outline">訂閱</Badge>}
-              </div>
-              <div className="text-right text-sm">
-                <div className={r.type === "expense" ? "text-destructive" : "text-emerald-600"}>
-                  {r.type === "expense" ? "-" : "+"}
-                  {Number(r.amount).toLocaleString("zh-TW")}
-                </div>
-                <div className="text-muted-foreground text-xs">
-                  下次 {format(new Date(r.nextOccurrence), "yyyy-MM-dd")}
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="flex flex-col items-center gap-2 rounded-2xl border bg-card p-6 text-center shadow-md shadow-foreground/10">
+          <BearIllustration name="empty" size={96} />
+          <p className="text-muted-foreground text-sm">還沒有設定任何定期收支項目。</p>
         </div>
+      ) : (
+        <StaggerList className="flex flex-col divide-y overflow-hidden rounded-2xl border bg-card">
+          {rules.map((r) => (
+            <RuleRow
+              key={r.id}
+              rule={{
+                id: r.id,
+                name: r.name,
+                amount: r.amount,
+                type: r.type === "transfer" ? "expense" : r.type,
+                paymentMethod: r.paymentMethod,
+                accountId: r.accountId,
+                frequency: r.frequency,
+                interval: r.interval,
+                nextOccurrence: r.nextOccurrence,
+                categoryId: r.categoryId,
+                isSubscription: r.isSubscription,
+              }}
+              categories={allCategories}
+              accounts={pickableAccounts}
+              showAccount={pickableAccounts.length > 1}
+            />
+          ))}
+        </StaggerList>
       )}
     </div>
   );

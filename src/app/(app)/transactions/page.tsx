@@ -1,69 +1,113 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, or } from "drizzle-orm";
 import { db } from "@/db";
-import { categories, transactions } from "@/db/schema";
+import { categories, sharedExpenses, transactions, userSettings } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
-import { paymentMethodIcon, paymentMethodLabel } from "@/lib/payment-methods";
-import { CategoryIcon } from "@/components/category-icon";
-import { Badge } from "@/components/ui/badge";
+import { listAccounts, listArchivedAccounts } from "@/lib/account";
+import { TransactionsList } from "@/components/transactions/transactions-list";
+import { TRANSACTIONS_PAGE_SIZE, type ListItemRow } from "@/lib/transactions/list-types";
 
 export default async function TransactionsPage() {
   const userId = await requireUserId();
 
-  const allTransactions = await db
-    .select({
-      id: transactions.id,
-      type: transactions.type,
-      amount: transactions.amount,
-      note: transactions.note,
-      merchant: transactions.merchant,
-      occurredAt: transactions.occurredAt,
-      categoryName: categories.name,
-      categoryIcon: categories.icon,
-      paymentMethod: transactions.paymentMethod,
-    })
-    .from(transactions)
-    .leftJoin(categories, eq(transactions.categoryId, categories.id))
-    .where(eq(transactions.userId, userId))
-    .orderBy(desc(transactions.occurredAt), desc(transactions.createdAt))
-    .limit(200);
+  const [regularRows, transferRows, userCategories, userAccounts, archivedAccounts, settingsRows] = await Promise.all([
+    db
+      .select({
+        id: transactions.id,
+        type: transactions.type,
+        amount: transactions.amount,
+        note: transactions.note,
+        merchant: transactions.merchant,
+        occurredAt: transactions.occurredAt,
+        createdAt: transactions.createdAt,
+        categoryId: transactions.categoryId,
+        categoryName: categories.name,
+        categoryIcon: categories.icon,
+        categoryColor: categories.color,
+        paymentMethod: transactions.paymentMethod,
+        accountId: transactions.accountId,
+        sharedExpenseId: sharedExpenses.id,
+      })
+      .from(transactions)
+      .leftJoin(categories, eq(transactions.categoryId, categories.id))
+      .leftJoin(sharedExpenses, eq(sharedExpenses.linkedTransactionId, transactions.id))
+      .where(and(eq(transactions.userId, userId), ne(transactions.type, "transfer")))
+      .orderBy(desc(transactions.occurredAt), desc(transactions.createdAt))
+      .limit(TRANSACTIONS_PAGE_SIZE),
+    db
+      .select({
+        id: transactions.id,
+        amount: transactions.amount,
+        feeAmount: transactions.feeAmount,
+        note: transactions.note,
+        occurredAt: transactions.occurredAt,
+        createdAt: transactions.createdAt,
+        fromAccountId: transactions.accountId,
+        toAccountId: transactions.toAccountId,
+      })
+      .from(transactions)
+      .where(and(eq(transactions.userId, userId), eq(transactions.type, "transfer")))
+      .orderBy(desc(transactions.occurredAt), desc(transactions.createdAt))
+      .limit(TRANSACTIONS_PAGE_SIZE),
+    db
+      .select({ id: categories.id, name: categories.name, icon: categories.icon, type: categories.type })
+      .from(categories)
+      .where(or(isNull(categories.userId), eq(categories.userId, userId)))
+      .orderBy(categories.sortOrder),
+    listAccounts(userId),
+    listArchivedAccounts(userId),
+    db
+      .select({ partnerName: userSettings.partnerName })
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId)),
+  ]);
+
+  const accountsById = Object.fromEntries(
+    [...userAccounts, ...archivedAccounts].map((a) => [a.id, { name: a.name, type: a.type }]),
+  );
+  const partnerName = settingsRows[0]?.partnerName || "另一半";
+
+  // The query already excludes/includes "transfer" rows by type; narrow here
+  // since drizzle can't reflect a runtime `where` filter in its inferred
+  // column type. Merge the two shapes by occurredAt/createdAt so the list
+  // reads as one continuous timeline instead of two separate feeds.
+  const merged: ListItemRow[] = [
+    ...regularRows.map((t) => ({
+      ...t,
+      kind: "transaction" as const,
+      type: t.type as "income" | "expense",
+      isSharedExpense: t.sharedExpenseId !== null,
+    })),
+    ...transferRows.map((t) => ({ ...t, kind: "transfer" as const })),
+  ].sort((a, b) => {
+    if (a.occurredAt !== b.occurredAt) return a.occurredAt < b.occurredAt ? 1 : -1;
+    return a.createdAt < b.createdAt ? 1 : -1;
+  });
+
+  // Either stream hitting the page size means there could be more of that
+  // type beyond this fetch, even if the merged page below is shorter.
+  const mightHaveMore =
+    merged.length > TRANSACTIONS_PAGE_SIZE ||
+    regularRows.length === TRANSACTIONS_PAGE_SIZE ||
+    transferRows.length === TRANSACTIONS_PAGE_SIZE;
+
+  const items = merged.slice(0, TRANSACTIONS_PAGE_SIZE);
+  const last = items[items.length - 1];
+  const initialCursor =
+    mightHaveMore && last ? { occurredAt: last.occurredAt, createdAt: last.createdAt } : null;
 
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">所有交易</h1>
-
-      {allTransactions.length === 0 ? (
-        <p className="text-muted-foreground text-sm">還沒有任何交易紀錄。</p>
-      ) : (
-        <div className="flex flex-col divide-y rounded-2xl border bg-card">
-          {allTransactions.map((t) => (
-            <div key={t.id} className="flex items-center justify-between px-4 py-3">
-              <div className="flex items-center gap-3">
-                <CategoryIcon icon={t.categoryIcon} className="h-6 w-6 text-xl" />
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{t.merchant || t.note || "（無備註）"}</span>
-                    {t.categoryName && <Badge variant="outline">{t.categoryName}</Badge>}
-                    <span className="text-xs" title={paymentMethodLabel(t.paymentMethod)}>
-                      {paymentMethodIcon(t.paymentMethod)}
-                    </span>
-                  </div>
-                  <span className="text-muted-foreground text-xs">{t.occurredAt}</span>
-                </div>
-              </div>
-              <span
-                className={
-                  t.type === "expense"
-                    ? "font-semibold text-destructive"
-                    : "font-semibold text-emerald-600"
-                }
-              >
-                {t.type === "expense" ? "-" : "+"}
-                {Number(t.amount).toLocaleString("zh-TW")}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+      <TransactionsList
+        items={items}
+        categories={userCategories}
+        accounts={userAccounts
+          .filter((a) => !a.excludeFromNetWorth)
+          .map((a) => ({ id: a.id, name: a.name, type: a.type }))}
+        accountsById={accountsById}
+        initialCursor={initialCursor}
+        partnerName={partnerName}
+      />
     </div>
   );
 }

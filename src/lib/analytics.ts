@@ -2,6 +2,7 @@ import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { and, eq, gte, isNotNull, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, transactions } from "@/db/schema";
+import { getTodayInTaipei } from "@/lib/date";
 
 export type CategoryAnomaly = {
   categoryName: string;
@@ -12,8 +13,9 @@ export type CategoryAnomaly = {
 
 export async function detectSpendingAnomalies(
   userId: string,
+  asOf: Date = getTodayInTaipei(),
 ): Promise<CategoryAnomaly[]> {
-  const now = new Date();
+  const now = asOf;
   const rangeStart = format(startOfMonth(subMonths(now, 3)), "yyyy-MM-dd");
   const rangeEnd = format(endOfMonth(now), "yyyy-MM-dd");
   const currentMonthKey = format(now, "yyyy-MM");
@@ -22,6 +24,7 @@ export async function detectSpendingAnomalies(
     .select({
       categoryName: categories.name,
       amount: transactions.amount,
+      exchangeRate: transactions.exchangeRate,
       occurredAt: transactions.occurredAt,
     })
     .from(transactions)
@@ -40,7 +43,7 @@ export async function detectSpendingAnomalies(
   for (const row of rows) {
     const monthKey = row.occurredAt.slice(0, 7);
     const monthMap = byCategory.get(row.categoryName) ?? new Map<string, number>();
-    monthMap.set(monthKey, (monthMap.get(monthKey) ?? 0) + Number(row.amount));
+    monthMap.set(monthKey, (monthMap.get(monthKey) ?? 0) + Number(row.amount) * Number(row.exchangeRate));
     byCategory.set(row.categoryName, monthMap);
   }
 

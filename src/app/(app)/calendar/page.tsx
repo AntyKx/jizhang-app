@@ -9,12 +9,20 @@ import {
   startOfMonth,
   subMonths,
 } from "date-fns";
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, or } from "drizzle-orm";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { db } from "@/db";
-import { categories, transactions } from "@/db/schema";
+import { accounts, categories, sharedExpenses, transactions, userSettings } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
-import { paymentMethodIcon, paymentMethodLabel } from "@/lib/payment-methods";
+import { listAccounts } from "@/lib/account";
+import { PaymentMethodIcon } from "@/components/transactions/payment-method-icon";
 import { CategoryIcon } from "@/components/category-icon";
+import { TodayTransactionRow } from "@/components/record/today-transaction-row";
+import { BearIllustration } from "@/components/bear-illustration";
+import { heatmapLevel, SEQUENTIAL_HEATMAP_STEPS } from "@/components/stats/chart-colors";
+import { Card, CardContent } from "@/components/ui/card";
+import { StaggerList } from "@/components/motion/stagger-list";
+import { getTodayInTaipei } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
@@ -27,136 +35,222 @@ export default async function CalendarPage({
   const userId = await requireUserId();
   const params = await searchParams;
 
-  const today = new Date();
-  const monthDate = params.month ? parse(params.month, "yyyy-MM", new Date()) : today;
+  const today = getTodayInTaipei();
+  const monthDate = params.month ? parse(params.month, "yyyy-MM", today) : today;
   const monthStart = startOfMonth(monthDate);
   const monthEnd = endOfMonth(monthDate);
   const monthKey = format(monthDate, "yyyy-MM");
   const prevMonthKey = format(subMonths(monthDate, 1), "yyyy-MM");
   const nextMonthKey = format(addMonths(monthDate, 1), "yyyy-MM");
-  const selectedDay = params.day ?? null;
+  // Default to today's details on first load so there's no extra tap needed
+  // — but only when today actually falls in the month being viewed; flipping
+  // to a different month shouldn't auto-select a date that isn't shown.
+  const todayKey = format(today, "yyyy-MM-dd");
+  const selectedDay = params.day ?? (monthKey === format(today, "yyyy-MM") ? todayKey : null);
 
-  const monthTransactions = await db
-    .select({
-      id: transactions.id,
-      type: transactions.type,
-      amount: transactions.amount,
-      occurredAt: transactions.occurredAt,
-      merchant: transactions.merchant,
-      note: transactions.note,
-      categoryName: categories.name,
-      categoryIcon: categories.icon,
-      paymentMethod: transactions.paymentMethod,
-    })
-    .from(transactions)
-    .leftJoin(categories, eq(transactions.categoryId, categories.id))
-    .where(
-      and(
-        eq(transactions.userId, userId),
-        gte(transactions.occurredAt, format(monthStart, "yyyy-MM-dd")),
-        lte(transactions.occurredAt, format(monthEnd, "yyyy-MM-dd")),
+  const [monthTransactionRows, userCategories, userAccounts, settingsRows] = await Promise.all([
+    db
+      .select({
+        id: transactions.id,
+        type: transactions.type,
+        amount: transactions.amount,
+        exchangeRate: transactions.exchangeRate,
+        occurredAt: transactions.occurredAt,
+        createdAt: transactions.createdAt,
+        merchant: transactions.merchant,
+        note: transactions.note,
+        categoryId: transactions.categoryId,
+        categoryName: categories.name,
+        categoryIcon: categories.icon,
+        categoryColor: categories.color,
+        paymentMethod: transactions.paymentMethod,
+        accountId: transactions.accountId,
+        accountName: accounts.name,
+        sharedExpenseId: sharedExpenses.id,
+      })
+      .from(transactions)
+      .leftJoin(categories, eq(transactions.categoryId, categories.id))
+      .innerJoin(accounts, eq(transactions.accountId, accounts.id))
+      .leftJoin(sharedExpenses, eq(sharedExpenses.linkedTransactionId, transactions.id))
+      .where(
+        and(
+          eq(transactions.userId, userId),
+          gte(transactions.occurredAt, format(monthStart, "yyyy-MM-dd")),
+          lte(transactions.occurredAt, format(monthEnd, "yyyy-MM-dd")),
+        ),
       ),
-    );
+    db
+      .select({ id: categories.id, name: categories.name, icon: categories.icon, type: categories.type })
+      .from(categories)
+      .where(or(isNull(categories.userId), eq(categories.userId, userId)))
+      .orderBy(categories.sortOrder),
+    listAccounts(userId),
+    db
+      .select({ partnerName: userSettings.partnerName })
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId)),
+  ]);
+
+  const partnerName = settingsRows[0]?.partnerName || "另一半";
+  const monthTransactions = monthTransactionRows.map((t) => ({
+    ...t,
+    isSharedExpense: t.sharedExpenseId !== null,
+  }));
 
   const byDay = new Map<string, { income: number; expense: number }>();
   for (const t of monthTransactions) {
     const entry = byDay.get(t.occurredAt) ?? { income: 0, expense: 0 };
-    if (t.type === "income") entry.income += Number(t.amount);
-    else if (t.type === "expense") entry.expense += Number(t.amount);
+    const amount = Number(t.amount) * Number(t.exchangeRate);
+    if (t.type === "income") entry.income += amount;
+    else if (t.type === "expense") entry.expense += amount;
     byDay.set(t.occurredAt, entry);
   }
 
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const leadingBlanks = getDay(monthStart);
+  const maxExpense = Math.max(0, ...[...byDay.values()].map((e) => e.expense));
 
   const selectedTransactions = selectedDay
     ? monthTransactions.filter((t) => t.occurredAt === selectedDay)
     : [];
+  // `TodayTransactionRow` (tap-to-edit, swipe-to-delete/duplicate, long-press
+  // quick-category — same component the home page's "今天記了 N 筆" list
+  // uses) only understands income/expense; transfers have no single
+  // category/account to edit against, so they keep the simple read-only row
+  // below instead of silently disappearing from the day's details.
+  const editableTransactions = selectedTransactions.filter(
+    (t): t is typeof t & { type: "income" | "expense" } => t.type === "income" || t.type === "expense",
+  );
+  const transferTransactions = selectedTransactions.filter((t) => t.type === "transfer");
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
       <div className="flex items-center justify-between">
         <Link
           href={`/calendar?month=${prevMonthKey}`}
-          className="rounded-full px-3 py-1 text-sm hover:bg-muted"
+          className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label="上個月"
         >
-          ← 上個月
+          <ChevronLeft className="size-5" strokeWidth={1.75} />
         </Link>
         <h1 className="text-xl font-semibold">{format(monthDate, "yyyy 年 M 月")}</h1>
         <Link
           href={`/calendar?month=${nextMonthKey}`}
-          className="rounded-full px-3 py-1 text-sm hover:bg-muted"
+          className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label="下個月"
         >
-          下個月 →
+          <ChevronRight className="size-5" strokeWidth={1.75} />
         </Link>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
-        {weekdays.map((w) => (
-          <div key={w}>{w}</div>
-        ))}
-      </div>
+      <Card>
+        <CardContent className="flex flex-col gap-2">
+          <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
+            {weekdays.map((w) => (
+              <div key={w}>{w}</div>
+            ))}
+          </div>
 
-      <div className="grid grid-cols-7 gap-1">
-        {Array.from({ length: leadingBlanks }).map((_, i) => (
-          <div key={`blank-${i}`} />
-        ))}
-        {days.map((d) => {
-          const key = format(d, "yyyy-MM-dd");
-          const entry = byDay.get(key);
-          const isSelected = selectedDay === key;
-          const isToday = key === format(today, "yyyy-MM-dd");
-          return (
-            <Link
-              key={key}
-              href={`/calendar?month=${monthKey}&day=${key}`}
-              className={cn(
-                "flex flex-col items-center gap-0.5 rounded-xl border p-1.5 text-center transition-colors",
-                isSelected ? "border-primary bg-primary/10" : "border-transparent hover:bg-muted",
-                isToday && !isSelected && "border-primary/40",
-              )}
-            >
-              <span className="text-xs">{format(d, "d")}</span>
-              {entry?.expense ? (
-                <span className="text-[10px] text-destructive">-{Math.round(entry.expense)}</span>
-              ) : null}
-              {entry?.income ? (
-                <span className="text-[10px] text-emerald-600">+{Math.round(entry.income)}</span>
-              ) : null}
-            </Link>
-          );
-        })}
-      </div>
+          <StaggerList className="grid grid-cols-7 gap-1">
+            {Array.from({ length: leadingBlanks }).map((_, i) => (
+              <div key={`blank-${i}`} />
+            ))}
+            {days.map((d) => {
+              const key = format(d, "yyyy-MM-dd");
+              const entry = byDay.get(key);
+              const isSelected = selectedDay === key;
+              const isToday = key === todayKey;
+              const level = heatmapLevel(entry?.expense ?? 0, maxExpense);
+              const titleParts = [
+                entry?.expense ? `支出 ${Math.round(entry.expense).toLocaleString("zh-TW")}` : null,
+                entry?.income ? `收入 ${Math.round(entry.income).toLocaleString("zh-TW")}` : null,
+              ].filter(Boolean);
+              return (
+                <Link
+                  key={key}
+                  href={`/calendar?month=${monthKey}&day=${key}`}
+                  title={titleParts.length > 0 ? `${key}・${titleParts.join("・")}` : key}
+                  className={cn(
+                    "relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl text-center tabular-nums transition-colors",
+                    isSelected
+                      ? "ring-2 ring-primary ring-offset-1 ring-offset-card"
+                      : isToday
+                        ? "ring-1 ring-primary/40"
+                        : "hover:ring-1 hover:ring-muted-foreground/30",
+                  )}
+                  style={level > 0 ? { backgroundColor: SEQUENTIAL_HEATMAP_STEPS[level] } : undefined}
+                >
+                  <span className={cn("text-xs", level >= 3 && "font-medium text-white")}>
+                    {format(d, "d")}
+                  </span>
+                  {entry?.income ? (
+                    <span className="absolute top-1 right-1 size-1.5 rounded-full bg-emerald-500" />
+                  ) : null}
+                </Link>
+              );
+            })}
+          </StaggerList>
+        </CardContent>
+      </Card>
 
       {selectedDay && (
         <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium text-muted-foreground">{selectedDay}</span>
-          {selectedTransactions.length === 0 ? (
-            <p className="text-muted-foreground text-sm">這天沒有記帳紀錄。</p>
-          ) : (
-            <div className="flex flex-col divide-y rounded-2xl border bg-card">
-              {selectedTransactions.map((t) => (
-                <div key={t.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <CategoryIcon icon={t.categoryIcon} className="h-6 w-6 text-xl" />
-                    <span className="text-sm">{t.merchant || t.note || t.categoryName || "（無備註）"}</span>
-                    <span className="text-xs" title={paymentMethodLabel(t.paymentMethod)}>
-                      {paymentMethodIcon(t.paymentMethod)}
-                    </span>
-                  </div>
-                  <span
-                    className={
-                      t.type === "expense"
-                        ? "text-sm font-semibold text-destructive"
-                        : "text-sm font-semibold text-emerald-600"
-                    }
-                  >
-                    {t.type === "expense" ? "-" : "+"}
-                    {Number(t.amount).toLocaleString("zh-TW")}
-                  </span>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-muted-foreground">{selectedDay}</span>
+            {(() => {
+              const dayTotals = byDay.get(selectedDay);
+              if (!dayTotals || (dayTotals.expense === 0 && dayTotals.income === 0)) return null;
+              return (
+                <div className="flex gap-3 text-sm font-semibold tabular-nums">
+                  {dayTotals.expense > 0 && (
+                    <span className="text-destructive">-{Math.round(dayTotals.expense).toLocaleString("zh-TW")}</span>
+                  )}
+                  {dayTotals.income > 0 && (
+                    <span className="text-emerald-600">+{Math.round(dayTotals.income).toLocaleString("zh-TW")}</span>
+                  )}
                 </div>
-              ))}
+              );
+            })()}
+          </div>
+          {selectedTransactions.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-2xl border bg-card p-6 text-center shadow-md shadow-foreground/10">
+              <BearIllustration name="empty" size={96} />
+              <p className="text-muted-foreground text-sm">這天還沒有記帳紀錄喔！</p>
             </div>
+          ) : (
+            <>
+              {editableTransactions.length > 0 && (
+                <StaggerList className="flex flex-col divide-y overflow-hidden rounded-2xl border bg-card">
+                  {editableTransactions.map((t) => (
+                    <TodayTransactionRow
+                      key={t.id}
+                      transaction={t}
+                      categories={userCategories}
+                      accounts={userAccounts.filter((a) => !a.excludeFromNetWorth)}
+                      showAccount={userAccounts.length > 1}
+                      partnerName={partnerName}
+                    />
+                  ))}
+                </StaggerList>
+              )}
+
+              {transferTransactions.length > 0 && (
+                <StaggerList className="flex flex-col divide-y overflow-hidden rounded-2xl border bg-card">
+                  {transferTransactions.map((t) => (
+                    <div key={t.id} className="flex items-center justify-between px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <CategoryIcon icon={t.categoryIcon} className="h-6 w-6 text-xl" />
+                        <span className="text-sm">{t.merchant || t.note || "轉帳"}</span>
+                        <PaymentMethodIcon method={t.paymentMethod} className="text-muted-foreground" />
+                      </div>
+                      <span className="text-sm font-semibold">
+                        {Number(t.amount).toLocaleString("zh-TW")}
+                      </span>
+                    </div>
+                  ))}
+                </StaggerList>
+              )}
+            </>
           )}
         </div>
       )}

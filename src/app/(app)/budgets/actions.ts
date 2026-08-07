@@ -2,10 +2,17 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { and, eq } from "drizzle-orm";
 import { format, startOfMonth } from "date-fns";
 import { db } from "@/db";
 import { budgets } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
+import { getTodayInTaipei } from "@/lib/date";
+
+function revalidateBudgetPaths() {
+  revalidatePath("/budgets");
+  revalidatePath("/stats");
+}
 
 const createBudgetSchema = z.object({
   categoryId: z.string().uuid().optional(),
@@ -23,10 +30,29 @@ export async function createBudget(formData: FormData) {
   await db.insert(budgets).values({
     userId,
     categoryId: parsed.categoryId,
-    month: format(startOfMonth(new Date()), "yyyy-MM-dd"),
+    month: format(startOfMonth(getTodayInTaipei()), "yyyy-MM-dd"),
     limitAmount: parsed.limitAmount.toString(),
   });
 
-  revalidatePath("/budgets");
-  revalidatePath("/stats");
+  revalidateBudgetPaths();
+}
+
+export async function updateBudget(id: string, limitAmount: number) {
+  const userId = await requireUserId();
+  if (!(limitAmount > 0)) throw new Error("預算上限需大於 0");
+
+  await db
+    .update(budgets)
+    .set({ limitAmount: limitAmount.toString() })
+    .where(and(eq(budgets.id, id), eq(budgets.userId, userId)));
+
+  revalidateBudgetPaths();
+}
+
+export async function deleteBudget(id: string) {
+  const userId = await requireUserId();
+
+  await db.delete(budgets).where(and(eq(budgets.id, id), eq(budgets.userId, userId)));
+
+  revalidateBudgetPaths();
 }

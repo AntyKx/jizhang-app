@@ -9,6 +9,9 @@ import { bearIcons } from "@/lib/bear-icons";
 import { CategoryIcon } from "@/components/category-icon";
 import { cn } from "@/lib/utils";
 
+// Temporarily hidden (2026-07-29) — flip back to true to re-expose the tab.
+const AI_ICON_GENERATION_ENABLED = false;
+
 export function IconPicker({
   icon,
   onIconChange,
@@ -68,18 +71,20 @@ export function IconPicker({
         >
           🐻 小熊圖示
         </button>
-        <button
-          type="button"
-          onClick={() => setPickerTab("ai")}
-          className={cn(
-            "border-b-2 pb-1",
-            pickerTab === "ai"
-              ? "border-primary font-medium text-foreground"
-              : "border-transparent text-muted-foreground",
-          )}
-        >
-          🎨 AI 生成
-        </button>
+        {AI_ICON_GENERATION_ENABLED && (
+          <button
+            type="button"
+            onClick={() => setPickerTab("ai")}
+            className={cn(
+              "border-b-2 pb-1",
+              pickerTab === "ai"
+                ? "border-primary font-medium text-foreground"
+                : "border-transparent text-muted-foreground",
+            )}
+          >
+            🎨 AI 生成
+          </button>
+        )}
       </div>
 
       {pickerTab === "emoji" ? (
@@ -118,7 +123,7 @@ export function IconPicker({
             </button>
           ))}
         </div>
-      ) : (
+      ) : AI_ICON_GENERATION_ENABLED ? (
         <div className="flex flex-col gap-3 rounded-xl border p-3">
           <Input
             value={aiDescription}
@@ -140,7 +145,7 @@ export function IconPicker({
             </div>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

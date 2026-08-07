@@ -19,12 +19,40 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createRecurringRule } from "@/app/(app)/subscriptions/actions";
+import { AmountKeypadField } from "@/components/record/amount-keypad-field";
+import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
+import { PaymentMethodIcon } from "@/components/transactions/payment-method-icon";
+import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
+import { paymentMethods, type PaymentMethod } from "@/lib/payment-methods";
+import { accountTypeToPaymentMethod, type AccountType } from "@/lib/account-type";
+import { cn } from "@/lib/utils";
 
-type Category = { id: string; name: string };
+type Category = { id: string; name: string; icon: string | null; type: "income" | "expense" };
+type Account = { id: string; name: string; type: AccountType };
 
-export function CreateRuleDialog({ categories }: { categories: Category[] }) {
+export function CreateRuleDialog({
+  categories,
+  accounts,
+}: {
+  categories: Category[];
+  accounts: Account[];
+}) {
   const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [type, setType] = useState<"income" | "expense">("expense");
+  const [categoryId, setCategoryId] = useState("");
+  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
+  // Most recurring items are auto-debited rather than paid in cash — a
+  // better default than the app-wide "cash" default other amount forms use.
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("auto_debit");
   const formRef = useRef<HTMLFormElement>(null);
+
+  const relevantCategories = categories.filter((c) => c.type === type);
+
+  function selectAccount(account: Account) {
+    setAccountId(account.id);
+    setPaymentMethod(accountTypeToPaymentMethod[account.type]);
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -39,6 +67,11 @@ export function CreateRuleDialog({ categories }: { categories: Category[] }) {
             await createRecurringRule(formData);
             setOpen(false);
             formRef.current?.reset();
+            setAmount("");
+            setType("expense");
+            setCategoryId("");
+            setPaymentMethod("auto_debit");
+            setAccountId(accounts[0]?.id ?? "");
           }}
           className="flex flex-col gap-4"
         >
@@ -52,7 +85,15 @@ export function CreateRuleDialog({ categories }: { categories: Category[] }) {
               <Label htmlFor="type">類型</Label>
               <Select
                 name="type"
-                defaultValue="expense"
+                value={type}
+                onValueChange={(v) => {
+                  if (!v || v === type) return;
+                  setType(v as "income" | "expense");
+                  // A category always belongs to exactly one type — the
+                  // previously selected one can't be valid after switching,
+                  // so clear it instead of silently saving a mismatch.
+                  setCategoryId("");
+                }}
                 items={{ expense: "支出", income: "收入" }}
               >
                 <SelectTrigger id="type">
@@ -65,8 +106,9 @@ export function CreateRuleDialog({ categories }: { categories: Category[] }) {
               </Select>
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="amount">金額</Label>
-              <Input id="amount" name="amount" type="number" step="0.01" required />
+              <Label>金額</Label>
+              <AmountKeypadField value={amount} onChange={setAmount} />
+              <input type="hidden" name="amount" value={amount} />
             </div>
           </div>
 
@@ -96,30 +138,62 @@ export function CreateRuleDialog({ categories }: { categories: Category[] }) {
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="categoryId">分類（選填）</Label>
-            <Select
-              name="categoryId"
-              items={Object.fromEntries(categories.map((c) => [c.id, c.name]))}
-            >
-              <SelectTrigger id="categoryId">
-                <SelectValue placeholder="不指定" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>分類（選填）</Label>
+            <CategoryPickerSheet categories={relevantCategories} value={categoryId} onChange={setCategoryId} placeholder="不指定" />
+            <input type="hidden" name="categoryId" value={categoryId} />
           </div>
 
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="isSubscription" className="size-4" />
-            這是一項訂閱服務
-          </label>
+          <div className="flex flex-col gap-2">
+            <Label>付款方式</Label>
+            <div className="flex flex-wrap gap-2">
+              {paymentMethods.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => setPaymentMethod(p.value)}
+                  className={cn(
+                    "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm transition-colors",
+                    paymentMethod === p.value
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  <PaymentMethodIcon method={p.value} />
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <input type="hidden" name="paymentMethod" value={paymentMethod} />
+          </div>
 
-          <Button type="submit">建立</Button>
+          {accounts.length > 1 && (
+            <div className="flex flex-col gap-2">
+              <Label>帳戶</Label>
+              <div className="flex flex-wrap gap-2">
+                {accounts.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => selectAccount(a)}
+                    className={cn(
+                      "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm transition-colors",
+                      accountId === a.id
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:bg-muted",
+                    )}
+                  >
+                    <AccountTypeIcon type={a.type} className="size-3.5" />
+                    {a.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <input type="hidden" name="accountId" value={accountId} />
+
+          <Button type="submit" disabled={!amount || Number(amount) <= 0}>
+            建立
+          </Button>
         </form>
       </DialogContent>
     </Dialog>

@@ -9,7 +9,13 @@ export default async function CategoriesPage() {
   const userId = await requireUserId();
 
   const userCategories = await db
-    .select({ id: categories.id, name: categories.name, icon: categories.icon, type: categories.type })
+    .select({
+      id: categories.id,
+      name: categories.name,
+      icon: categories.icon,
+      type: categories.type,
+      userId: categories.userId,
+    })
     .from(categories)
     .where(or(isNull(categories.userId), eq(categories.userId, userId)))
     .orderBy(categories.sortOrder);
@@ -23,7 +29,9 @@ export default async function CategoriesPage() {
         <h1 className="text-2xl font-semibold">分類管理</h1>
         <CreateCategoryDialog />
       </div>
-      <p className="text-xs text-muted-foreground">點圖示可編輯、點右上角 ✕ 可刪除、按住拖曳可排序</p>
+      <p className="text-xs text-muted-foreground">
+        點圖示可編輯、點右上角 ✕ 可刪除、按住拖曳可排序（系統預設分類無法編輯或刪除）
+      </p>
 
       <div className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-muted-foreground">支出分類</h2>

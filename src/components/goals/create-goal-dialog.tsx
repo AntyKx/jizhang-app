@@ -12,9 +12,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createGoal } from "@/app/(app)/goals/actions";
+import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 
 export function CreateGoalDialog() {
   const [open, setOpen] = useState(false);
+  const [targetAmount, setTargetAmount] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
   return (
@@ -30,6 +32,7 @@ export function CreateGoalDialog() {
             await createGoal(formData);
             setOpen(false);
             formRef.current?.reset();
+            setTargetAmount("");
           }}
           className="flex flex-col gap-4"
         >
@@ -38,14 +41,17 @@ export function CreateGoalDialog() {
             <Input id="name" name="name" placeholder="例：日本旅遊基金" required />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="targetAmount">目標金額</Label>
-            <Input id="targetAmount" name="targetAmount" type="number" step="0.01" required />
+            <Label>目標金額</Label>
+            <AmountKeypadField value={targetAmount} onChange={setTargetAmount} />
+            <input type="hidden" name="targetAmount" value={targetAmount} />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="targetDate">目標日期（選填）</Label>
             <Input id="targetDate" name="targetDate" type="date" />
           </div>
-          <Button type="submit">建立</Button>
+          <Button type="submit" disabled={!targetAmount || Number(targetAmount) <= 0}>
+            建立
+          </Button>
         </form>
       </DialogContent>
     </Dialog>

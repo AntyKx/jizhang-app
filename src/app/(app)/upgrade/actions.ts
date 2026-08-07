@@ -1,0 +1,81 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { currentUser } from "@clerk/nextjs/server";
+import { db } from "@/db";
+import { userSettings } from "@/db/schema";
+import { requireUserId } from "@/lib/auth";
+import { getSiteOrigin, stripe } from "@/lib/stripe";
+
+async function getOrCreateStripeCustomerId(userId: string): Promise<string> {
+  const [row] = await db
+    .select({ stripeCustomerId: userSettings.stripeCustomerId })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId));
+  if (row?.stripeCustomerId) return row.stripeCustomerId;
+
+  const user = await currentUser();
+  const customer = await stripe.customers.create({
+    email: user?.primaryEmailAddress?.emailAddress,
+    metadata: { userId },
+  });
+
+  await db
+    .insert(userSettings)
+    .values({ userId, stripeCustomerId: customer.id })
+    .onConflictDoUpdate({ target: userSettings.userId, set: { stripeCustomerId: customer.id } });
+
+  return customer.id;
+}
+
+export async function createCoreCheckoutSession() {
+  const userId = await requireUserId();
+  const customerId = await getOrCreateStripeCustomerId(userId);
+  const origin = await getSiteOrigin();
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer: customerId,
+    client_reference_id: userId,
+    line_items: [{ price: process.env.STRIPE_PRICE_CORE_UNLOCK!, quantity: 1 }],
+    success_url: `${origin}/upgrade?status=success`,
+    cancel_url: `${origin}/upgrade?status=canceled`,
+  });
+
+  redirect(session.url!);
+}
+
+export async function createAiSubscriptionCheckoutSession() {
+  const userId = await requireUserId();
+  const customerId = await getOrCreateStripeCustomerId(userId);
+  const origin = await getSiteOrigin();
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "subscription",
+    customer: customerId,
+    client_reference_id: userId,
+    line_items: [{ price: process.env.STRIPE_PRICE_AI_SUBSCRIPTION!, quantity: 1 }],
+    success_url: `${origin}/upgrade?status=success`,
+    cancel_url: `${origin}/upgrade?status=canceled`,
+  });
+
+  redirect(session.url!);
+}
+
+export async function createBillingPortalSession() {
+  const userId = await requireUserId();
+  const [row] = await db
+    .select({ stripeCustomerId: userSettings.stripeCustomerId })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId));
+  if (!row?.stripeCustomerId) throw new Error("尚未建立訂閱");
+
+  const origin = await getSiteOrigin();
+  const session = await stripe.billingPortal.sessions.create({
+    customer: row.stripeCustomerId,
+    return_url: `${origin}/upgrade`,
+  });
+
+  redirect(session.url);
+}

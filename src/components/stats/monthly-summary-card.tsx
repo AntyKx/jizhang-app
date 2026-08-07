@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BearIllustration } from "@/components/bear-illustration";
 
 export function MonthlySummaryCard() {
   const [summary, setSummary] = useState<string | null>(null);
@@ -29,9 +30,16 @@ export function MonthlySummaryCard() {
           {loading ? "分析中…" : summary ? "重新產生" : "產生摘要"}
         </Button>
       </CardHeader>
-      {summary && (
+      {summary ? (
         <CardContent>
           <p className="text-sm leading-relaxed">{summary}</p>
+        </CardContent>
+      ) : (
+        <CardContent className="flex flex-col items-center gap-2 text-center">
+          <BearIllustration name="ai-analysis" size={80} />
+          <p className="text-sm text-muted-foreground">
+            讓小熊幫你分析這個月的收支，點上面的「產生摘要」試試看！
+          </p>
         </CardContent>
       )}
     </Card>

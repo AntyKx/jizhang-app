@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { contributeToGoal } from "@/app/(app)/goals/actions";
 
 export function ContributeForm({ goalId }: { goalId: string }) {
@@ -11,13 +11,10 @@ export function ContributeForm({ goalId }: { goalId: string }) {
 
   return (
     <div className="flex gap-2">
-      <Input
-        type="number"
-        step="0.01"
-        placeholder="存入金額"
+      <AmountKeypadField
         value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        className="h-8"
+        onChange={setAmount}
+        className="h-8 flex-1 rounded-md text-sm font-normal"
       />
       <Button
         size="sm"

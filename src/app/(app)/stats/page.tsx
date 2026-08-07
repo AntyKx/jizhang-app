@@ -1,225 +1,168 @@
-import { format, startOfMonth, endOfMonth } from "date-fns";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/db";
-import { budgets, categories, savingsGoals, transactions, userSettings } from "@/db/schema";
+import { transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { detectSpendingAnomalies } from "@/lib/analytics";
-import { paymentMethodColor, paymentMethodIcon, paymentMethodLabel } from "@/lib/payment-methods";
+import { resolveStatsRange } from "@/lib/stats/range";
+import { getPreviousPeriodTotals } from "@/lib/stats/overview-queries";
+import { getCategoryBreakdown } from "@/lib/stats/category-queries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { MonthlySummaryCard } from "@/components/stats/monthly-summary-card";
-import { CategoryBreakdown } from "@/components/stats/category-breakdown";
+import { CollapsibleProgressList } from "@/components/stats/collapsible-progress-list";
+import { StatsTabNav } from "@/components/stats/stats-tab-nav";
+import { StatsRangeSwitcher } from "@/components/stats/stats-range-switcher";
+import { CategoryIcon } from "@/components/category-icon";
+import { StaggerList } from "@/components/motion/stagger-list";
+import { CountUpNumber } from "@/components/motion/count-up-number";
+import { BearIllustration } from "@/components/bear-illustration";
+import { cn } from "@/lib/utils";
 
-export default async function StatsPage() {
+export default async function StatsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string; date?: string }>;
+}) {
   const userId = await requireUserId();
+  const params = await searchParams;
+  const range = resolveStatsRange(params);
 
-  const monthStart = format(startOfMonth(new Date()), "yyyy-MM-dd");
-  const monthEnd = format(endOfMonth(new Date()), "yyyy-MM-dd");
-
-  const [monthTransactions, settings, goals, monthBudgets, anomalies] = await Promise.all([
+  const [rangeTransactions, anomalies, prevTotals, expenseCategories] = await Promise.all([
     db
-      .select({
-        type: transactions.type,
-        amount: transactions.amount,
-        categoryId: transactions.categoryId,
-        categoryName: categories.name,
-        categoryIcon: categories.icon,
-        categoryColor: categories.color,
-        paymentMethod: transactions.paymentMethod,
-      })
+      .select({ type: transactions.type, amount: transactions.amount, exchangeRate: transactions.exchangeRate })
       .from(transactions)
-      .leftJoin(categories, eq(transactions.categoryId, categories.id))
       .where(
         and(
           eq(transactions.userId, userId),
-          gte(transactions.occurredAt, monthStart),
-          lte(transactions.occurredAt, monthEnd),
+          gte(transactions.occurredAt, range.startStr),
+          lte(transactions.occurredAt, range.endStr),
         ),
       ),
-    db.select().from(userSettings).where(eq(userSettings.userId, userId)),
-    db
-      .select()
-      .from(savingsGoals)
-      .where(and(eq(savingsGoals.userId, userId), eq(savingsGoals.isCompleted, false)))
-      .limit(3),
-    db
-      .select({
-        id: budgets.id,
-        categoryId: budgets.categoryId,
-        limitAmount: budgets.limitAmount,
-        categoryName: categories.name,
-      })
-      .from(budgets)
-      .leftJoin(categories, eq(budgets.categoryId, categories.id))
-      .where(and(eq(budgets.userId, userId), eq(budgets.month, monthStart))),
-    detectSpendingAnomalies(userId),
+    detectSpendingAnomalies(userId, range.end),
+    getPreviousPeriodTotals(userId, range),
+    getCategoryBreakdown(userId, range, "expense"),
   ]);
 
-  const income = monthTransactions
+  const income = rangeTransactions
     .filter((t) => t.type === "income")
-    .reduce((sum, t) => sum + Number(t.amount), 0);
-  const expense = monthTransactions
+    .reduce((sum, t) => sum + Number(t.amount) * Number(t.exchangeRate), 0);
+  const expense = rangeTransactions
     .filter((t) => t.type === "expense")
-    .reduce((sum, t) => sum + Number(t.amount), 0);
+    .reduce((sum, t) => sum + Number(t.amount) * Number(t.exchangeRate), 0);
+  const balance = income - expense;
 
-  const spentByCategory = new Map<string, number>();
-  const categoryMeta = new Map<string, { icon: string | null; color: string }>();
-  for (const t of monthTransactions) {
-    if (t.type !== "expense" || !t.categoryId || !t.categoryName) continue;
-    spentByCategory.set(t.categoryId, (spentByCategory.get(t.categoryId) ?? 0) + Number(t.amount));
-    categoryMeta.set(t.categoryId, {
-      icon: t.categoryIcon,
-      color: t.categoryColor ?? "#6366f1",
-    });
-  }
-  const breakdownRows = [...spentByCategory.entries()]
-    .map(([categoryId, amount]) => {
-      const tx = monthTransactions.find((t) => t.categoryId === categoryId);
-      return {
-        name: tx?.categoryName ?? "未分類",
-        icon: categoryMeta.get(categoryId)?.icon ?? null,
-        color: categoryMeta.get(categoryId)?.color ?? "#6366f1",
-        amount,
-      };
-    })
-    .sort((a, b) => b.amount - a.amount);
-
-  const spentByPaymentMethod = new Map<string, number>();
-  for (const t of monthTransactions) {
-    if (t.type !== "expense") continue;
-    spentByPaymentMethod.set(
-      t.paymentMethod,
-      (spentByPaymentMethod.get(t.paymentMethod) ?? 0) + Number(t.amount),
-    );
-  }
-  const paymentBreakdownRows = [...spentByPaymentMethod.entries()]
-    .map(([method, amount]) => ({
-      name: paymentMethodLabel(method),
-      icon: paymentMethodIcon(method),
-      color: paymentMethodColor(method),
-      amount,
-    }))
-    .sort((a, b) => b.amount - a.amount);
-
-  const streak = settings[0]?.currentStreak ?? 0;
+  const topCategory = expenseCategories[0] ?? null;
+  const expensePctChange = prevTotals.expense > 0 ? ((expense - prevTotals.expense) / prevTotals.expense) * 100 : null;
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">統計</h1>
+    <>
+      <StatsTabNav active="/stats" />
+      <StatsRangeSwitcher basePath="/stats" range={range} />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-muted-foreground text-sm font-normal">本月收入</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold text-emerald-600">
-            {income.toLocaleString("zh-TW")}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-muted-foreground text-sm font-normal">本月支出</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold text-destructive">
-            {expense.toLocaleString("zh-TW")}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-muted-foreground text-sm font-normal">連續記帳天數</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">🔥 {streak} 天</CardContent>
-        </Card>
-      </div>
-
-      <MonthlySummaryCard />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>本月支出分類</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CategoryBreakdown rows={breakdownRows} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>本月付款方式</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CategoryBreakdown rows={paymentBreakdownRows} />
-        </CardContent>
-      </Card>
-
-      {anomalies.length > 0 && (
-        <Card className="border-amber-500/50">
-          <CardHeader>
-            <CardTitle className="text-amber-600">消費異常提醒</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            {anomalies.map((a) => (
-              <div key={a.categoryName} className="flex justify-between text-sm">
-                <span>{a.categoryName}</span>
-                <span className="text-amber-600">
-                  本月 {Math.round(a.thisMonth).toLocaleString("zh-TW")}，較平均高{" "}
-                  {Math.round(a.pctChange * 100)}%
-                </span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+      {rangeTransactions.length === 0 && (
+        <div className="flex flex-col items-center gap-2 rounded-2xl border bg-card p-6 text-center shadow-md shadow-foreground/10">
+          <BearIllustration name="reports" size={96} />
+          <p className="text-muted-foreground text-sm">這段時間還沒有任何紀錄，開始記帳來看看你的第一份報表吧！</p>
+        </div>
       )}
 
-      {monthBudgets.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>本月預算</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            {monthBudgets.map((b) => {
-              const spent = b.categoryId ? spentByCategory.get(b.categoryId) ?? 0 : expense;
-              const pct = Math.min(100, (spent / Number(b.limitAmount)) * 100);
-              return (
-                <div key={b.id} className="flex flex-col gap-1">
-                  <div className="flex justify-between text-sm">
-                    <span>{b.categoryName ?? "整體預算"}</span>
-                    <span className={pct >= 100 ? "text-destructive" : "text-muted-foreground"}>
-                      {spent.toLocaleString("zh-TW")} / {Number(b.limitAmount).toLocaleString("zh-TW")}
-                    </span>
+      <StaggerList className="flex flex-col gap-6">
+        <div className="grid grid-cols-3 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-muted-foreground text-sm font-normal">收入</CardTitle>
+            </CardHeader>
+            <CardContent className="text-2xl font-semibold text-emerald-600">
+              <CountUpNumber value={income} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-muted-foreground text-sm font-normal">支出</CardTitle>
+            </CardHeader>
+            <CardContent className="text-2xl font-semibold text-destructive">
+              <CountUpNumber value={expense} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-muted-foreground text-sm font-normal">結餘</CardTitle>
+            </CardHeader>
+            <CardContent className={cn("text-2xl font-semibold", balance >= 0 ? "text-emerald-600" : "text-destructive")}>
+              <CountUpNumber value={balance} />
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-muted-foreground text-sm font-normal">最大支出分類</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {topCategory ? (
+                <div className="flex items-center gap-2">
+                  <CategoryIcon icon={topCategory.icon} className="h-8 w-8 text-2xl" />
+                  <div>
+                    <p className="font-semibold">{topCategory.name}</p>
+                    <p className="text-muted-foreground text-sm">
+                      <CountUpNumber value={topCategory.amount} />（{Math.round(topCategory.pct)}%）
+                    </p>
                   </div>
-                  <Progress value={pct} />
                 </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
+              ) : (
+                <p className="text-muted-foreground text-sm">這段時間還沒有支出紀錄</p>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-muted-foreground text-sm font-normal">支出與上期比較</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {expensePctChange === null ? (
+                <p className="text-muted-foreground text-sm">上一期沒有支出紀錄可比較</p>
+              ) : (
+                <p
+                  className={cn(
+                    "text-2xl font-semibold tabular-nums",
+                    expensePctChange > 0 ? "text-destructive" : "text-emerald-600",
+                  )}
+                >
+                  {expensePctChange > 0 ? "↑" : expensePctChange < 0 ? "↓" : ""}
+                  {Math.abs(Math.round(expensePctChange))}%
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-      {goals.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>儲蓄目標</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            {goals.map((g) => {
-              const pct = Math.min(100, (Number(g.currentAmount) / Number(g.targetAmount)) * 100);
-              return (
-                <div key={g.id} className="flex flex-col gap-1">
-                  <div className="flex justify-between text-sm">
-                    <span>{g.name}</span>
-                    <span className="text-muted-foreground">
-                      {Number(g.currentAmount).toLocaleString("zh-TW")} /{" "}
-                      {Number(g.targetAmount).toLocaleString("zh-TW")}
-                    </span>
-                  </div>
-                  <Progress value={pct} />
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
-    </div>
+        <MonthlySummaryCard />
+
+        {anomalies.length > 0 && (
+          <Card className="border-amber-500/50">
+            <CardHeader>
+              <CardTitle className="text-amber-600">消費異常提醒</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CollapsibleProgressList
+                gapClassName="gap-2"
+                items={anomalies.map((a) => ({
+                  key: a.categoryName,
+                  node: (
+                    <div className="flex justify-between text-sm">
+                      <span>{a.categoryName}</span>
+                      <span className="text-amber-600 tabular-nums">
+                        本月 {Math.round(a.thisMonth).toLocaleString("zh-TW")}，較平均高{" "}
+                        {Math.round(a.pctChange * 100)}%
+                      </span>
+                    </div>
+                  ),
+                }))}
+              />
+            </CardContent>
+          </Card>
+        )}
+      </StaggerList>
+    </>
   );
 }

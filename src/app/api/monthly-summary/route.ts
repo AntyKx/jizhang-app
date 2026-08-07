@@ -6,6 +6,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { categories, transactions } from "@/db/schema";
 import { detectSpendingAnomalies } from "@/lib/analytics";
+import { getTodayInTaipei } from "@/lib/date";
 
 export async function POST() {
   const { userId } = await auth();
@@ -13,7 +14,7 @@ export async function POST() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const now = new Date();
+  const now = getTodayInTaipei();
   const thisMonthStart = format(startOfMonth(now), "yyyy-MM-dd");
   const thisMonthEnd = format(endOfMonth(now), "yyyy-MM-dd");
   const lastMonth = subMonths(now, 1);
@@ -25,6 +26,7 @@ export async function POST() {
       .select({
         type: transactions.type,
         amount: transactions.amount,
+        exchangeRate: transactions.exchangeRate,
         categoryName: categories.name,
       })
       .from(transactions)
@@ -37,7 +39,7 @@ export async function POST() {
         ),
       ),
     db
-      .select({ type: transactions.type, amount: transactions.amount })
+      .select({ type: transactions.type, amount: transactions.amount, exchangeRate: transactions.exchangeRate })
       .from(transactions)
       .where(
         and(
@@ -46,7 +48,7 @@ export async function POST() {
           lte(transactions.occurredAt, lastMonthEnd),
         ),
       ),
-    detectSpendingAnomalies(userId),
+    detectSpendingAnomalies(userId, now),
   ]);
 
   if (thisMonthTx.length === 0) {
@@ -55,8 +57,8 @@ export async function POST() {
     });
   }
 
-  const sum = (rows: { type: string; amount: string }[], type: string) =>
-    rows.filter((r) => r.type === type).reduce((s, r) => s + Number(r.amount), 0);
+  const sum = (rows: { type: string; amount: string; exchangeRate: string }[], type: string) =>
+    rows.filter((r) => r.type === type).reduce((s, r) => s + Number(r.amount) * Number(r.exchangeRate), 0);
 
   const thisIncome = sum(thisMonthTx, "income");
   const thisExpense = sum(thisMonthTx, "expense");
@@ -66,7 +68,8 @@ export async function POST() {
   const categoryTotals = new Map<string, number>();
   for (const t of thisMonthTx) {
     if (t.type !== "expense" || !t.categoryName) continue;
-    categoryTotals.set(t.categoryName, (categoryTotals.get(t.categoryName) ?? 0) + Number(t.amount));
+    const amount = Number(t.amount) * Number(t.exchangeRate);
+    categoryTotals.set(t.categoryName, (categoryTotals.get(t.categoryName) ?? 0) + amount);
   }
   const topCategories = [...categoryTotals.entries()]
     .sort((a, b) => b[1] - a[1])

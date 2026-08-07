@@ -9,7 +9,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -19,11 +18,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createBudget } from "@/app/(app)/budgets/actions";
+import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 
 type Category = { id: string; name: string };
 
 export function CreateBudgetDialog({ categories }: { categories: Category[] }) {
   const [open, setOpen] = useState(false);
+  const [limitAmount, setLimitAmount] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
   return (
@@ -39,6 +40,7 @@ export function CreateBudgetDialog({ categories }: { categories: Category[] }) {
             await createBudget(formData);
             setOpen(false);
             formRef.current?.reset();
+            setLimitAmount("");
           }}
           className="flex flex-col gap-4"
         >
@@ -63,16 +65,13 @@ export function CreateBudgetDialog({ categories }: { categories: Category[] }) {
             </Select>
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="limitAmount">預算上限</Label>
-            <Input
-              id="limitAmount"
-              name="limitAmount"
-              type="number"
-              step="0.01"
-              required
-            />
+            <Label>預算上限</Label>
+            <AmountKeypadField value={limitAmount} onChange={setLimitAmount} />
+            <input type="hidden" name="limitAmount" value={limitAmount} />
           </div>
-          <Button type="submit">建立</Button>
+          <Button type="submit" disabled={!limitAmount || Number(limitAmount) <= 0}>
+            建立
+          </Button>
         </form>
       </DialogContent>
     </Dialog>
