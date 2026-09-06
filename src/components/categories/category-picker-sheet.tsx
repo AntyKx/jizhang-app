@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { BottomSheet, BottomSheetContent, BottomSheetTitle } from "@/components/ui/bottom-sheet";
-import { CategoryIcon } from "@/components/category-icon";
+import { CategoryIcon, CategoryIconBadge } from "@/components/category-icon";
 import { cn } from "@/lib/utils";
 
 export type PickerCategory = { id: string; name: string; icon?: string | null };
@@ -62,17 +62,19 @@ export function CategoryPickerSheet({
       <BottomSheet open={open} onOpenChange={setOpen}>
         <BottomSheetContent>
           <BottomSheetTitle>選擇分類</BottomSheetTitle>
-          <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
+          <div className="grid grid-cols-5 gap-2 sm:grid-cols-6">
             <button
               type="button"
               onClick={() => pick("")}
               className={cn(
-                "flex flex-col items-center gap-0.5 rounded-2xl border bg-card p-2 shadow-sm transition-shadow hover:shadow-md",
-                !value && "border-primary bg-primary/10",
+                "flex flex-col items-center gap-1 rounded-lg p-1 transition-colors hover:bg-muted/60",
+                !value && "bg-primary/10",
               )}
             >
-              <span className="flex h-16 w-16 items-center justify-center text-2xl text-muted-foreground">—</span>
-              <span className="text-xs text-muted-foreground">不指定</span>
+              <span className="flex h-11 w-11 items-center justify-center rounded-md bg-muted text-base text-muted-foreground">
+                —
+              </span>
+              <span className="text-[11px] text-muted-foreground">不指定</span>
             </button>
             {categories.map((c) => (
               <button
@@ -80,12 +82,12 @@ export function CategoryPickerSheet({
                 type="button"
                 onClick={() => pick(c.id)}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-2xl border bg-card p-2 shadow-sm transition-shadow hover:shadow-md",
-                  value === c.id && "border-primary bg-primary/10",
+                  "flex flex-col items-center gap-1 rounded-lg p-1 transition-colors hover:bg-muted/60",
+                  value === c.id && "bg-primary/10",
                 )}
               >
-                <CategoryIcon icon={c.icon ?? null} className="h-16 w-16 text-3xl" />
-                <span className="text-xs text-muted-foreground">{c.name}</span>
+                <CategoryIconBadge icon={c.icon ?? null} className="h-11 w-11" iconClassName="h-5 w-5" />
+                <span className="text-[11px] text-muted-foreground">{c.name}</span>
               </button>
             ))}
           </div>

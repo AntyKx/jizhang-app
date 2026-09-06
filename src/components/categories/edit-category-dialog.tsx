@@ -39,9 +39,13 @@ export function EditCategoryDialog({
   function handleSave() {
     if (!category || !name.trim() || !icon) return;
     startTransition(async () => {
-      await updateCategory({ id: category.id, name: name.trim(), icon });
-      toast.success("已更新分類");
-      onClose();
+      try {
+        await updateCategory({ id: category.id, name: name.trim(), icon });
+        toast.success("已更新分類");
+        onClose();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "更新分類失敗");
+      }
     });
   }
 

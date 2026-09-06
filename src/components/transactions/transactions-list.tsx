@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { format, parse } from "date-fns";
 import { Repeat2, Trash2 } from "lucide-react";
-import { CategoryIcon } from "@/components/category-icon";
+import { CategoryIconBadge } from "@/components/category-icon";
 import { CategoryPill } from "@/components/transactions/category-pill";
 import { OTHER_COLOR } from "@/components/stats/chart-colors";
 import { BearIllustration } from "@/components/bear-illustration";
@@ -28,6 +28,7 @@ import type {
   ListItem,
   RegularItem,
   TransactionsCursor,
+  TransactionsFilter,
   TransferListItem,
 } from "@/lib/transactions/list-types";
 
@@ -131,7 +132,12 @@ function RegularRow({
     >
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
-          <CategoryIcon icon={item.categoryIcon} className="h-6 w-6 text-xl" />
+          <CategoryIconBadge
+            icon={item.categoryIcon}
+            color={item.categoryColor ?? OTHER_COLOR}
+            className="h-8 w-8"
+            iconClassName="h-4 w-4"
+          />
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
               <span className="font-medium">{item.merchant || item.note || "（無備註）"}</span>
@@ -178,6 +184,7 @@ export function TransactionsList({
   accountsById,
   initialCursor,
   partnerName,
+  filter,
 }: {
   items: ListItem[];
   categories: Category[];
@@ -185,6 +192,10 @@ export function TransactionsList({
   accountsById: Record<string, AccountInfo>;
   initialCursor: TransactionsCursor | null;
   partnerName: string;
+  // Category/date-range narrowing carried over into "load more" so paging
+  // stays inside the same filtered set the server already applied to
+  // `items` — see /transactions's page.tsx.
+  filter?: TransactionsFilter;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -193,11 +204,24 @@ export function TransactionsList({
   const [cursor, setCursor] = useState(initialCursor);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  // `items`/`cursor` only read initialItems/initialCursor on first mount —
+  // a parent re-render with a genuinely new server result (switching the
+  // account's month, or any router.refresh() after a mutation) otherwise
+  // left this list frozen on whatever it first loaded. Render-phase reset
+  // (same pattern as EditTransactionDialog/AddSharedExpenseDialog) rather
+  // than useEffect, so there's no stale-data flash before the sync runs.
+  const [prevInitialItems, setPrevInitialItems] = useState(initialItems);
+  if (initialItems !== prevInitialItems) {
+    setPrevInitialItems(initialItems);
+    setItems(initialItems);
+    setCursor(initialCursor);
+  }
+
   async function handleLoadMore() {
     if (!cursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const page = await loadMoreTransactions(cursor);
+      const page = await loadMoreTransactions(cursor, filter);
       setItems((prev) => [...prev, ...page.items]);
       setCursor(page.nextCursor);
     } catch (err) {
@@ -264,6 +288,7 @@ export function TransactionsList({
         note: selected.note,
         occurredAt: selected.occurredAt,
         isSharedExpense: selected.isSharedExpense,
+        paidByMe: selected.paidByMe,
       }
     : null;
 

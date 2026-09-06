@@ -43,6 +43,7 @@ export type EditableTransaction = {
   note: string | null;
   occurredAt: string;
   isSharedExpense: boolean;
+  paidByMe: boolean;
 };
 
 export function EditTransactionDialog({
@@ -67,10 +68,10 @@ export function EditTransactionDialog({
   const [categoryId, setCategoryId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [accountId, setAccountId] = useState("");
-  const [merchant, setMerchant] = useState("");
   const [note, setNote] = useState("");
   const [occurredAt, setOccurredAt] = useState("");
   const [isSharedExpense, setIsSharedExpense] = useState(false);
+  const [paidByMe, setPaidByMe] = useState(true);
   const [pending, startTransition] = useTransition();
 
   // Re-seed the form from `transaction` right when the dialog opens, rather
@@ -87,10 +88,10 @@ export function EditTransactionDialog({
       setCategoryId(transaction.categoryId ?? "");
       setPaymentMethod(transaction.paymentMethod);
       setAccountId(transaction.accountId);
-      setMerchant(transaction.merchant ?? "");
       setNote(transaction.note ?? "");
       setOccurredAt(transaction.occurredAt);
       setIsSharedExpense(transaction.isSharedExpense);
+      setPaidByMe(transaction.paidByMe);
     }
   }
 
@@ -112,10 +113,14 @@ export function EditTransactionDialog({
           amount: Number(amount),
           paymentMethod,
           accountId,
-          merchant: merchant || null,
+          // No UI to edit this here (see 商家 field removal) — pass the
+          // original value straight through so saving other fields doesn't
+          // clobber it.
+          merchant: transaction.merchant,
           note: note || null,
           occurredAt,
           isSharedExpense: type === "expense" ? isSharedExpense : undefined,
+          paidByMe: type === "expense" ? paidByMe : undefined,
         });
         toast.success("已更新交易");
         onSaved();
@@ -185,28 +190,33 @@ export function EditTransactionDialog({
             <CategoryPickerSheet categories={relevantCategories} value={categoryId} onChange={setCategoryId} />
           </div>
 
-          <div className="flex flex-col gap-2">
-            <Label>付款方式</Label>
-            <div className="flex flex-wrap gap-2">
-              {paymentMethods.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => setPaymentMethod(p.value)}
-                  className={
-                    paymentMethod === p.value
-                      ? "flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-3 py-1.5 text-sm text-primary"
-                      : "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
-                  }
-                >
-                  <PaymentMethodIcon method={p.value} />
-                  {p.label}
-                </button>
-              ))}
+          {/* A partner-paid share never touches any of my accounts (see
+              updateTransaction, which deletes the underlying transaction
+              entirely in that case) — 付款方式/帳戶 would be misleading. */}
+          {!(type === "expense" && isSharedExpense && !paidByMe) && (
+            <div className="flex flex-col gap-2">
+              <Label>付款方式</Label>
+              <div className="flex flex-wrap gap-2">
+                {paymentMethods.map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setPaymentMethod(p.value)}
+                    className={
+                      paymentMethod === p.value
+                        ? "flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-3 py-1.5 text-sm text-primary"
+                        : "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+                    }
+                  >
+                    <PaymentMethodIcon method={p.value} />
+                    {p.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {accounts.length > 1 && (
+          {accounts.length > 1 && !(type === "expense" && isSharedExpense && !paidByMe) && (
             <div className="flex flex-col gap-2">
               <Label>帳戶</Label>
               <div className="flex flex-wrap gap-2">
@@ -234,6 +244,8 @@ export function EditTransactionDialog({
             <SharedExpenseToggle
               checked={isSharedExpense}
               onChange={setIsSharedExpense}
+              paidByMe={paidByMe}
+              onPaidByMeChange={setPaidByMe}
               partnerName={partnerName}
             />
           )}
@@ -246,19 +258,6 @@ export function EditTransactionDialog({
               value={occurredAt}
               onChange={(e) => setOccurredAt(e.target.value)}
             />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="edit-merchant">商家（選填）</Label>
-            <Input
-              id="edit-merchant"
-              value={merchant}
-              onChange={(e) => setMerchant(e.target.value)}
-              placeholder="例：麥當勞"
-            />
-            <p className="text-xs text-muted-foreground">
-              明細列表的標題優先顯示商家，沒有商家時才會顯示備註。
-            </p>
           </div>
 
           <div className="flex flex-col gap-2">

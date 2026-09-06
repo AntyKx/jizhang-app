@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createTransaction, deleteTransaction } from "@/app/(app)/transactions/actions";
+import { createTransaction, deleteTransaction, deleteUnlinkedSharedExpense } from "@/app/(app)/transactions/actions";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
 import { paymentMethods, type PaymentMethod } from "@/lib/payment-methods";
@@ -71,6 +71,7 @@ export function TextQuickAdd({
   const [parsing, setParsing] = useState(false);
   const [parseFailed, setParseFailed] = useState(false);
   const [isSharedExpense, setIsSharedExpense] = useState(false);
+  const [paidByMe, setPaidByMe] = useState(true);
   const [pending, startTransition] = useTransition();
 
   async function handleParse(overrideText?: string) {
@@ -136,6 +137,10 @@ export function TextQuickAdd({
 
   function handleConfirm() {
     if (!draft) return;
+    // Partner-paid shared expenses don't create a real transaction (see
+    // createTransaction) — captured up front so the undo action below still
+    // knows which delete function to call.
+    const isPartnerPaidShare = draft.type === "expense" && isSharedExpense && !paidByMe;
     startTransition(async () => {
       let created: { id: string };
       try {
@@ -155,6 +160,7 @@ export function TextQuickAdd({
           note: draft.note ?? undefined,
           occurredAt: draft.occurredAt,
           isSharedExpense: draft.type === "expense" ? isSharedExpense : undefined,
+          paidByMe: draft.type === "expense" ? paidByMe : undefined,
         });
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "記帳失敗，請稍後再試");
@@ -164,7 +170,8 @@ export function TextQuickAdd({
         action: {
           label: "復原",
           onClick: async () => {
-            await deleteTransaction(created.id);
+            if (isPartnerPaidShare) await deleteUnlinkedSharedExpense(created.id);
+            else await deleteTransaction(created.id);
             router.refresh();
           },
         },
@@ -252,28 +259,32 @@ export function TextQuickAdd({
             <CategoryPickerSheet categories={relevantCategories} value={categoryId} onChange={setCategoryId} />
           </div>
 
-          <div className="flex flex-col gap-2">
-            <Label>付款方式</Label>
-            <div className="flex flex-wrap gap-2">
-              {paymentMethods.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => setDraft({ ...draft, paymentMethod: p.value })}
-                  className={
-                    draft.paymentMethod === p.value
-                      ? "flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-3 py-1.5 text-sm text-primary"
-                      : "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
-                  }
-                >
-                  <PaymentMethodIcon method={p.value} />
-                  {p.label}
-                </button>
-              ))}
+          {/* A partner-paid share never touches any of my accounts (see
+              createTransaction) — 付款方式/帳戶 would be misleading. */}
+          {!(isSharedExpense && !paidByMe) && (
+            <div className="flex flex-col gap-2">
+              <Label>付款方式</Label>
+              <div className="flex flex-wrap gap-2">
+                {paymentMethods.map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setDraft({ ...draft, paymentMethod: p.value })}
+                    className={
+                      draft.paymentMethod === p.value
+                        ? "flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-3 py-1.5 text-sm text-primary"
+                        : "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+                    }
+                  >
+                    <PaymentMethodIcon method={p.value} />
+                    {p.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {accounts.length > 1 && (
+          {accounts.length > 1 && !(isSharedExpense && !paidByMe) && (
             <div className="flex flex-col gap-2">
               <Label>帳戶</Label>
               <div className="flex flex-wrap gap-2">
@@ -304,6 +315,8 @@ export function TextQuickAdd({
             <SharedExpenseToggle
               checked={isSharedExpense}
               onChange={setIsSharedExpense}
+              paidByMe={paidByMe}
+              onPaidByMeChange={setPaidByMe}
               partnerName={partnerName}
             />
           )}

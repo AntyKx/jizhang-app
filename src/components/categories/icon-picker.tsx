@@ -4,13 +4,17 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { iconOptions } from "@/lib/icon-options";
 import { bearIcons } from "@/lib/bear-icons";
+import { categoryIconOptions } from "@/lib/category-icons";
 import { CategoryIcon } from "@/components/category-icon";
 import { cn } from "@/lib/utils";
 
 // Temporarily hidden (2026-07-29) — flip back to true to re-expose the tab.
 const AI_ICON_GENERATION_ENABLED = false;
+// Hidden (2026-09-04) — bear icons read as hard to tell apart and cluttered
+// the category grid, so the plain Lucide icon set (categoryIconOptions,
+// below) is now the only picker tab. Flip back to true to re-expose it.
+const BEAR_ICONS_ENABLED = false;
 
 export function IconPicker({
   icon,
@@ -21,7 +25,7 @@ export function IconPicker({
   onIconChange: (icon: string) => void;
   onBearLabel?: (label: string) => void;
 }) {
-  const [pickerTab, setPickerTab] = useState<"emoji" | "bear" | "ai">("emoji");
+  const [pickerTab, setPickerTab] = useState<"icon" | "bear" | "ai">("icon");
   const [aiDescription, setAiDescription] = useState("");
   const [generating, setGenerating] = useState(false);
 
@@ -49,28 +53,30 @@ export function IconPicker({
       <div className="flex items-center gap-4 text-sm">
         <button
           type="button"
-          onClick={() => setPickerTab("emoji")}
+          onClick={() => setPickerTab("icon")}
           className={cn(
             "border-b-2 pb-1",
-            pickerTab === "emoji"
+            pickerTab === "icon"
               ? "border-primary font-medium text-foreground"
               : "border-transparent text-muted-foreground",
           )}
         >
           選圖示
         </button>
-        <button
-          type="button"
-          onClick={() => setPickerTab("bear")}
-          className={cn(
-            "border-b-2 pb-1",
-            pickerTab === "bear"
-              ? "border-primary font-medium text-foreground"
-              : "border-transparent text-muted-foreground",
-          )}
-        >
-          🐻 小熊圖示
-        </button>
+        {BEAR_ICONS_ENABLED && (
+          <button
+            type="button"
+            onClick={() => setPickerTab("bear")}
+            className={cn(
+              "border-b-2 pb-1",
+              pickerTab === "bear"
+                ? "border-primary font-medium text-foreground"
+                : "border-transparent text-muted-foreground",
+            )}
+          >
+            🐻 小熊圖示
+          </button>
+        )}
         {AI_ICON_GENERATION_ENABLED && (
           <button
             type="button"
@@ -87,23 +93,24 @@ export function IconPicker({
         )}
       </div>
 
-      {pickerTab === "emoji" ? (
-        <div className="grid max-h-56 grid-cols-8 gap-1.5 overflow-y-auto rounded-xl border p-2">
-          {iconOptions.map((emoji) => (
+      {pickerTab === "icon" ? (
+        <div className="grid max-h-56 grid-cols-6 gap-1.5 overflow-y-auto rounded-xl border p-2">
+          {categoryIconOptions.map((opt) => (
             <button
-              key={emoji}
+              key={opt.slug}
               type="button"
-              onClick={() => onIconChange(emoji)}
+              onClick={() => onIconChange(opt.slug)}
+              title={opt.label}
               className={cn(
-                "flex aspect-square items-center justify-center rounded-lg text-xl transition-colors",
-                icon === emoji ? "bg-primary/20 ring-2 ring-primary" : "hover:bg-muted",
+                "flex aspect-square items-center justify-center rounded-lg transition-colors",
+                icon === opt.slug ? "bg-primary/20 ring-2 ring-primary" : "hover:bg-muted",
               )}
             >
-              {emoji}
+              <CategoryIcon icon={opt.slug} className="h-5 w-5" />
             </button>
           ))}
         </div>
-      ) : pickerTab === "bear" ? (
+      ) : pickerTab === "bear" && BEAR_ICONS_ENABLED ? (
         <div className="grid max-h-64 grid-cols-4 gap-2 overflow-y-auto rounded-xl border p-2">
           {bearIcons.map((b) => (
             <button

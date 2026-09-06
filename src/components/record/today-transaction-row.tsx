@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Copy, Trash2 } from "lucide-react";
-import { CategoryIcon } from "@/components/category-icon";
+import { CategoryIconBadge } from "@/components/category-icon";
 import { CategoryPill } from "@/components/transactions/category-pill";
 import { OTHER_COLOR } from "@/components/stats/chart-colors";
 import {
@@ -38,6 +38,7 @@ export type TodayTransaction = {
   occurredAt: string;
   createdAt: Date;
   isSharedExpense: boolean;
+  paidByMe: boolean;
 };
 
 export function TodayTransactionRow({
@@ -96,6 +97,7 @@ export function TodayTransactionRow({
     note: t.note,
     occurredAt: t.occurredAt,
     isSharedExpense: t.isSharedExpense,
+    paidByMe: t.paidByMe,
   };
 
   // The title falls back to merchant -> note -> category, so a note never
@@ -136,7 +138,12 @@ export function TodayTransactionRow({
       >
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <CategoryIcon icon={t.categoryIcon} className="h-6 w-6 text-xl" />
+            <CategoryIconBadge
+              icon={t.categoryIcon}
+              color={t.categoryColor ?? OTHER_COLOR}
+              className="h-8 w-8"
+              iconClassName="h-4 w-4"
+            />
             <div className="flex flex-col gap-0.5">
               <span className="text-sm">{t.merchant || t.note || t.categoryName || "（無備註）"}</span>
               <div className="flex items-center gap-1.5">

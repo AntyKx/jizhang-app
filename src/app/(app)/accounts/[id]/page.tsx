@@ -51,6 +51,7 @@ export default async function AccountDetailPage({
           paymentMethod: transactions.paymentMethod,
           accountId: transactions.accountId,
           sharedExpenseId: sharedExpenses.id,
+          sharedExpensePaidByMe: sharedExpenses.paidByMe,
         })
         .from(transactions)
         .leftJoin(categories, eq(transactions.categoryId, categories.id))
@@ -115,6 +116,7 @@ export default async function AccountDetailPage({
       kind: "transaction" as const,
       type: t.type as "income" | "expense",
       isSharedExpense: t.sharedExpenseId !== null,
+      paidByMe: t.sharedExpensePaidByMe ?? true,
     })),
     ...transferRows.map((t) => ({ ...t, kind: "transfer" as const })),
   ].sort((a, b) => {

@@ -7,16 +7,19 @@ import { db } from "@/db";
 import { categories } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { pickCategoryColor } from "@/lib/category-color";
-import { iconOptions } from "@/lib/icon-options";
 import { bearIcons } from "@/lib/bear-icons";
+import { categoryIconRegistry } from "@/lib/category-icons";
 
 const dataImagePattern = /^data:image\/(png|jpeg|jpg|webp);base64,/;
+// Bear paths stay accepted (not just the current Lucide slugs) so existing
+// rows nobody has re-picked yet don't fail re-validation on unrelated edits.
 const bearIconPaths = new Set(bearIcons.map((b) => b.path));
+const lucideIconSlugs = new Set(Object.keys(categoryIconRegistry));
 
 const iconSchema = z
   .string()
   .max(10_000_000)
-  .refine((v) => iconOptions.includes(v) || bearIconPaths.has(v) || dataImagePattern.test(v));
+  .refine((v) => lucideIconSlugs.has(v) || bearIconPaths.has(v) || dataImagePattern.test(v));
 
 const createCategorySchema = z.object({
   name: z.string().min(1).max(20),

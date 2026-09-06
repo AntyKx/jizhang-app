@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { eq, and, or, lt, ne, desc, inArray, sql } from "drizzle-orm";
+import { eq, and, or, lt, ne, desc, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, categories, sharedExpenses, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
@@ -12,7 +12,9 @@ import {
   TRANSACTIONS_PAGE_SIZE,
   type ListItemRow,
   type TransactionsCursor,
+  type TransactionsFilter,
 } from "@/lib/transactions/list-types";
+import { transactionsFilterConditions } from "@/lib/transactions/filter";
 
 function revalidateTransactionPaths() {
   revalidatePath("/record");
@@ -35,6 +37,7 @@ const createTransactionSchema = z.object({
   merchant: z.string().max(100).optional(),
   occurredAt: z.string().min(1),
   isSharedExpense: z.boolean().optional(),
+  paidByMe: z.boolean().optional(),
 });
 
 export async function createTransaction(input: {
@@ -47,10 +50,36 @@ export async function createTransaction(input: {
   merchant?: string;
   occurredAt: string;
   isSharedExpense?: boolean;
+  // Who paid the shared portion — only meaningful alongside isSharedExpense.
+  // Defaults to true (the account owner) so every other caller that never
+  // passes it keeps the old always-paidByMe behavior.
+  paidByMe?: boolean;
 }) {
   const userId = await requireUserId();
   const parsed = createTransactionSchema.parse(input);
   const { accountId } = parsed;
+
+  // Partner paid the whole thing — no money actually left any of my own
+  // accounts, so this doesn't belong in my personal transaction ledger at
+  // all (same as a plain "新增分帳支出" entry from /shared). Only my share
+  // becomes a real transaction later, at settlement (see
+  // shared/actions.ts's settleSharedExpense) — recording the full amount
+  // here too would double-count it.
+  if (parsed.isSharedExpense && parsed.type === "expense" && parsed.paidByMe === false) {
+    const [created] = await db
+      .insert(sharedExpenses)
+      .values({
+        userId,
+        paidByMe: false,
+        categoryId: parsed.categoryId,
+        name: parsed.merchant || parsed.note || "分帳支出",
+        amount: parsed.amount.toString(),
+        occurredAt: parsed.occurredAt,
+      })
+      .returning({ id: sharedExpenses.id });
+    revalidateTransactionPaths();
+    return { id: created.id };
+  }
 
   const [ownedAccount] = await db
     .select({ id: accounts.id, currency: accounts.currency })
@@ -86,11 +115,12 @@ export async function createTransaction(input: {
     .set({ currentBalance: sql`${accounts.currentBalance} + ${delta}` })
     .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)));
 
-  // "分帳" checkbox — only meaningful for an expense you actually paid for,
-  // so it always implies paidByMe=true. Linked so deleting this transaction
-  // cascades to remove the shared-ledger copy (see schema.ts). Everything
-  // below runs as a single atomic batch so the transaction, balance update,
-  // and shared-ledger copy can never partially fail.
+  // "分帳" checkbox reaching here always means I paid (the paidByMe===false
+  // case returned early above without ever creating this transaction).
+  // Linked so deleting this transaction cascades to remove the shared-ledger
+  // copy (see schema.ts). Everything below runs as a single atomic batch so
+  // the transaction, balance update, and shared-ledger copy can never
+  // partially fail.
   if (parsed.isSharedExpense && parsed.type === "expense") {
     await db.batch([
       insertTransaction,
@@ -206,6 +236,7 @@ const updateTransactionSchema = z.object({
   merchant: z.string().max(100).nullable(),
   occurredAt: z.string().min(1),
   isSharedExpense: z.boolean().optional(),
+  paidByMe: z.boolean().optional(),
 });
 
 export async function updateTransaction(input: {
@@ -219,6 +250,7 @@ export async function updateTransaction(input: {
   merchant: string | null;
   occurredAt: string;
   isSharedExpense?: boolean;
+  paidByMe?: boolean;
 }) {
   const userId = await requireUserId();
   const parsed = updateTransactionSchema.parse(input);
@@ -276,16 +308,39 @@ export async function updateTransaction(input: {
     .where(and(eq(accounts.id, parsed.accountId), eq(accounts.userId, userId)));
 
   // "分帳" checkbox, same semantics as createTransaction's — only
-  // meaningful for an expense, always implies paidByMe=true.
+  // meaningful for an expense.
   const wantsShared = parsed.type === "expense" && !!parsed.isSharedExpense;
 
   // Everything runs as one atomic batch so the transaction edit, the balance
   // adjustments on both accounts, and the shared-ledger sync can never
   // partially apply.
-  if (linkedShared && wantsShared) {
+  if (wantsShared && parsed.paidByMe === false) {
+    // Switched to "partner paid" — same reasoning as createTransaction's:
+    // no money actually left any of my accounts, so this transaction
+    // shouldn't exist in my personal ledger at all. Delete it (reversing
+    // its balance effect on the account it used to sit in; cascades to
+    // remove any existing linked shared-ledger row) and record only an
+    // unlinked shared-ledger entry instead, same as a plain "新增分帳支出"
+    // from /shared. My share only becomes a real transaction later, at
+    // settlement.
+    await db.batch([
+      db.delete(transactions).where(and(eq(transactions.id, parsed.id), eq(transactions.userId, userId))),
+      updateOldAccountBalance,
+      db.insert(sharedExpenses).values({
+        userId,
+        paidByMe: false,
+        categoryId: parsed.categoryId,
+        name: parsed.merchant || parsed.note || "分帳支出",
+        amount: parsed.amount.toString(),
+        occurredAt: parsed.occurredAt,
+      }),
+    ]);
+  } else if (linkedShared && wantsShared) {
     // Keep the shared-ledger copy in sync with the transaction it was
     // created from — otherwise the shared balance silently drifts from
-    // what the personal transaction actually says.
+    // what the personal transaction actually says. paidByMe included here
+    // too, so switching who paid on an already-shared transaction actually
+    // sticks instead of only ever taking effect on first creation.
     await db.batch([
       updateTx,
       updateOldAccountBalance,
@@ -297,6 +352,7 @@ export async function updateTransaction(input: {
           amount: parsed.amount.toString(),
           categoryId: parsed.categoryId,
           occurredAt: parsed.occurredAt,
+          paidByMe: parsed.paidByMe ?? true,
         })
         .where(eq(sharedExpenses.id, linkedShared.id)),
     ]);
@@ -318,7 +374,7 @@ export async function updateTransaction(input: {
       updateNewAccountBalance,
       db.insert(sharedExpenses).values({
         userId,
-        paidByMe: true,
+        paidByMe: parsed.paidByMe ?? true,
         categoryId: parsed.categoryId,
         name: parsed.merchant || parsed.note || "分帳支出",
         amount: parsed.amount.toString(),
@@ -396,6 +452,26 @@ export async function duplicateTransaction(transactionId: string) {
   return { id: insertedRows[0].id };
 }
 
+// Undo for the "partner paid" branch of createTransaction/updateTransaction
+// above, which creates a bare sharedExpenses row instead of a transaction —
+// deleteTransaction can't reach it since there's no transaction id. The
+// isNull(linkedTransactionId) guard keeps this from ever touching a real
+// linked shared-expense row (those go through deleteSharedExpense instead,
+// which also blocks deleting a settled one).
+export async function deleteUnlinkedSharedExpense(sharedExpenseId: string) {
+  const userId = await requireUserId();
+  await db
+    .delete(sharedExpenses)
+    .where(
+      and(
+        eq(sharedExpenses.id, sharedExpenseId),
+        eq(sharedExpenses.userId, userId),
+        isNull(sharedExpenses.linkedTransactionId),
+      ),
+    );
+  revalidateTransactionPaths();
+}
+
 export async function deleteTransaction(transactionId: string) {
   const userId = await requireUserId();
 
@@ -462,7 +538,7 @@ export async function deleteTransaction(transactionId: string) {
   revalidateTransactionPaths();
 }
 
-export async function loadMoreTransactions(cursor: TransactionsCursor) {
+export async function loadMoreTransactions(cursor: TransactionsCursor, filter?: TransactionsFilter) {
   const userId = await requireUserId();
 
   // Keyset pagination on the same (occurredAt, createdAt) sort the list
@@ -471,6 +547,12 @@ export async function loadMoreTransactions(cursor: TransactionsCursor) {
     lt(transactions.occurredAt, cursor.occurredAt),
     and(eq(transactions.occurredAt, cursor.occurredAt), lt(transactions.createdAt, cursor.createdAt)),
   );
+
+  // Same category/date-range narrowing as the initial page (see
+  // /transactions's page.tsx) — keeps "load more" paging through the same
+  // filtered set instead of falling back to the unfiltered timeline once
+  // scrolled past what the server sent on first load.
+  const filterConditions = transactionsFilterConditions(filter);
 
   const [regularRows, transferRows] = await Promise.all([
     db
@@ -489,28 +571,48 @@ export async function loadMoreTransactions(cursor: TransactionsCursor) {
         paymentMethod: transactions.paymentMethod,
         accountId: transactions.accountId,
         sharedExpenseId: sharedExpenses.id,
+        sharedExpensePaidByMe: sharedExpenses.paidByMe,
       })
       .from(transactions)
       .leftJoin(categories, eq(transactions.categoryId, categories.id))
       .leftJoin(sharedExpenses, eq(sharedExpenses.linkedTransactionId, transactions.id))
-      .where(and(eq(transactions.userId, userId), ne(transactions.type, "transfer"), beforeCursor))
+      .where(
+        and(
+          eq(transactions.userId, userId),
+          ne(transactions.type, "transfer"),
+          beforeCursor,
+          ...filterConditions,
+        ),
+      )
       .orderBy(desc(transactions.occurredAt), desc(transactions.createdAt))
       .limit(TRANSACTIONS_PAGE_SIZE),
-    db
-      .select({
-        id: transactions.id,
-        amount: transactions.amount,
-        feeAmount: transactions.feeAmount,
-        note: transactions.note,
-        occurredAt: transactions.occurredAt,
-        createdAt: transactions.createdAt,
-        fromAccountId: transactions.accountId,
-        toAccountId: transactions.toAccountId,
-      })
-      .from(transactions)
-      .where(and(eq(transactions.userId, userId), eq(transactions.type, "transfer"), beforeCursor))
-      .orderBy(desc(transactions.occurredAt), desc(transactions.createdAt))
-      .limit(TRANSACTIONS_PAGE_SIZE),
+    // A category filter never matches a transfer (transfers have no
+    // category), so skip that stream entirely rather than querying for rows
+    // that can't come back.
+    filter?.categoryId !== undefined
+      ? Promise.resolve([])
+      : db
+          .select({
+            id: transactions.id,
+            amount: transactions.amount,
+            feeAmount: transactions.feeAmount,
+            note: transactions.note,
+            occurredAt: transactions.occurredAt,
+            createdAt: transactions.createdAt,
+            fromAccountId: transactions.accountId,
+            toAccountId: transactions.toAccountId,
+          })
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.userId, userId),
+              eq(transactions.type, "transfer"),
+              beforeCursor,
+              ...filterConditions,
+            ),
+          )
+          .orderBy(desc(transactions.occurredAt), desc(transactions.createdAt))
+          .limit(TRANSACTIONS_PAGE_SIZE),
   ]);
 
   const merged: ListItemRow[] = [
@@ -519,6 +621,7 @@ export async function loadMoreTransactions(cursor: TransactionsCursor) {
       kind: "transaction" as const,
       type: t.type as "income" | "expense",
       isSharedExpense: t.sharedExpenseId !== null,
+      paidByMe: t.sharedExpensePaidByMe ?? true,
     })),
     ...transferRows.map((t) => ({ ...t, kind: "transfer" as const })),
   ].sort((a, b) => {

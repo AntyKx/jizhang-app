@@ -1,21 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Handshake, Lock, Plus, Sparkles, SquarePen, X } from "lucide-react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Plus, Sparkles, SquarePen, X } from "lucide-react";
 import { BottomSheet, BottomSheetContent, BottomSheetTitle } from "@/components/ui/bottom-sheet";
 import { QuickAddCategoryFlow } from "@/components/record/quick-add-category-flow";
 import { PersonalAiQuickAddFlow } from "@/components/record/personal-ai-quick-add-flow";
-import { AddSharedExpenseDialog } from "@/components/shared/add-expense-dialog";
 import { cn } from "@/lib/utils";
 import type { QuickAddAccount, QuickAddCategory } from "@/lib/quick-add-context";
 
-type Mode = "general" | "ai" | "shared";
+type Mode = "general" | "ai";
 
 const choices: { mode: Mode; label: string; desc: string; Icon: typeof SquarePen }[] = [
-  { mode: "general", label: "一般記帳", desc: "分類格 → 金額輸入", Icon: SquarePen },
+  { mode: "general", label: "一般記帳", desc: "分類格 → 金額輸入（含分帳）", Icon: SquarePen },
   { mode: "ai", label: "AI 記帳", desc: "打字或語音一句話", Icon: Sparkles },
-  { mode: "shared", label: "分帳記帳", desc: "跟另一半平分的支出", Icon: Handshake },
 ];
 
 // Renders on every page except the home page (mounted alongside MainNav in
@@ -27,6 +25,11 @@ const choices: { mode: Mode; label: string; desc: string; Icon: typeof SquarePen
 // Tapping "+" never navigates — it opens a chooser sheet, then the picked
 // flow opens in its own sheet on top of whatever page is currently
 // showing, and closing it returns you right where you were.
+//
+// 分帳記帳 used to be its own third choice here (a separate
+// AddSharedExpenseDialog form). It's now just the 分帳 tab inside "一般記帳"
+// (QuickAddCategoryFlow's enableSharedTab) — same merge as the home page,
+// so there's only one shared-expense entry flow app-wide instead of two.
 export function GlobalQuickAddFab({
   categories,
   accounts,
@@ -40,7 +43,6 @@ export function GlobalQuickAddFab({
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const router = useRouter();
   const [chooserOpen, setChooserOpen] = useState(false);
   const [mode, setMode] = useState<Mode | null>(null);
 
@@ -68,11 +70,6 @@ export function GlobalQuickAddFab({
   if (pathname.startsWith("/record")) return null;
 
   function pick(next: Mode) {
-    if (next === "shared" && sharedLocked) {
-      setChooserOpen(false);
-      router.push("/upgrade?from=shared");
-      return;
-    }
     setChooserOpen(false);
     setMode(next);
   }
@@ -104,26 +101,22 @@ export function GlobalQuickAddFab({
               <X className="size-4" />
             </button>
           </div>
-          {choices.map(({ mode: choiceMode, label, desc, Icon }) => {
-            const locked = choiceMode === "shared" && sharedLocked;
-            return (
-              <button
-                key={choiceMode}
-                type="button"
-                onClick={() => pick(choiceMode)}
-                className={cn(
-                  "flex items-center gap-3 rounded-2xl border bg-background px-4 py-3 text-left transition-colors hover:bg-muted",
-                )}
-              >
-                <Icon className="size-5 text-primary" strokeWidth={1.75} />
-                <span className="flex flex-1 flex-col">
-                  <span className="text-sm font-medium">{label}</span>
-                  <span className="text-xs text-muted-foreground">{desc}</span>
-                </span>
-                {locked && <Lock className="size-4 text-muted-foreground" strokeWidth={2} />}
-              </button>
-            );
-          })}
+          {choices.map(({ mode: choiceMode, label, desc, Icon }) => (
+            <button
+              key={choiceMode}
+              type="button"
+              onClick={() => pick(choiceMode)}
+              className={cn(
+                "flex items-center gap-3 rounded-2xl border bg-background px-4 py-3 text-left transition-colors hover:bg-muted",
+              )}
+            >
+              <Icon className="size-5 text-primary" strokeWidth={1.75} />
+              <span className="flex flex-1 flex-col">
+                <span className="text-sm font-medium">{label}</span>
+                <span className="text-xs text-muted-foreground">{desc}</span>
+              </span>
+            </button>
+          ))}
           <p className="pb-2 text-center text-xs text-muted-foreground">
             在任何分頁按「+」都會直接彈出這個選單。
           </p>
@@ -140,6 +133,8 @@ export function GlobalQuickAddFab({
             defaultAccountId={contextAccountId}
             defaultDate={defaultDate}
             onDone={() => setMode(null)}
+            enableSharedTab
+            sharedLocked={sharedLocked}
           />
         </BottomSheetContent>
       </BottomSheet>
@@ -157,14 +152,6 @@ export function GlobalQuickAddFab({
           />
         </BottomSheetContent>
       </BottomSheet>
-
-      <AddSharedExpenseDialog
-        categories={categories.filter((c) => c.type === "expense")}
-        partnerName={partnerName}
-        defaultDate={defaultDate}
-        open={mode === "shared"}
-        onOpenChange={(open) => !open && setMode(null)}
-      />
     </>
   );
 }

@@ -209,9 +209,9 @@ export const sharedExpenses = pgTable("shared_expenses", {
   isSettled: boolean("is_settled").notNull().default(false),
   settledAt: timestamp("settled_at"),
   // Set only when this row was auto-created from the "分帳" checkbox on a
-  // personal transaction (always paidByMe=true in that case). Cascades so
-  // deleting the source transaction removes the shared-ledger copy too,
-  // instead of leaving an orphaned row behind.
+  // personal transaction. Cascades so deleting the source transaction
+  // removes the shared-ledger copy too, instead of leaving an orphaned row
+  // behind.
   linkedTransactionId: uuid("linked_transaction_id").references(() => transactions.id, {
     onDelete: "cascade",
   }),

@@ -21,6 +21,7 @@ export type RegularItem = {
   paymentMethod: string;
   accountId: string;
   isSharedExpense: boolean;
+  paidByMe: boolean;
 };
 
 export type TransferListItem = {
@@ -42,3 +43,9 @@ export type ListItem = RegularItem | TransferListItem;
 export type ListItemRow = ListItem & { createdAt: Date };
 
 export type TransactionsCursor = { occurredAt: string; createdAt: Date };
+
+// Optional narrowing for the /transactions page reached by tapping a
+// category on /stats — `categoryId: null` means "uncategorized" (a real,
+// selectable state), so it's kept distinct from "no filter" (the field
+// simply absent).
+export type TransactionsFilter = { categoryId?: string | null; start?: string; end?: string };

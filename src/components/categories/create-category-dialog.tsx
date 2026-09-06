@@ -32,10 +32,14 @@ export function CreateCategoryDialog() {
   function handleSave() {
     if (!name.trim() || !icon) return;
     startTransition(async () => {
-      await createCategory({ name: name.trim(), type, icon });
-      toast.success(`已新增分類 ${name}`);
-      reset();
-      setOpen(false);
+      try {
+        await createCategory({ name: name.trim(), type, icon });
+        toast.success(`已新增分類 ${name}`);
+        reset();
+        setOpen(false);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "新增分類失敗");
+      }
     });
   }
 

@@ -1,11 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Handshake } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { QuickAddCategoryFlow } from "@/components/record/quick-add-category-flow";
 import { PersonalAiQuickAddFlow } from "@/components/record/personal-ai-quick-add-flow";
-import { AddSharedExpenseDialog } from "@/components/shared/add-expense-dialog";
 import type { QuickAddAccount, QuickAddCategory } from "@/lib/quick-add-context";
 
 // The AI bar + category grid — split out of the old monolithic RecordScreen
@@ -27,17 +24,7 @@ export function QuickAddSection({
   partnerName: string;
   sharedLocked: boolean;
 }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const [showShared, setShowShared] = useState(false);
-
-  function openShared() {
-    if (sharedLocked) {
-      router.push("/upgrade?from=shared");
-      return;
-    }
-    setShowShared(true);
-  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -54,25 +41,18 @@ export function QuickAddSection({
         initialShowScan={searchParams.get("action") === "scan"}
       />
 
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold text-muted-foreground">選擇分類</span>
-        <button
-          type="button"
-          onClick={openShared}
-          className="flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/15"
-        >
-          <Handshake className="size-3.5" strokeWidth={1.75} />
-          分帳記帳
-        </button>
-      </div>
+      <span className="text-sm font-semibold text-muted-foreground">選擇分類</span>
 
-      <QuickAddCategoryFlow categories={categories} accounts={accounts} partnerName={partnerName} />
-
-      <AddSharedExpenseDialog
-        categories={categories.filter((c) => c.type === "expense")}
+      {/* 分帳記帳 used to be a separate pill button + dialog here; it's now
+          just a third tab next to 支出/收入 inside the flow below (see
+          QuickAddCategoryFlow's enableSharedTab), reusing the same
+          category-grid → amount-sheet flow instead of a second form. */}
+      <QuickAddCategoryFlow
+        categories={categories}
+        accounts={accounts}
         partnerName={partnerName}
-        open={showShared}
-        onOpenChange={setShowShared}
+        enableSharedTab
+        sharedLocked={sharedLocked}
       />
     </div>
   );

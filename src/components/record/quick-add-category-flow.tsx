@@ -2,16 +2,17 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Lock } from "lucide-react";
 import { toast } from "sonner";
 import { gsap } from "@/lib/gsap";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BottomSheet, BottomSheetContent, BottomSheetTitle } from "@/components/ui/bottom-sheet";
-import { createTransaction, deleteTransaction } from "@/app/(app)/transactions/actions";
+import { createTransaction, deleteTransaction, deleteUnlinkedSharedExpense } from "@/app/(app)/transactions/actions";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { SharedExpenseToggle } from "@/components/record/shared-expense-toggle";
-import { CategoryIcon } from "@/components/category-icon";
+import { CategoryIconBadge } from "@/components/category-icon";
 import { StaggerList } from "@/components/motion/stagger-list";
 import { SlidingIndicator } from "@/components/motion/sliding-indicator";
 import { paymentMethods, type PaymentMethod } from "@/lib/payment-methods";
@@ -41,6 +42,8 @@ export function QuickAddCategoryFlow({
   defaultAccountId,
   defaultDate,
   onDone,
+  enableSharedTab = false,
+  sharedLocked = false,
 }: {
   categories: QuickAddCategory[];
   accounts: QuickAddAccount[];
@@ -52,10 +55,17 @@ export function QuickAddCategoryFlow({
   defaultAccountId?: string;
   defaultDate?: string;
   onDone?: () => void;
+  // Adds a third "分帳" segment next to 支出/收入 — used only on the home
+  // page, where it replaces the standalone 分帳記帳 button. It reuses the
+  // expense category list (a shared expense is always an expense) and just
+  // pre-checks the existing SharedExpenseToggle below, rather than being a
+  // separate entry flow.
+  enableSharedTab?: boolean;
+  sharedLocked?: boolean;
 }) {
   const router = useRouter();
   const toggleRef = useRef<HTMLDivElement>(null);
-  const [tab, setTab] = useState<"expense" | "income">("expense");
+  const [tab, setTab] = useState<"expense" | "income" | "shared">("expense");
   // `selected` stays populated through the sheet's closing animation (it's
   // only cleared in onOpenChangeComplete) — the sheet's content reads
   // selected.icon/name/type, so nulling it immediately on close would blank
@@ -66,6 +76,7 @@ export function QuickAddCategoryFlow({
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [isSharedExpense, setIsSharedExpense] = useState(false);
+  const [paidByMe, setPaidByMe] = useState(true);
   const initialAccountId = accounts.find((a) => a.id === defaultAccountId)?.id ?? accounts[0]?.id ?? "";
   const [accountId, setAccountId] = useState(initialAccountId);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
@@ -74,20 +85,34 @@ export function QuickAddCategoryFlow({
   const [occurredAt, setOccurredAt] = useState(defaultDate ?? todayInTaipeiString());
   const [pending, startTransition] = useTransition();
 
-  const visibleCategories = categories.filter((c) => c.type === tab);
+  // "分帳" reuses the expense category list — 分類就照支出設定的分類.
+  const visibleCategories = categories.filter((c) => c.type === (tab === "shared" ? "expense" : tab));
 
   function reset() {
     setSelected(null);
     setAmount("");
     setNote("");
     setIsSharedExpense(false);
+    setPaidByMe(true);
     const currentAccount = accounts.find((a) => a.id === accountId);
     setPaymentMethod(accountTypeToPaymentMethod[currentAccount?.type ?? "cash"]);
     setOccurredAt(defaultDate ?? todayInTaipeiString());
   }
 
+  function selectTab(next: "expense" | "income" | "shared") {
+    if (next === "shared" && sharedLocked) {
+      router.push("/upgrade?from=shared");
+      return;
+    }
+    setTab(next);
+  }
+
   function openCategory(c: QuickAddCategory) {
     setSelected(c);
+    // Pre-check the shared-expense toggle when opened from the 分帳 tab —
+    // still just a personal expense transaction under the hood, so the
+    // toggle stays visible/editable below in case they change their mind.
+    setIsSharedExpense(tab === "shared");
     setAmountSheetOpen(true);
   }
 
@@ -99,6 +124,10 @@ export function QuickAddCategoryFlow({
   function handleSave() {
     if (!selected || !amount || Number(amount) <= 0) return;
     const savedAmount = amount;
+    // Partner-paid shared expenses don't create a real transaction (see
+    // createTransaction) — captured up front so the undo action below still
+    // knows which delete function to call after state resets on close.
+    const isPartnerPaidShare = selected.type === "expense" && isSharedExpense && !paidByMe;
     startTransition(async () => {
       let created: { id: string };
       try {
@@ -111,6 +140,7 @@ export function QuickAddCategoryFlow({
           note: note || undefined,
           occurredAt,
           isSharedExpense: selected.type === "expense" ? isSharedExpense : undefined,
+          paidByMe: selected.type === "expense" ? paidByMe : undefined,
         });
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "記帳失敗，請稍後再試");
@@ -120,7 +150,8 @@ export function QuickAddCategoryFlow({
         action: {
           label: "復原",
           onClick: async () => {
-            await deleteTransaction(created.id);
+            if (isPartnerPaidShare) await deleteUnlinkedSharedExpense(created.id);
+            else await deleteTransaction(created.id);
             router.refresh();
           },
         },
@@ -145,7 +176,7 @@ export function QuickAddCategoryFlow({
         <button
           type="button"
           data-key="expense"
-          onClick={() => setTab("expense")}
+          onClick={() => selectTab("expense")}
           className={cn(
             "flex-1 rounded-full py-2 text-sm font-medium transition-colors",
             tab === "expense" ? "text-primary-foreground" : "text-muted-foreground",
@@ -156,7 +187,7 @@ export function QuickAddCategoryFlow({
         <button
           type="button"
           data-key="income"
-          onClick={() => setTab("income")}
+          onClick={() => selectTab("income")}
           className={cn(
             "flex-1 rounded-full py-2 text-sm font-medium transition-colors",
             tab === "income" ? "text-primary-foreground" : "text-muted-foreground",
@@ -164,9 +195,23 @@ export function QuickAddCategoryFlow({
         >
           收入
         </button>
+        {enableSharedTab && (
+          <button
+            type="button"
+            data-key="shared"
+            onClick={() => selectTab("shared")}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-1 rounded-full py-2 text-sm font-medium transition-colors",
+              tab === "shared" ? "text-primary-foreground" : "text-muted-foreground",
+            )}
+          >
+            分帳
+            {sharedLocked && <Lock className="size-3" strokeWidth={2} />}
+          </button>
+        )}
       </div>
 
-      <StaggerList key={tab} className="grid grid-cols-4 gap-3 sm:grid-cols-5">
+      <StaggerList key={tab} className="grid grid-cols-5 gap-2 sm:grid-cols-6">
         {visibleCategories.map((c) => (
           <button
             key={c.id}
@@ -175,10 +220,10 @@ export function QuickAddCategoryFlow({
             onPointerDown={bounceDown}
             onPointerUp={bounceUp}
             onPointerLeave={bounceUp}
-            className="flex flex-col items-center gap-0.5 rounded-2xl border bg-card p-2 shadow-md shadow-foreground/10 transition-shadow hover:shadow-md"
+            className="flex flex-col items-center gap-1 rounded-lg p-1 transition-colors hover:bg-muted/60"
           >
-            <CategoryIcon icon={c.icon} className="h-16 w-16 text-3xl" />
-            <span className="text-xs text-muted-foreground">{c.name}</span>
+            <CategoryIconBadge icon={c.icon} color={c.color} className="h-11 w-11" iconClassName="h-5 w-5" />
+            <span className="text-[11px] text-muted-foreground">{c.name}</span>
           </button>
         ))}
       </StaggerList>
@@ -190,11 +235,11 @@ export function QuickAddCategoryFlow({
           if (!open) reset();
         }}
       >
-        <BottomSheetContent>
+        <BottomSheetContent className="max-w-none">
           {selected && (
             <>
-              <div className="flex flex-col items-center gap-1 py-2">
-                <CategoryIcon icon={selected.icon} className="h-14 w-14 text-5xl" />
+              <div className="flex flex-col items-center gap-1.5 py-2">
+                <CategoryIconBadge icon={selected.icon} color={selected.color} className="h-12 w-12" iconClassName="h-6 w-6" />
                 <BottomSheetTitle className="text-lg font-medium">{selected.name}</BottomSheetTitle>
               </div>
 
@@ -203,29 +248,9 @@ export function QuickAddCategoryFlow({
                 <AmountKeypadField value={amount} onChange={setAmount} autoOpen />
               </div>
 
-              <div className="flex flex-col gap-2">
-                <Label>付款方式</Label>
-                <div className="flex flex-wrap gap-2">
-                  {paymentMethods.map((p) => (
-                    <button
-                      key={p.value}
-                      type="button"
-                      onClick={() => setPaymentMethod(p.value)}
-                      className={cn(
-                        "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm transition-colors",
-                        paymentMethod === p.value
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "text-muted-foreground hover:bg-muted",
-                      )}
-                    >
-                      <PaymentMethodIcon method={p.value} />
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {accounts.length > 1 && (
+              {/* A partner-paid share never touches any of my accounts (see
+                  createTransaction) — 帳戶/付款方式 would be misleading. */}
+              {accounts.length > 1 && !(isSharedExpense && !paidByMe) && (
                 <div className="flex flex-col gap-2">
                   <Label>帳戶</Label>
                   <div className="flex flex-wrap gap-2">
@@ -249,10 +274,36 @@ export function QuickAddCategoryFlow({
                 </div>
               )}
 
+              {!(isSharedExpense && !paidByMe) && (
+                <div className="flex flex-col gap-2">
+                  <Label>付款方式</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {paymentMethods.map((p) => (
+                      <button
+                        key={p.value}
+                        type="button"
+                        onClick={() => setPaymentMethod(p.value)}
+                        className={cn(
+                          "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm transition-colors",
+                          paymentMethod === p.value
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "text-muted-foreground hover:bg-muted",
+                        )}
+                      >
+                        <PaymentMethodIcon method={p.value} />
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {selected.type === "expense" && (
                 <SharedExpenseToggle
                   checked={isSharedExpense}
                   onChange={setIsSharedExpense}
+                  paidByMe={paidByMe}
+                  onPaidByMeChange={setPaidByMe}
                   partnerName={partnerName}
                 />
               )}

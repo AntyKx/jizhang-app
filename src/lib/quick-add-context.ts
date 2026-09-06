@@ -5,7 +5,13 @@ import { categories, userSettings } from "@/db/schema";
 import { getDefaultAccountId, listAccounts } from "@/lib/account";
 import type { AccountType } from "@/lib/account-type";
 
-export type QuickAddCategory = { id: string; name: string; icon: string | null; type: "income" | "expense" };
+export type QuickAddCategory = {
+  id: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+  type: "income" | "expense";
+};
 export type QuickAddAccount = { id: string; name: string; type: AccountType };
 
 // Shared by every surface that can trigger a quick-add flow (the /record
@@ -22,7 +28,13 @@ export const getQuickAddContext = cache(async (userId: string): Promise<{
 }> => {
   const [userCategories, accountRows, settingsRows] = await Promise.all([
     db
-      .select({ id: categories.id, name: categories.name, icon: categories.icon, type: categories.type })
+      .select({
+        id: categories.id,
+        name: categories.name,
+        icon: categories.icon,
+        color: categories.color,
+        type: categories.type,
+      })
       .from(categories)
       .where(or(isNull(categories.userId), eq(categories.userId, userId)))
       .orderBy(categories.sortOrder),

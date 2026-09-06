@@ -11,7 +11,7 @@ import { MonthlySummaryCard } from "@/components/stats/monthly-summary-card";
 import { CollapsibleProgressList } from "@/components/stats/collapsible-progress-list";
 import { StatsTabNav } from "@/components/stats/stats-tab-nav";
 import { StatsRangeSwitcher } from "@/components/stats/stats-range-switcher";
-import { CategoryIcon } from "@/components/category-icon";
+import { CategoryOverviewList } from "@/components/stats/category-overview-list";
 import { StaggerList } from "@/components/motion/stagger-list";
 import { CountUpNumber } from "@/components/motion/count-up-number";
 import { BearIllustration } from "@/components/bear-illustration";
@@ -50,7 +50,6 @@ export default async function StatsPage({
     .reduce((sum, t) => sum + Number(t.amount) * Number(t.exchangeRate), 0);
   const balance = income - expense;
 
-  const topCategory = expenseCategories[0] ?? null;
   const expensePctChange = prevTotals.expense > 0 ? ((expense - prevTotals.expense) / prevTotals.expense) * 100 : null;
 
   return (
@@ -93,50 +92,42 @@ export default async function StatsPage({
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-muted-foreground text-sm font-normal">最大支出分類</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {topCategory ? (
-                <div className="flex items-center gap-2">
-                  <CategoryIcon icon={topCategory.icon} className="h-8 w-8 text-2xl" />
-                  <div>
-                    <p className="font-semibold">{topCategory.name}</p>
-                    <p className="text-muted-foreground text-sm">
-                      <CountUpNumber value={topCategory.amount} />（{Math.round(topCategory.pct)}%）
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">這段時間還沒有支出紀錄</p>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-muted-foreground text-sm font-normal">支出與上期比較</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {expensePctChange === null ? (
-                <p className="text-muted-foreground text-sm">上一期沒有支出紀錄可比較</p>
-              ) : (
-                <p
-                  className={cn(
-                    "text-2xl font-semibold tabular-nums",
-                    expensePctChange > 0 ? "text-destructive" : "text-emerald-600",
-                  )}
-                >
-                  {expensePctChange > 0 ? "↑" : expensePctChange < 0 ? "↓" : ""}
-                  {Math.abs(Math.round(expensePctChange))}%
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-muted-foreground text-sm font-normal">支出與上期比較</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {expensePctChange === null ? (
+              <p className="text-muted-foreground text-sm">上一期沒有支出紀錄可比較</p>
+            ) : (
+              <p
+                className={cn(
+                  "text-2xl font-semibold tabular-nums",
+                  expensePctChange > 0 ? "text-destructive" : "text-emerald-600",
+                )}
+              >
+                {expensePctChange > 0 ? "↑" : expensePctChange < 0 ? "↓" : ""}
+                {Math.abs(Math.round(expensePctChange))}%
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
-        <MonthlySummaryCard />
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-muted-foreground text-sm font-normal">支出分類</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CategoryOverviewList
+              rows={expenseCategories}
+              rangeStart={range.startStr}
+              rangeEnd={range.endStr}
+              rangeLabel={range.label}
+            />
+          </CardContent>
+        </Card>
+
+        <MonthlySummaryCard unit={range.unit} dateParam={range.dateParam} label={range.label} />
 
         {anomalies.length > 0 && (
           <Card className="border-amber-500/50">

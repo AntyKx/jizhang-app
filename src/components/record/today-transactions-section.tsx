@@ -44,6 +44,7 @@ export async function TodayTransactionsSection({
       occurredAt: transactions.occurredAt,
       createdAt: transactions.createdAt,
       sharedExpenseId: sharedExpenses.id,
+      sharedExpensePaidByMe: sharedExpenses.paidByMe,
     })
     .from(transactions)
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
@@ -60,6 +61,7 @@ export async function TodayTransactionsSection({
     ...t,
     type: t.type as "income" | "expense",
     isSharedExpense: t.sharedExpenseId !== null,
+    paidByMe: t.sharedExpensePaidByMe ?? true,
   }));
 
   if (todayTransactions.length === 0) {

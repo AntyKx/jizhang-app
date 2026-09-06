@@ -19,7 +19,7 @@ import { PaymentMethodIcon } from "@/components/transactions/payment-method-icon
 import { CategoryIcon } from "@/components/category-icon";
 import { TodayTransactionRow } from "@/components/record/today-transaction-row";
 import { BearIllustration } from "@/components/bear-illustration";
-import { heatmapLevel, SEQUENTIAL_HEATMAP_STEPS } from "@/components/stats/chart-colors";
+import { heatmapLevel, SEQUENTIAL_HEATMAP_STEPS, SEQUENTIAL_HEATMAP_TEXT } from "@/components/stats/chart-colors";
 import { Card, CardContent } from "@/components/ui/card";
 import { StaggerList } from "@/components/motion/stagger-list";
 import { getTodayInTaipei } from "@/lib/date";
@@ -67,6 +67,7 @@ export default async function CalendarPage({
         accountId: transactions.accountId,
         accountName: accounts.name,
         sharedExpenseId: sharedExpenses.id,
+        sharedExpensePaidByMe: sharedExpenses.paidByMe,
       })
       .from(transactions)
       .leftJoin(categories, eq(transactions.categoryId, categories.id))
@@ -95,6 +96,7 @@ export default async function CalendarPage({
   const monthTransactions = monthTransactionRows.map((t) => ({
     ...t,
     isSharedExpense: t.sharedExpenseId !== null,
+    paidByMe: t.sharedExpensePaidByMe ?? true,
   }));
 
   const byDay = new Map<string, { income: number; expense: number }>();
@@ -161,6 +163,7 @@ export default async function CalendarPage({
               const isSelected = selectedDay === key;
               const isToday = key === todayKey;
               const level = heatmapLevel(entry?.expense ?? 0, maxExpense);
+              const textColor = SEQUENTIAL_HEATMAP_TEXT[level];
               const titleParts = [
                 entry?.expense ? `支出 ${Math.round(entry.expense).toLocaleString("zh-TW")}` : null,
                 entry?.income ? `收入 ${Math.round(entry.income).toLocaleString("zh-TW")}` : null,
@@ -171,18 +174,21 @@ export default async function CalendarPage({
                   href={`/calendar?month=${monthKey}&day=${key}`}
                   title={titleParts.length > 0 ? `${key}・${titleParts.join("・")}` : key}
                   className={cn(
-                    "relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl text-center tabular-nums transition-colors",
+                    "relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg text-center tabular-nums transition-all",
                     isSelected
-                      ? "ring-2 ring-primary ring-offset-1 ring-offset-card"
-                      : isToday
-                        ? "ring-1 ring-primary/40"
-                        : "hover:ring-1 hover:ring-muted-foreground/30",
+                      ? "z-10 scale-105 shadow-md ring-2 ring-primary ring-offset-2 ring-offset-card"
+                      : "hover:ring-1 hover:ring-muted-foreground/30",
                   )}
-                  style={level > 0 ? { backgroundColor: SEQUENTIAL_HEATMAP_STEPS[level] } : undefined}
+                  style={{ backgroundColor: SEQUENTIAL_HEATMAP_STEPS[level], color: textColor }}
                 >
-                  <span className={cn("text-xs", level >= 3 && "font-medium text-white")}>
-                    {format(d, "d")}
-                  </span>
+                  <span className={cn("text-xs", level >= 3 && "font-medium")}>{format(d, "d")}</span>
+                  {/* "Today" no longer relies on a ring (that's the isSelected
+                      signal now) — a small dot in the day's own text color
+                      stays visible no matter how intense that day's heat
+                      color is. */}
+                  {isToday && (
+                    <span className="size-1 rounded-full" style={{ backgroundColor: textColor }} />
+                  )}
                   {entry?.income ? (
                     <span className="absolute top-1 right-1 size-1.5 rounded-full bg-emerald-500" />
                   ) : null}
