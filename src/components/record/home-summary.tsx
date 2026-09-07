@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { getNowInTaipei } from "@/lib/date";
 import { Progress } from "@/components/ui/progress";
+import { BearLogoMark } from "@/components/bear-logo-mark";
 import { cn } from "@/lib/utils";
 
 function getGreeting(hour: number): string {
@@ -14,6 +14,11 @@ function getGreeting(hour: number): string {
   return "晚安";
 }
 
+// Full-bleed banner — the -mx-4 -mt-6 cancels (app)/layout.tsx's <main>
+// px-4 py-6 so this touches the screen's real edges instead of sitting
+// inset like every other section, then rounds off only its bottom corners
+// so the rest of the page can flow directly underneath it with no card
+// boundary of its own (see quick-add-section.tsx / today-transactions-section.tsx).
 export function HomeSummary({
   userName,
   todayExpense,
@@ -33,74 +38,57 @@ export function HomeSummary({
   const overBudget = remaining != null && remaining < 0;
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/10 via-card to-card shadow-sm shadow-foreground/5">
-      <div className="flex flex-col gap-4 p-5">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xl font-semibold">
-            {greeting}
-            {userName ? `，${userName}` : ""}
-          </span>
-          <span className="text-xs text-muted-foreground">{dateLabel}</span>
-          <span className="mt-1 text-sm text-muted-foreground">
-            {overBudget ? "這個月支出有點超過囉，一起看看吧" : "今天也一起管理好錢包吧！"}
+    <div className="relative -mx-4 -mt-6 overflow-hidden rounded-b-[28px] bg-gradient-to-br from-secondary via-secondary/45 to-transparent">
+      <div className="absolute -top-20 -right-8 size-[150px] rounded-full bg-[color-mix(in_oklch,var(--secondary)_70%,transparent)]" />
+
+      <div className="relative flex flex-col gap-4 px-5 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-5">
+        <div className="flex items-start justify-between">
+          <div className="flex flex-col gap-0.5 pt-0.5">
+            <span className="text-sm font-bold">
+              {greeting}
+              {userName ? `，${userName}` : ""}
+            </span>
+            <span className="text-xs text-muted-foreground">{dateLabel}</span>
+          </div>
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-card shadow-sm shadow-foreground/10">
+            <BearLogoMark className="size-[30px]" />
           </span>
         </div>
 
-        {/* Reserve room on the right so the bottom-right bear sticker (see
-            below) never overlaps the right-aligned amounts. The greeting
-            block above is clear of the sticker's shorter footprint, so it
-            keeps the full card width for wrapping. */}
-        <div className="flex flex-col gap-1.5 pr-[43%]">
-          <div className="flex items-baseline justify-between">
-            <span className="text-sm text-muted-foreground">今日支出</span>
-            <span
+        <div className="flex items-stretch">
+          <div className="flex-1">
+            <span className="text-[10.5px] text-muted-foreground">今日支出</span>
+            <div
               className={cn(
-                "text-xl font-semibold tabular-nums",
+                "mt-0.5 text-[22px] font-semibold tabular-nums",
                 todayExpense > 0 ? "text-destructive" : "text-foreground",
               )}
             >
               NT$ {Math.round(todayExpense).toLocaleString("zh-TW")}
-            </span>
+            </div>
           </div>
-
-          {budgetLimit != null && budgetPct != null && remaining != null && (
-            <>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">本月剩餘</span>
-                <span
-                  className={cn(
-                    "font-semibold tabular-nums",
-                    overBudget && "text-destructive",
-                  )}
-                >
-                  NT$ {Math.round(remaining).toLocaleString("zh-TW")}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Progress value={budgetPct} className="flex-1" />
-                <span className="w-9 text-right text-xs text-muted-foreground">
-                  {Math.round(budgetPct)}%
-                </span>
-              </div>
-            </>
-          )}
+          <div className="mx-4 w-px bg-border" />
+          <div className="flex-1">
+            <span className="text-[10.5px] text-muted-foreground">本月支出</span>
+            <div className="mt-0.5 text-[22px] font-semibold tabular-nums">
+              NT$ {Math.round(monthExpense).toLocaleString("zh-TW")}
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* object-fit crops against the actual file's pixel ratio (640x640,
-          exactly 1:1) — not the illustration's visually-trimmed content
-          bounding box, which is landscape but isn't what cover/contain see.
-          aspect-square matches the file exactly, so nothing gets cropped;
-          floating this absolutely instead of stretching to the card's
-          height is what avoids the blank space above it. */}
-      <div className="absolute right-0 bottom-0 aspect-square w-[43%]">
-        <Image
-          src={overBudget ? "/images/bears/bear-over-budget.webp" : "/images/bears/bear-record.webp"}
-          alt=""
-          fill
-          sizes="150px"
-          className="object-cover object-bottom"
-        />
+        {budgetLimit != null && budgetPct != null && (
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">本月預算</span>
+              <span className={cn("font-semibold", overBudget ? "text-destructive" : "text-primary")}>
+                {overBudget
+                  ? `已超支 NT$${Math.round(-remaining!).toLocaleString("zh-TW")}`
+                  : `預算 ${Math.round(budgetPct)}%`}
+              </span>
+            </div>
+            <Progress value={budgetPct} />
+          </div>
+        )}
       </div>
     </div>
   );

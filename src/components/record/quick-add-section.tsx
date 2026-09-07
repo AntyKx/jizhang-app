@@ -43,7 +43,7 @@ export function QuickAddSection({
         initialShowScan={searchParams.get("action") === "scan"}
       />
 
-      <div className="flex flex-col gap-4 rounded-3xl border bg-card p-5 shadow-sm shadow-foreground/5">
+      <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2 text-[15px] font-semibold">
             <span className="flex size-6 items-center justify-center rounded-md bg-primary/12 text-primary">

@@ -66,7 +66,7 @@ export async function TodayTransactionsSection({
 
   if (todayTransactions.length === 0) {
     return (
-      <Reveal className="flex flex-col items-center gap-3 rounded-3xl border bg-card p-8 text-center shadow-sm shadow-foreground/5">
+      <Reveal className="flex flex-col items-center gap-3 py-8 text-center">
         <BearIllustration name="record" size={96} />
         <span className="text-sm text-muted-foreground">今天還沒有記帳，來記第一筆吧！</span>
       </Reveal>
@@ -76,7 +76,7 @@ export async function TodayTransactionsSection({
   return (
     <div className="flex flex-col gap-2">
       <span className="text-sm font-medium text-muted-foreground">今天記了 {todayTransactions.length} 筆</span>
-      <StaggerList className="flex flex-col divide-y overflow-hidden rounded-2xl border bg-card">
+      <StaggerList className="flex flex-col divide-y">
         {todayTransactions.map((t) => (
           <TodayTransactionRow
             key={t.id}

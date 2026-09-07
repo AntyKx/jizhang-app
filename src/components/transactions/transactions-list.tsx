@@ -270,7 +270,7 @@ export function TransactionsList({
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-2xl border bg-card p-6 text-center shadow-md shadow-foreground/10">
+      <div className="flex flex-col items-center gap-2 py-8 text-center">
         <BearIllustration name="spending" size={96} />
         <p className="text-muted-foreground text-sm">還沒有任何交易紀錄。</p>
       </div>
@@ -302,7 +302,7 @@ export function TransactionsList({
       />
 
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-2xl border bg-card p-6 text-center shadow-md shadow-foreground/10">
+        <div className="flex flex-col items-center gap-2 py-8 text-center">
           <BearIllustration name="search" size={96} />
           <p className="text-muted-foreground text-sm">找不到符合的交易。</p>
         </div>
@@ -311,7 +311,7 @@ export function TransactionsList({
           {monthGroups.map((group) => (
             <div key={group.monthKey} className="flex flex-col gap-2">
               <span className="text-sm font-semibold text-muted-foreground">{monthLabel(group.monthKey)}</span>
-              <div className="flex flex-col divide-y overflow-hidden rounded-2xl border bg-card">
+              <div className="flex flex-col divide-y">
                 {group.items.map((item) =>
                   item.kind === "transfer" ? (
                     <TransferRow key={item.id} item={item} accountsById={accountsById} />

@@ -32,12 +32,14 @@ function bounceUp(e: React.PointerEvent<HTMLElement>) {
   gsap.to(e.currentTarget, { scale: 1, duration: 0.4, ease: "back.out(2)" });
 }
 
-// Keeps the home page's category grid to a single row no matter how many
-// categories exist — the rest live behind the "其他" tile's full-list
-// sheet. 4 (not 5/6, matching the grid's own column counts) so the "其他"
-// tile itself always has room as the row's last slot at every breakpoint,
-// rather than wrapping to a second row on the narrower mobile grid.
-const CATEGORY_PREVIEW_COUNT = 4;
+// Keeps the home page's category grid to a fixed 2-row/5-column block (10
+// cells) no matter how many categories exist — up to 9 real categories fill
+// cells 1-9 in order, and "其他" (opening the full-list sheet) is pinned to
+// the 10th cell via explicit grid placement below, always in the
+// bottom-right corner. Fewer than 9 categories just leaves the remaining
+// cells before "其他" blank rather than reflowing/centering — same as
+// leaving unfilled slots empty in the reference layout this was modeled on.
+const CATEGORY_PREVIEW_COUNT = 9;
 
 // Category grid ("一般記帳") + its amount entry sheet — used inline by
 // quick-add-section.tsx on the home page AND opened from the global
@@ -102,7 +104,6 @@ export function QuickAddCategoryFlow({
   // separate favorites concept, so putting a category first in the
   // management page is the same action as putting it first on this grid.
   const previewCategories = visibleCategories.slice(0, CATEGORY_PREVIEW_COUNT);
-  const hasMoreCategories = visibleCategories.length > CATEGORY_PREVIEW_COUNT;
 
   function reset() {
     setSelected(null);
@@ -233,7 +234,7 @@ export function QuickAddCategoryFlow({
         )}
       </div>
 
-      <StaggerList key={tab} className="grid grid-cols-5 gap-x-1 gap-y-4 sm:grid-cols-6">
+      <StaggerList key={tab} className="grid grid-cols-5 gap-x-1 gap-y-4">
         {previewCategories.map((c) => (
           <button
             key={c.id}
@@ -255,21 +256,24 @@ export function QuickAddCategoryFlow({
             </span>
           </button>
         ))}
-        {hasMoreCategories && (
-          <button
-            type="button"
-            onClick={() => setMoreOpen(true)}
-            onPointerDown={bounceDown}
-            onPointerUp={bounceUp}
-            onPointerLeave={bounceUp}
-            className="flex flex-col items-center gap-1.5 rounded-lg p-1 sm:hover:bg-muted/50"
-          >
-            <span className="flex h-[54px] w-[54px] items-center justify-center rounded-full bg-muted text-muted-foreground">
-              <MoreHorizontal className="h-[22px] w-[22px]" strokeWidth={1.8} />
-            </span>
-            <span className="text-center text-[11.5px] font-medium leading-tight text-muted-foreground">其他</span>
-          </button>
-        )}
+        {/* Pinned to the grid's 10th cell (row 2, col 5) regardless of how
+            many real categories rendered above — always the fixed
+            bottom-right corner tile, never sliding up to sit right after
+            the last category. */}
+        <button
+          type="button"
+          onClick={() => setMoreOpen(true)}
+          onPointerDown={bounceDown}
+          onPointerUp={bounceUp}
+          onPointerLeave={bounceUp}
+          style={{ gridColumn: 5, gridRow: 2 }}
+          className="flex flex-col items-center gap-1.5 rounded-lg p-1 sm:hover:bg-muted/50"
+        >
+          <span className="flex h-[54px] w-[54px] items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <MoreHorizontal className="h-[22px] w-[22px]" strokeWidth={1.8} />
+          </span>
+          <span className="text-center text-[11.5px] font-medium leading-tight text-muted-foreground">其他</span>
+        </button>
       </StaggerList>
 
       <BottomSheet open={moreOpen} onOpenChange={setMoreOpen}>

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { categories, recurringRules } from "@/db/schema";
 import { getTodayInTaipei } from "@/lib/date";
 import { DueSubscriptionsCard } from "@/components/record/due-subscriptions-card";
+import { Reveal } from "@/components/motion/reveal";
 
 // Independent Suspense island on /record — kept separate from
 // HomeSummarySection so a slow Clerk API call there never holds up this
@@ -38,5 +39,14 @@ export async function DueSubscriptionsSection({ userId }: { userId: string }) {
   // column type.
   const dueRules = dueRuleRows.map((r) => ({ ...r, type: r.type as "income" | "expense" }));
 
-  return <DueSubscriptionsCard rules={dueRules} />;
+  // Returning null with no wrapper at all (rather than a Reveal that still
+  // renders an empty div around a null child) keeps this section from
+  // taking up a flex gap on the home page when nothing's due.
+  if (dueRules.length === 0) return null;
+
+  return (
+    <Reveal>
+      <DueSubscriptionsCard rules={dueRules} />
+    </Reveal>
+  );
 }

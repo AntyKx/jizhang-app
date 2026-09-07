@@ -27,7 +27,7 @@ export default async function RecordPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6">
-      <Suspense fallback={<Skeleton className="h-40 w-full rounded-3xl" />}>
+      <Suspense fallback={<Skeleton className="-mx-4 -mt-6 h-52 rounded-b-[28px]" />}>
         <Reveal>
           <HomeSummarySection userId={userId} />
         </Reveal>
@@ -36,11 +36,14 @@ export default async function RecordPage() {
       {/* No skeleton reserved here — this card is null most of the time
           (no subscriptions due today), so a placeholder that usually just
           collapses to nothing would cause more layout jitter than it
-          prevents. */}
+          prevents. Reveal now lives inside DueSubscriptionsSection itself
+          (only rendered when there's actually something due) rather than
+          wrapping it here — a Reveal wrapping a null child still renders an
+          empty div, which the surrounding flex gap-6 still puts a full gap
+          on both sides of, showing up as a large dead gap between the
+          banner and the AI quick-add row whenever nothing's due. */}
       <Suspense fallback={null}>
-        <Reveal>
-          <DueSubscriptionsSection userId={userId} />
-        </Reveal>
+        <DueSubscriptionsSection userId={userId} />
       </Suspense>
 
       <Reveal>
@@ -56,7 +59,7 @@ export default async function RecordPage() {
         fallback={
           <div className="flex flex-col gap-2">
             <Skeleton className="h-5 w-28" />
-            <div className="flex flex-col divide-y overflow-hidden rounded-2xl border bg-card">
+            <div className="flex flex-col divide-y">
               <Skeleton className="h-16 w-full rounded-none" />
               <Skeleton className="h-16 w-full rounded-none" />
             </div>

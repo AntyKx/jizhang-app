@@ -224,18 +224,18 @@ export function VoiceRecordButton({ onTranscribed }: { onTranscribed: (text: str
       disabled={state === "processing"}
       aria-label={state === "recording" ? "停止錄音" : "語音記帳"}
       className={cn(
-        "flex size-8 shrink-0 items-center justify-center rounded-full transition-colors",
+        "flex size-7 shrink-0 items-center justify-center rounded-full transition-colors",
         state === "recording"
           ? "bg-destructive text-white animate-pulse"
           : "text-muted-foreground hover:bg-background hover:text-foreground",
       )}
     >
       {state === "processing" ? (
-        <Loader2 className="size-4 animate-spin" />
+        <Loader2 className="size-3.5 animate-spin" />
       ) : state === "recording" ? (
-        <Square className="size-3.5 fill-current" />
+        <Square className="size-3 fill-current" />
       ) : (
-        <Mic className="size-4" strokeWidth={1.75} />
+        <Mic className="size-3.5" strokeWidth={1.75} />
       )}
     </button>
   );
