@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Lock } from "lucide-react";
+import { Lock, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { gsap } from "@/lib/gsap";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,13 @@ function bounceDown(e: React.PointerEvent<HTMLElement>) {
 function bounceUp(e: React.PointerEvent<HTMLElement>) {
   gsap.to(e.currentTarget, { scale: 1, duration: 0.4, ease: "back.out(2)" });
 }
+
+// Keeps the home page's category grid to a single row no matter how many
+// categories exist — the rest live behind the "其他" tile's full-list
+// sheet. 4 (not 5/6, matching the grid's own column counts) so the "其他"
+// tile itself always has room as the row's last slot at every breakpoint,
+// rather than wrapping to a second row on the narrower mobile grid.
+const CATEGORY_PREVIEW_COUNT = 4;
 
 // Category grid ("一般記帳") + its amount entry sheet — used inline by
 // quick-add-section.tsx on the home page AND opened from the global
@@ -75,6 +82,7 @@ export function QuickAddCategoryFlow({
   // signal passed to the Drawer.
   const [selected, setSelected] = useState<QuickAddCategory | null>(null);
   const [amountSheetOpen, setAmountSheetOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [isSharedExpense, setIsSharedExpense] = useState(false);
@@ -89,6 +97,12 @@ export function QuickAddCategoryFlow({
 
   // "分帳" reuses the expense category list — 分類就照支出設定的分類.
   const visibleCategories = categories.filter((c) => c.type === (tab === "shared" ? "expense" : tab));
+  // Order here is whatever /categories' drag-to-reorder already set
+  // (sortOrder) — reused as-is as "常用在前" rather than inventing a
+  // separate favorites concept, so putting a category first in the
+  // management page is the same action as putting it first on this grid.
+  const previewCategories = visibleCategories.slice(0, CATEGORY_PREVIEW_COUNT);
+  const hasMoreCategories = visibleCategories.length > CATEGORY_PREVIEW_COUNT;
 
   function reset() {
     setSelected(null);
@@ -116,6 +130,14 @@ export function QuickAddCategoryFlow({
     // toggle stays visible/editable below in case they change their mind.
     setIsSharedExpense(tab === "shared");
     setAmountSheetOpen(true);
+  }
+
+  // Picking from the "其他" overflow sheet closes that sheet first — the
+  // amount sheet opening underneath while it's still animating shut would
+  // otherwise show both stacked briefly.
+  function pickFromMore(c: QuickAddCategory) {
+    setMoreOpen(false);
+    openCategory(c);
   }
 
   function selectAccount(account: QuickAddAccount) {
@@ -212,7 +234,7 @@ export function QuickAddCategoryFlow({
       </div>
 
       <StaggerList key={tab} className="grid grid-cols-5 gap-x-1 gap-y-4 sm:grid-cols-6">
-        {visibleCategories.map((c) => (
+        {previewCategories.map((c) => (
           <button
             key={c.id}
             type="button"
@@ -233,7 +255,48 @@ export function QuickAddCategoryFlow({
             </span>
           </button>
         ))}
+        {hasMoreCategories && (
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            onPointerDown={bounceDown}
+            onPointerUp={bounceUp}
+            onPointerLeave={bounceUp}
+            className="flex flex-col items-center gap-1.5 rounded-lg p-1 sm:hover:bg-muted/50"
+          >
+            <span className="flex h-[54px] w-[54px] items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <MoreHorizontal className="h-[22px] w-[22px]" strokeWidth={1.8} />
+            </span>
+            <span className="text-center text-[11.5px] font-medium leading-tight text-muted-foreground">其他</span>
+          </button>
+        )}
       </StaggerList>
+
+      <BottomSheet open={moreOpen} onOpenChange={setMoreOpen}>
+        <BottomSheetContent>
+          <BottomSheetTitle>選擇分類</BottomSheetTitle>
+          <div className="grid grid-cols-5 gap-x-1 gap-y-4 sm:grid-cols-6">
+            {visibleCategories.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => pickFromMore(c)}
+                className="flex flex-col items-center gap-1.5 rounded-lg p-1 transition-colors hover:bg-muted/50"
+              >
+                <CategoryIconBadge
+                  icon={c.icon}
+                  color={c.color}
+                  className="h-[54px] w-[54px]"
+                  iconClassName="h-[22px] w-[22px]"
+                />
+                <span className="line-clamp-2 text-center text-[11.5px] font-medium leading-tight text-muted-foreground">
+                  {categoryDisplayName(c.name)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </BottomSheetContent>
+      </BottomSheet>
 
       <BottomSheet
         open={amountSheetOpen}
