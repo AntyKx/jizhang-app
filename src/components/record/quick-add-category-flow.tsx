@@ -14,6 +14,7 @@ import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { SharedExpenseToggle } from "@/components/record/shared-expense-toggle";
 import { CategoryIconBadge } from "@/components/category-icon";
+import { categoryDisplayName } from "@/lib/category-display-name";
 import { StaggerList } from "@/components/motion/stagger-list";
 import { SlidingIndicator } from "@/components/motion/sliding-indicator";
 import { paymentMethods, type PaymentMethod } from "@/lib/payment-methods";
@@ -165,19 +166,19 @@ export function QuickAddCategoryFlow({
     <>
       <div
         ref={toggleRef}
-        className="relative isolate flex items-center justify-center gap-2 rounded-full bg-muted p-1"
+        className="relative isolate flex h-12 items-center justify-center gap-1 rounded-xl bg-muted p-1"
       >
         <SlidingIndicator
           activeKey={tab}
           containerRef={toggleRef}
-          className="-z-10 rounded-full bg-primary shadow-sm"
+          className="-z-10 rounded-lg bg-primary shadow-[0_4px_10px_-4px_var(--primary)]"
         />
         <button
           type="button"
           data-key="expense"
           onClick={() => selectTab("expense")}
           className={cn(
-            "flex-1 rounded-full py-2 text-sm font-medium transition-colors",
+            "flex h-full flex-1 items-center justify-center rounded-lg text-sm font-medium transition-colors",
             tab === "expense" ? "text-primary-foreground" : "text-muted-foreground",
           )}
         >
@@ -188,7 +189,7 @@ export function QuickAddCategoryFlow({
           data-key="income"
           onClick={() => selectTab("income")}
           className={cn(
-            "flex-1 rounded-full py-2 text-sm font-medium transition-colors",
+            "flex h-full flex-1 items-center justify-center rounded-lg text-sm font-medium transition-colors",
             tab === "income" ? "text-primary-foreground" : "text-muted-foreground",
           )}
         >
@@ -200,7 +201,7 @@ export function QuickAddCategoryFlow({
             data-key="shared"
             onClick={() => selectTab("shared")}
             className={cn(
-              "flex flex-1 items-center justify-center gap-1 rounded-full py-2 text-sm font-medium transition-colors",
+              "flex h-full flex-1 items-center justify-center gap-1 rounded-lg text-sm font-medium transition-colors",
               tab === "shared" ? "text-primary-foreground" : "text-muted-foreground",
             )}
           >
@@ -210,7 +211,7 @@ export function QuickAddCategoryFlow({
         )}
       </div>
 
-      <StaggerList key={tab} className="grid grid-cols-5 gap-2 sm:grid-cols-6">
+      <StaggerList key={tab} className="grid grid-cols-5 gap-x-1 gap-y-4 sm:grid-cols-6">
         {visibleCategories.map((c) => (
           <button
             key={c.id}
@@ -219,10 +220,17 @@ export function QuickAddCategoryFlow({
             onPointerDown={bounceDown}
             onPointerUp={bounceUp}
             onPointerLeave={bounceUp}
-            className="flex flex-col items-center gap-1 rounded-lg p-1 transition-colors hover:bg-muted/60"
+            className="flex flex-col items-center gap-1.5 rounded-lg p-1 sm:hover:bg-muted/50"
           >
-            <CategoryIconBadge icon={c.icon} color={c.color} className="h-11 w-11" iconClassName="h-5 w-5" />
-            <span className="text-[11px] text-muted-foreground">{c.name}</span>
+            <CategoryIconBadge
+              icon={c.icon}
+              color={c.color}
+              className="h-[54px] w-[54px]"
+              iconClassName="h-[22px] w-[22px]"
+            />
+            <span className="line-clamp-2 text-center text-[11.5px] font-medium leading-tight text-muted-foreground">
+              {categoryDisplayName(c.name)}
+            </span>
           </button>
         ))}
       </StaggerList>

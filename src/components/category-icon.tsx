@@ -38,17 +38,12 @@ export function CategoryIcon({
   );
 }
 
-// Soft-tint rounded-square "chip" — a light wash of the category's own
-// color behind an icon in that same color (same color-mix formula
-// CategoryPill already uses for its tag background, just applied to an
-// icon instead of text). `className` sizes the chip itself (width/height +
-// rounding); `iconClassName` sizes the glyph inside.
-//
-// This project's --radius base is 1rem (not Tailwind's default), so
-// rounded-xl resolves to 22.4px — on a 36px badge that's past half the box
-// size, which CSS clamps to a full circle no matter what the class says.
-// rounded-md (0.8 * 1rem ≈ 12.8px) is the one that actually reads as a
-// rounded square at these sizes.
+// Soft-tint circular "chip" — a light wash of the category's own color
+// behind an icon in that same color (same color-mix formula CategoryPill
+// already uses for its tag background, just applied to an icon instead of
+// text). `className` sizes the chip itself (width/height); `iconClassName`
+// sizes the glyph inside. Circular rather than a rounded square — reads
+// less like a dashboard icon grid and more like a warm lifestyle app.
 export function CategoryIconBadge({
   icon,
   color,
@@ -63,7 +58,7 @@ export function CategoryIconBadge({
   const c = color ?? "var(--primary)";
   return (
     <span
-      className={cn("flex shrink-0 items-center justify-center rounded-md", className)}
+      className={cn("flex shrink-0 items-center justify-center rounded-full", className)}
       style={{ backgroundColor: categoryTint(c) }}
     >
       <CategoryIcon icon={icon} color={c} className={cn("shrink-0", iconClassName)} />

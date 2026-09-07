@@ -33,7 +33,7 @@ export function HomeSummary({
   const overBudget = remaining != null && remaining < 0;
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/10 via-card to-card shadow-md shadow-foreground/10">
+    <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/10 via-card to-card shadow-sm shadow-foreground/5">
       <div className="flex flex-col gap-4 p-5">
         <div className="flex flex-col gap-0.5">
           <span className="text-xl font-semibold">
@@ -51,9 +51,14 @@ export function HomeSummary({
             block above is clear of the sticker's shorter footprint, so it
             keeps the full card width for wrapping. */}
         <div className="flex flex-col gap-1.5 pr-[43%]">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">今日支出</span>
-            <span className="font-semibold text-destructive tabular-nums">
+          <div className="flex items-baseline justify-between">
+            <span className="text-sm text-muted-foreground">今日支出</span>
+            <span
+              className={cn(
+                "text-xl font-semibold tabular-nums",
+                todayExpense > 0 ? "text-destructive" : "text-foreground",
+              )}
+            >
               NT$ {Math.round(todayExpense).toLocaleString("zh-TW")}
             </span>
           </div>

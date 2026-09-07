@@ -13,6 +13,7 @@ export default async function CategoriesPage() {
       id: categories.id,
       name: categories.name,
       icon: categories.icon,
+      color: categories.color,
       type: categories.type,
       userId: categories.userId,
     })

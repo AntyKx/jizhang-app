@@ -1,6 +1,8 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { ChevronRight, LayoutGrid } from "lucide-react";
 import { QuickAddCategoryFlow } from "@/components/record/quick-add-category-flow";
 import { PersonalAiQuickAddFlow } from "@/components/record/personal-ai-quick-add-flow";
 import type { QuickAddAccount, QuickAddCategory } from "@/lib/quick-add-context";
@@ -41,19 +43,35 @@ export function QuickAddSection({
         initialShowScan={searchParams.get("action") === "scan"}
       />
 
-      <span className="text-sm font-semibold text-muted-foreground">選擇分類</span>
+      <div className="flex flex-col gap-4 rounded-3xl border bg-card p-5 shadow-sm shadow-foreground/5">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-2 text-[15px] font-semibold">
+            <span className="flex size-6 items-center justify-center rounded-md bg-primary/12 text-primary">
+              <LayoutGrid className="size-3.5" strokeWidth={2} />
+            </span>
+            選擇分類
+          </span>
+          <Link
+            href="/categories"
+            className="flex items-center gap-0.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            管理分類
+            <ChevronRight className="size-3.5" strokeWidth={2} />
+          </Link>
+        </div>
 
-      {/* 分帳記帳 used to be a separate pill button + dialog here; it's now
-          just a third tab next to 支出/收入 inside the flow below (see
-          QuickAddCategoryFlow's enableSharedTab), reusing the same
-          category-grid → amount-sheet flow instead of a second form. */}
-      <QuickAddCategoryFlow
-        categories={categories}
-        accounts={accounts}
-        partnerName={partnerName}
-        enableSharedTab
-        sharedLocked={sharedLocked}
-      />
+        {/* 分帳記帳 used to be a separate pill button + dialog here; it's now
+            just a third tab next to 支出/收入 inside the flow below (see
+            QuickAddCategoryFlow's enableSharedTab), reusing the same
+            category-grid → amount-sheet flow instead of a second form. */}
+        <QuickAddCategoryFlow
+          categories={categories}
+          accounts={accounts}
+          partnerName={partnerName}
+          enableSharedTab
+          sharedLocked={sharedLocked}
+        />
+      </div>
     </div>
   );
 }

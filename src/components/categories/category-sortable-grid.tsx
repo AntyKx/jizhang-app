@@ -18,13 +18,13 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, X } from "lucide-react";
-import { CategoryIcon } from "@/components/category-icon";
+import { CategoryIconBadge } from "@/components/category-icon";
 import { EditCategoryDialog } from "@/components/categories/edit-category-dialog";
 import { deleteCategory, reorderCategories } from "@/app/(app)/categories/actions";
 import { isFail } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 
-type Category = { id: string; name: string; icon: string | null; userId: string | null };
+type Category = { id: string; name: string; icon: string | null; color: string | null; userId: string | null };
 
 function SortableTile({
   category,
@@ -102,7 +102,12 @@ function SortableTile({
       >
         <GripVertical className="h-3 w-3" />
       </button>
-      <CategoryIcon icon={category.icon} className="h-7 w-7 text-2xl" />
+      <CategoryIconBadge
+        icon={category.icon}
+        color={category.color}
+        className="h-11 w-11"
+        iconClassName="h-5 w-5"
+      />
       <span className="text-xs text-muted-foreground">
         {confirmingDelete ? "再點一次刪除" : category.name}
       </span>
