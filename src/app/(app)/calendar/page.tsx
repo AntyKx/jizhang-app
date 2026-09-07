@@ -9,7 +9,7 @@ import {
   startOfMonth,
   subMonths,
 } from "date-fns";
-import { and, eq, gte, isNull, lte, or } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { db } from "@/db";
 import { accounts, categories, sharedExpenses, transactions, userSettings } from "@/db/schema";
@@ -81,9 +81,9 @@ export default async function CalendarPage({
         ),
       ),
     db
-      .select({ id: categories.id, name: categories.name, icon: categories.icon, type: categories.type })
+      .select({ id: categories.id, name: categories.name, icon: categories.icon, color: categories.color, type: categories.type })
       .from(categories)
-      .where(or(isNull(categories.userId), eq(categories.userId, userId)))
+      .where(eq(categories.userId, userId))
       .orderBy(categories.sortOrder),
     listAccounts(userId),
     db

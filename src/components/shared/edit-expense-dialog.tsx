@@ -19,7 +19,7 @@ import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
 import { cn } from "@/lib/utils";
 
-type Category = { id: string; name: string; icon: string | null };
+type Category = { id: string; name: string; icon: string | null; color: string | null };
 
 export type EditableSharedExpense = {
   id: string;

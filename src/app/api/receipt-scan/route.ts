@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { format } from "date-fns";
-import { and, or, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { categories } from "@/db/schema";
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       .select({ name: categories.name })
       .from(categories)
       .where(
-        and(eq(categories.type, "expense"), or(isNull(categories.userId), eq(categories.userId, userId))),
+        and(eq(categories.type, "expense"), eq(categories.userId, userId)),
       ),
     listAccounts(userId),
   ]);

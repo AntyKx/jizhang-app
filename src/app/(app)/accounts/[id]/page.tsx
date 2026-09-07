@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, desc, eq, isNull, ne, or, gte, lte } from "drizzle-orm";
+import { and, desc, eq, ne, or, gte, lte } from "drizzle-orm";
 import { ChevronLeft } from "lucide-react";
 import { db } from "@/db";
 import { accounts, categories, sharedExpenses, transactions, userSettings } from "@/db/schema";
@@ -89,9 +89,9 @@ export default async function AccountDetailPage({
         )
         .orderBy(desc(transactions.occurredAt), desc(transactions.createdAt)),
       db
-        .select({ id: categories.id, name: categories.name, icon: categories.icon, type: categories.type })
+        .select({ id: categories.id, name: categories.name, icon: categories.icon, color: categories.color, type: categories.type })
         .from(categories)
-        .where(or(isNull(categories.userId), eq(categories.userId, userId)))
+        .where(eq(categories.userId, userId))
         .orderBy(categories.sortOrder),
       listAccounts(userId),
       listArchivedAccounts(userId),

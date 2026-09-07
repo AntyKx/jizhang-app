@@ -17,14 +17,14 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, X } from "lucide-react";
+import { X } from "lucide-react";
 import { CategoryIconBadge } from "@/components/category-icon";
 import { EditCategoryDialog } from "@/components/categories/edit-category-dialog";
 import { deleteCategory, reorderCategories } from "@/app/(app)/categories/actions";
 import { isFail } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 
-type Category = { id: string; name: string; icon: string | null; color: string | null; userId: string | null };
+type Category = { id: string; name: string; icon: string | null; color: string | null };
 
 function SortableTile({
   category,
@@ -40,10 +40,6 @@ function SortableTile({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: category.id,
   });
-  // System default categories (userId === null) are shared across every
-  // user — editing/deleting them here is blocked server-side too, but
-  // hiding the affordance avoids a confusing silent no-op.
-  const isSystemCategory = category.userId === null;
   // Scale merges into the same transform as the drag translate (has to
   // stay in the one property so the tile still tracks the finger 1:1, no
   // lag) — the "pop" feel instead comes from the shadow/opacity, which
@@ -60,47 +56,33 @@ function SortableTile({
       ref={setNodeRef}
       style={{ transform: dragTransform, transition }}
       onClick={() => {
-        if (isDragging) return;
-        if (isSystemCategory) {
-          toast.info("系統預設分類無法編輯，如需自訂請新增一個新分類");
-          return;
-        }
-        onTap();
+        if (!isDragging) onTap();
       }}
+      // No dedicated grab handle — the whole tile is the drag surface, iOS
+      // home-screen style: a quick tap opens edit, a long press (see the
+      // sensor's activationConstraint below) starts a drag. touch-action:
+      // none is what lets dnd-kit's delay timer win the gesture instead of
+      // the browser starting its own scroll on touch-down.
+      {...attributes}
+      {...listeners}
       className={cn(
-        "relative flex flex-col items-center gap-1.5 rounded-2xl border bg-card p-3 select-none transition-shadow duration-150",
+        "relative flex touch-none flex-col items-center gap-1.5 rounded-2xl border bg-card p-3 select-none transition-shadow duration-150",
         isDragging && "z-10 opacity-90 shadow-xl",
       )}
     >
-      {!isSystemCategory && (
-        <button
-          type="button"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDeleteTap();
-          }}
-          className={cn(
-            "absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full text-white transition-colors",
-            confirmingDelete ? "bg-destructive" : "bg-muted-foreground/60 hover:bg-destructive",
-          )}
-        >
-          <X className="h-3 w-3" />
-        </button>
-      )}
-      {/* Dedicated drag handle, same reasoning as accounts-list.tsx's
-          SortableAccountCard — dnd-kit needs touch-action: none to reliably
-          capture the drag gesture on touch, but scoping that to just this
-          small corner handle (rather than the whole tile) keeps the rest of
-          the grid natively scrollable. */}
       <button
         type="button"
-        aria-label="拖曳排序"
-        {...attributes}
-        {...listeners}
-        className="absolute -top-1.5 -left-1.5 flex h-5 w-5 touch-none cursor-grab items-center justify-center rounded-full bg-muted-foreground/60 text-white active:cursor-grabbing"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onDeleteTap();
+        }}
+        className={cn(
+          "absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full text-white transition-colors",
+          confirmingDelete ? "bg-destructive" : "bg-muted-foreground/60 hover:bg-destructive",
+        )}
       >
-        <GripVertical className="h-3 w-3" />
+        <X className="h-3.5 w-3.5" />
       </button>
       <CategoryIconBadge
         icon={category.icon}
@@ -121,10 +103,12 @@ export function CategorySortableGrid({ categories }: { categories: Category[] })
   const [editing, setEditing] = useState<Category | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
-  // A small distance threshold (not a long-press delay) — dragging only
-  // starts from each tile's dedicated grip handle (not the whole tile), so
-  // there's no more conflict with scrolling to guard against.
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  // iOS-style long press instead of a dedicated handle: the same 500ms as
+  // this app's other long-press affordance (SwipeToDelete's onLongPress).
+  // `tolerance` cancels the drag-start if the finger moves more than 8px
+  // before the delay elapses, so a normal scroll swipe starting on a tile
+  // still falls through as a scroll instead of misfiring a drag.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { delay: 500, tolerance: 8 } }));
 
   if (categories !== prevCategories) {
     setPrevCategories(categories);
@@ -157,7 +141,7 @@ export function CategorySortableGrid({ categories }: { categories: Category[] })
       if (isFail(result)) {
         toast.error(result.error);
         // Removed optimistically above — put it back since the delete
-        // didn't actually happen (e.g. a system default category).
+        // didn't actually happen.
         setItems((prev) => (prev.some((i) => i.id === id) ? prev : [...prev, ...categories.filter((c) => c.id === id)]));
         return;
       }
@@ -169,7 +153,7 @@ export function CategorySortableGrid({ categories }: { categories: Category[] })
     <>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={items.map((i) => i.id)} strategy={rectSortingStrategy}>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-4 gap-4">
             {items.map((c) => (
               <SortableTile
                 key={c.id}

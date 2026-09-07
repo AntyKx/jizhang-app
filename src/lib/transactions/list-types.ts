@@ -2,7 +2,7 @@ import { type AccountType } from "@/lib/account-type";
 
 export const TRANSACTIONS_PAGE_SIZE = 50;
 
-export type Category = { id: string; name: string; icon: string | null; type: "income" | "expense" };
+export type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
 export type Account = { id: string; name: string; type: AccountType };
 export type AccountInfo = { name: string; type: AccountType };
 

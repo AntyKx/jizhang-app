@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { QuickAddBar } from "@/components/record/quick-add-bar";
 import { SharedTextQuickAdd } from "@/components/shared/text-quick-add";
 
-type Category = { id: string; name: string; icon: string | null };
+type Category = { id: string; name: string; icon: string | null; color: string | null };
 
 export function SharedQuickAddFlow({
   categories,

@@ -1,5 +1,5 @@
 import { format, startOfMonth, endOfMonth } from "date-fns";
-import { and, eq, gte, isNull, lte, or } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { budgets, categories, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
@@ -28,12 +28,7 @@ export default async function BudgetsPage() {
     db
       .select({ id: categories.id, name: categories.name })
       .from(categories)
-      .where(
-        and(
-          eq(categories.type, "expense"),
-          or(isNull(categories.userId), eq(categories.userId, userId)),
-        ),
-      )
+      .where(and(eq(categories.type, "expense"), eq(categories.userId, userId)))
       .orderBy(categories.sortOrder),
     db
       .select({

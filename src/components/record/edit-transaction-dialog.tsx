@@ -30,7 +30,7 @@ import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { PaymentMethodIcon } from "@/components/transactions/payment-method-icon";
 import { cn } from "@/lib/utils";
 
-type Category = { id: string; name: string; icon: string | null; type: "income" | "expense" };
+type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
 type Account = { id: string; name: string; type: AccountType };
 
 export type EditableTransaction = {

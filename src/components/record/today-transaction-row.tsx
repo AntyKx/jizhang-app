@@ -19,7 +19,7 @@ import { paymentMethodLabel } from "@/lib/payment-methods";
 import { formatTimeInTaipei } from "@/lib/date";
 import { type AccountType } from "@/lib/account-type";
 
-type Category = { id: string; name: string; icon: string | null; type: "income" | "expense" };
+type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
 type Account = { id: string; name: string; type: AccountType };
 
 export type TodayTransaction = {

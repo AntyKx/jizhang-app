@@ -11,7 +11,7 @@ import { isFail } from "@/lib/action-result";
 import { EditSharedExpenseDialog } from "@/components/shared/edit-expense-dialog";
 import { SwipeToDelete } from "@/components/transactions/swipe-to-delete";
 
-type Category = { id: string; name: string; icon: string | null };
+type Category = { id: string; name: string; icon: string | null; color: string | null };
 
 export type SharedExpense = {
   id: string;

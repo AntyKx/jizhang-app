@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CategoryIcon } from "@/components/category-icon";
+import { CategoryIconBadge } from "@/components/category-icon";
 import { Button } from "@/components/ui/button";
 import { postRecurringOccurrence, skipRecurringOccurrence } from "@/app/(app)/subscriptions/actions";
 import { isFail } from "@/lib/action-result";
@@ -14,6 +14,7 @@ export type DueRule = {
   amount: string;
   type: "income" | "expense";
   categoryIcon: string | null;
+  categoryColor: string | null;
   nextOccurrence: string;
 };
 
@@ -62,7 +63,7 @@ export function DueSubscriptionsCard({ rules }: { rules: DueRule[] }) {
         {rules.map((r) => (
           <div key={r.id} className="flex items-center justify-between gap-2 px-4 py-3">
             <div className="flex items-center gap-2">
-              <CategoryIcon icon={r.categoryIcon} className="h-6 w-6 text-xl" />
+              <CategoryIconBadge icon={r.categoryIcon} color={r.categoryColor} className="h-8 w-8" iconClassName="h-4 w-4" />
               <div className="flex flex-col">
                 <span className="text-sm">{r.name}</span>
                 <span className="text-xs text-muted-foreground">{r.nextOccurrence}</span>

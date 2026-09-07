@@ -1,5 +1,5 @@
 import { addDays, addMonths, addWeeks, addYears } from "date-fns";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, recurringRules } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
@@ -53,9 +53,9 @@ export default async function SubscriptionsPage() {
   // edit-transaction-dialog.tsx.
   const [allCategories, accountRows, rules] = await Promise.all([
     db
-      .select({ id: categories.id, name: categories.name, icon: categories.icon, type: categories.type })
+      .select({ id: categories.id, name: categories.name, icon: categories.icon, color: categories.color, type: categories.type })
       .from(categories)
-      .where(or(isNull(categories.userId), eq(categories.userId, userId)))
+      .where(eq(categories.userId, userId))
       .orderBy(categories.sortOrder),
     listAccounts(userId),
     db

@@ -10,7 +10,7 @@ import { PartnerNameDialog } from "@/components/shared/partner-name-dialog";
 import { BearIllustration } from "@/components/bear-illustration";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-type Category = { id: string; name: string; icon: string | null };
+type Category = { id: string; name: string; icon: string | null; color: string | null };
 
 export function SharedLedgerDashboard({
   partnerName,

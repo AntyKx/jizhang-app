@@ -18,6 +18,7 @@ export async function DueSubscriptionsSection({ userId }: { userId: string }) {
       amount: recurringRules.amount,
       type: recurringRules.type,
       categoryIcon: categories.icon,
+      categoryColor: categories.color,
       nextOccurrence: recurringRules.nextOccurrence,
     })
     .from(recurringRules)

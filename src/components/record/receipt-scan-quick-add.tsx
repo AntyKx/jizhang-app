@@ -28,7 +28,7 @@ import { compressImageToBase64 } from "@/lib/compress-image";
 import { todayInTaipeiString } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
-type Category = { id: string; name: string; icon: string | null; type: "income" | "expense" };
+type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
 type Account = { id: string; name: string; type: AccountType };
 
 type Draft = {

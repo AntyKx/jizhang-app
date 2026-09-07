@@ -3,11 +3,12 @@
 import { useTransition } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CategoryIcon } from "@/components/category-icon";
+import { CategoryIconBadge } from "@/components/category-icon";
+import { categoryDisplayName } from "@/lib/category-display-name";
 import { updateTransactionCategory } from "@/app/(app)/transactions/actions";
 import { isFail } from "@/lib/action-result";
 
-type Category = { id: string; name: string; icon: string | null; type: "income" | "expense" };
+type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
 
 export function QuickCategoryDialog({
   transaction,
@@ -46,17 +47,24 @@ export function QuickCategoryDialog({
         <DialogHeader>
           <DialogTitle>快速改分類</DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
+        <div className="grid grid-cols-4 gap-x-1 gap-y-4 sm:grid-cols-5">
           {relevantCategories.map((c) => (
             <button
               key={c.id}
               type="button"
               disabled={pending}
               onClick={() => pick(c.id)}
-              className="flex flex-col items-center gap-0.5 rounded-2xl border bg-card p-2 shadow-md shadow-foreground/10 transition-shadow hover:shadow-md disabled:opacity-50"
+              className="flex flex-col items-center gap-1.5 rounded-lg p-1 transition-colors hover:bg-muted/50 disabled:opacity-50"
             >
-              <CategoryIcon icon={c.icon} className="h-14 w-14 text-2xl" />
-              <span className="text-xs text-muted-foreground">{c.name}</span>
+              <CategoryIconBadge
+                icon={c.icon}
+                color={c.color}
+                className="h-[54px] w-[54px]"
+                iconClassName="h-[22px] w-[22px]"
+              />
+              <span className="line-clamp-2 text-center text-[11.5px] font-medium leading-tight text-muted-foreground">
+                {categoryDisplayName(c.name)}
+              </span>
             </button>
           ))}
         </div>

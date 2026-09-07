@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, lte, or } from "drizzle-orm";
+import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, sharedExpenses, userSettings } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
@@ -37,11 +37,9 @@ export default async function SharedLedgerPage({
       .where(and(eq(sharedExpenses.userId, userId), ...dateConditions))
       .orderBy(desc(sharedExpenses.occurredAt), desc(sharedExpenses.createdAt)),
     db
-      .select({ id: categories.id, name: categories.name, icon: categories.icon })
+      .select({ id: categories.id, name: categories.name, icon: categories.icon, color: categories.color })
       .from(categories)
-      .where(
-        and(eq(categories.type, "expense"), or(isNull(categories.userId), eq(categories.userId, userId))),
-      )
+      .where(and(eq(categories.type, "expense"), eq(categories.userId, userId)))
       .orderBy(categories.sortOrder),
     getMonthlySharedExpenseTrend(userId),
   ]);

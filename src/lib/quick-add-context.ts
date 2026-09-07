@@ -1,8 +1,9 @@
 import { cache } from "react";
-import { eq, isNull, or } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, userSettings } from "@/db/schema";
 import { getDefaultAccountId, listAccounts } from "@/lib/account";
+import { seedDefaultCategories } from "@/lib/default-categories";
 import type { AccountType } from "@/lib/account-type";
 
 export type QuickAddCategory = {
@@ -13,6 +14,20 @@ export type QuickAddCategory = {
   type: "income" | "expense";
 };
 export type QuickAddAccount = { id: string; name: string; type: AccountType };
+
+async function listCategories(userId: string) {
+  return db
+    .select({
+      id: categories.id,
+      name: categories.name,
+      icon: categories.icon,
+      color: categories.color,
+      type: categories.type,
+    })
+    .from(categories)
+    .where(eq(categories.userId, userId))
+    .orderBy(categories.sortOrder);
+}
 
 // Shared by every surface that can trigger a quick-add flow (the /record
 // page and the global FAB rendered from the (app) layout on every page) so
@@ -26,21 +41,21 @@ export const getQuickAddContext = cache(async (userId: string): Promise<{
   accounts: QuickAddAccount[];
   partnerName: string;
 }> => {
-  const [userCategories, accountRows, settingsRows] = await Promise.all([
-    db
-      .select({
-        id: categories.id,
-        name: categories.name,
-        icon: categories.icon,
-        color: categories.color,
-        type: categories.type,
-      })
-      .from(categories)
-      .where(or(isNull(categories.userId), eq(categories.userId, userId)))
-      .orderBy(categories.sortOrder),
+  const [initialCategories, accountRows, settingsRows] = await Promise.all([
+    listCategories(userId),
     listAccounts(userId),
     db.select({ partnerName: userSettings.partnerName }).from(userSettings).where(eq(userSettings.userId, userId)),
   ]);
+
+  // A brand-new user has zero categories of their own — seed the starter
+  // set once, same "create on first need" pattern as the account fallback
+  // right below. Every category is the user's own from here on (no more
+  // shared/locked rows), so this only ever needs to run once per account.
+  let userCategories = initialCategories;
+  if (userCategories.length === 0) {
+    await seedDefaultCategories(userId);
+    userCategories = await listCategories(userId);
+  }
 
   // Accounts flagged "exclude from net worth" (e.g. a fixed-deposit account)
   // are deliberately left out of the quick-add account picker — they're

@@ -17,7 +17,7 @@ import { CategoryPickerSheet } from "@/components/categories/category-picker-she
 import { todayInTaipeiString } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
-type Category = { id: string; name: string; icon: string | null };
+type Category = { id: string; name: string; icon: string | null; color: string | null };
 
 export function AddSharedExpenseDialog({
   partnerName,

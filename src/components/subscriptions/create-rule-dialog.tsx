@@ -29,7 +29,7 @@ import { paymentMethods, type PaymentMethod } from "@/lib/payment-methods";
 import { accountTypeToPaymentMethod, type AccountType } from "@/lib/account-type";
 import { cn } from "@/lib/utils";
 
-type Category = { id: string; name: string; icon: string | null; type: "income" | "expense" };
+type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
 type Account = { id: string; name: string; type: AccountType };
 
 export function CreateRuleDialog({

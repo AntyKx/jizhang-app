@@ -21,7 +21,7 @@ type Rule = {
   categoryId: string | null;
   isSubscription: boolean;
 };
-type Category = { id: string; name: string; icon: string | null; type: "income" | "expense" };
+type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
 type Account = { id: string; name: string; type: AccountType };
 
 export function RuleRow({

@@ -38,12 +38,14 @@ export function CategoryIcon({
   );
 }
 
-// Soft-tint circular "chip" — a light wash of the category's own color
+// Soft-tint "squircle" chip — a light wash of the category's own color
 // behind an icon in that same color (same color-mix formula CategoryPill
 // already uses for its tag background, just applied to an icon instead of
 // text). `className` sizes the chip itself (width/height); `iconClassName`
-// sizes the glyph inside. Circular rather than a rounded square — reads
-// less like a dashboard icon grid and more like a warm lifestyle app.
+// sizes the glyph inside. 30% radius approximates the rounded-square look
+// of an iOS app icon — softer than a sharp square, more distinctive than a
+// plain circle. Picked by comparing shape options side by side (circle /
+// rounded-square / squircle / sharp square) before settling here.
 export function CategoryIconBadge({
   icon,
   color,
@@ -58,7 +60,7 @@ export function CategoryIconBadge({
   const c = color ?? "var(--primary)";
   return (
     <span
-      className={cn("flex shrink-0 items-center justify-center rounded-full", className)}
+      className={cn("flex shrink-0 items-center justify-center rounded-[30%]", className)}
       style={{ backgroundColor: categoryTint(c) }}
     >
       <CategoryIcon icon={icon} color={c} className={cn("shrink-0", iconClassName)} />

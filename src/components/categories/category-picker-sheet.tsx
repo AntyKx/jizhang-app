@@ -4,9 +4,10 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { BottomSheet, BottomSheetContent, BottomSheetTitle } from "@/components/ui/bottom-sheet";
 import { CategoryIcon, CategoryIconBadge } from "@/components/category-icon";
+import { categoryDisplayName } from "@/lib/category-display-name";
 import { cn } from "@/lib/utils";
 
-export type PickerCategory = { id: string; name: string; icon?: string | null };
+export type PickerCategory = { id: string; name: string; icon?: string | null; color?: string | null };
 
 // Drop-in replacement for the shadcn `<Select>` category dropdown — that
 // dropdown renders every category as a single-column list, which gets very
@@ -49,7 +50,7 @@ export function CategoryPickerSheet({
         <span className={cn("flex flex-1 items-center gap-1.5 truncate text-left", !selected && "text-muted-foreground")}>
           {selected ? (
             <>
-              <CategoryIcon icon={selected.icon ?? null} className="h-4 w-4 shrink-0" />
+              <CategoryIcon icon={selected.icon ?? null} color={selected.color} className="h-4 w-4 shrink-0" />
               {selected.name}
             </>
           ) : (
@@ -62,19 +63,19 @@ export function CategoryPickerSheet({
       <BottomSheet open={open} onOpenChange={setOpen}>
         <BottomSheetContent>
           <BottomSheetTitle>選擇分類</BottomSheetTitle>
-          <div className="grid grid-cols-5 gap-2 sm:grid-cols-6">
+          <div className="grid grid-cols-5 gap-x-1 gap-y-4 sm:grid-cols-6">
             <button
               type="button"
               onClick={() => pick("")}
               className={cn(
-                "flex flex-col items-center gap-1 rounded-lg p-1 transition-colors hover:bg-muted/60",
+                "flex flex-col items-center gap-1.5 rounded-lg p-1 transition-colors hover:bg-muted/50",
                 !value && "bg-primary/10",
               )}
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-md bg-muted text-base text-muted-foreground">
+              <span className="flex h-[54px] w-[54px] items-center justify-center rounded-[30%] bg-muted text-base text-muted-foreground">
                 —
               </span>
-              <span className="text-[11px] text-muted-foreground">不指定</span>
+              <span className="text-[11.5px] font-medium text-muted-foreground">不指定</span>
             </button>
             {categories.map((c) => (
               <button
@@ -82,12 +83,19 @@ export function CategoryPickerSheet({
                 type="button"
                 onClick={() => pick(c.id)}
                 className={cn(
-                  "flex flex-col items-center gap-1 rounded-lg p-1 transition-colors hover:bg-muted/60",
+                  "flex flex-col items-center gap-1.5 rounded-lg p-1 transition-colors hover:bg-muted/50",
                   value === c.id && "bg-primary/10",
                 )}
               >
-                <CategoryIconBadge icon={c.icon ?? null} className="h-11 w-11" iconClassName="h-5 w-5" />
-                <span className="text-[11px] text-muted-foreground">{c.name}</span>
+                <CategoryIconBadge
+                  icon={c.icon ?? null}
+                  color={c.color}
+                  className="h-[54px] w-[54px]"
+                  iconClassName="h-[22px] w-[22px]"
+                />
+                <span className="line-clamp-2 text-center text-[11.5px] font-medium leading-tight text-muted-foreground">
+                  {categoryDisplayName(c.name)}
+                </span>
               </button>
             ))}
           </div>

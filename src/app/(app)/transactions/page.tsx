@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, ne, or } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, sharedExpenses, transactions, userSettings } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
@@ -84,7 +84,7 @@ export default async function TransactionsPage({
         type: categories.type,
       })
       .from(categories)
-      .where(or(isNull(categories.userId), eq(categories.userId, userId)))
+      .where(eq(categories.userId, userId))
       .orderBy(categories.sortOrder),
     listAccounts(userId),
     listArchivedAccounts(userId),

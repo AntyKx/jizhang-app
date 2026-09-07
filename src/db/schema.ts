@@ -103,7 +103,13 @@ export const accounts = pgTable("accounts", {
 
 export const categories = pgTable("categories", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id"), // null = system default category, visible to everyone
+  // Always owned by exactly one user — there used to be a shared
+  // userId-IS-NULL "system default" row visible to (and un-editable by)
+  // everyone, but that meant one user's edit/delete/reorder would've
+  // silently affected every other user's copy too. New users get a starter
+  // set seeded into their own account instead (see
+  // lib/default-categories.ts's seedDefaultCategories).
+  userId: text("user_id").notNull(),
   name: text("name").notNull(),
   type: categoryTypeEnum("type").notNull(),
   icon: text("icon").default("tag"),
