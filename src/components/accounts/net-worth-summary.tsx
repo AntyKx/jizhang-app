@@ -9,7 +9,7 @@ export function NetWorthSummary({
   accountCount: number;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-3xl border bg-gradient-to-br from-primary/10 via-card to-card p-5 shadow-md shadow-foreground/10">
+    <div className="flex items-center justify-between rounded-3xl bg-gradient-to-br from-secondary via-secondary/40 to-transparent p-5">
       <div className="flex flex-col gap-1">
         <span className="text-sm text-muted-foreground">總資產</span>
         {total === null ? (
@@ -21,7 +21,7 @@ export function NetWorthSummary({
         )}
         <span className="text-xs text-muted-foreground">共 {accountCount} 個帳戶</span>
       </div>
-      <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+      <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-card text-primary shadow-sm shadow-foreground/10">
         <Wallet className="size-6" strokeWidth={1.75} />
       </span>
     </div>

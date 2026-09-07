@@ -58,38 +58,39 @@ export default async function StatsPage({
       <StatsRangeSwitcher basePath="/stats" range={range} />
 
       {rangeTransactions.length === 0 && (
-        <div className="flex flex-col items-center gap-2 rounded-2xl border bg-card p-6 text-center shadow-md shadow-foreground/10">
+        <div className="flex flex-col items-center gap-2 py-8 text-center">
           <BearIllustration name="reports" size={96} />
           <p className="text-muted-foreground text-sm">這段時間還沒有任何紀錄，開始記帳來看看你的第一份報表吧！</p>
         </div>
       )}
 
       <StaggerList className="flex flex-col gap-6">
-        <div className="grid grid-cols-3 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-muted-foreground text-sm font-normal">收入</CardTitle>
-            </CardHeader>
-            <CardContent className="text-2xl font-semibold text-emerald-600">
+        {/* Income/expense/balance merged into one banner (rather than 3
+            separate Cards) — they're 3 facets of the same equation, not
+            independent datasets, so they read better as one grouped stat
+            row than as 3 boxes. Everything below this stays its own Card:
+            each is a genuinely different analysis (comparison, category
+            breakdown, anomalies), and the card boundary is what lets a
+            reader tell where one dataset ends and the next begins. */}
+        <div className="flex items-stretch divide-x rounded-3xl border bg-card py-4">
+          <div className="flex flex-1 flex-col items-center gap-1">
+            <span className="text-muted-foreground text-sm font-normal">收入</span>
+            <span className="text-lg font-semibold text-emerald-600">
               <CountUpNumber value={income} />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-muted-foreground text-sm font-normal">支出</CardTitle>
-            </CardHeader>
-            <CardContent className="text-2xl font-semibold text-destructive">
+            </span>
+          </div>
+          <div className="flex flex-1 flex-col items-center gap-1">
+            <span className="text-muted-foreground text-sm font-normal">支出</span>
+            <span className="text-lg font-semibold text-destructive">
               <CountUpNumber value={expense} />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-muted-foreground text-sm font-normal">結餘</CardTitle>
-            </CardHeader>
-            <CardContent className={cn("text-2xl font-semibold", balance >= 0 ? "text-emerald-600" : "text-destructive")}>
+            </span>
+          </div>
+          <div className="flex flex-1 flex-col items-center gap-1">
+            <span className="text-muted-foreground text-sm font-normal">結餘</span>
+            <span className={cn("text-lg font-semibold", balance >= 0 ? "text-emerald-600" : "text-destructive")}>
               <CountUpNumber value={balance} />
-            </CardContent>
-          </Card>
+            </span>
+          </div>
         </div>
 
         <Card>

@@ -42,7 +42,7 @@ export function TransferHistory({
   return (
     <div className="flex flex-col gap-2">
       <span className="text-sm font-medium text-muted-foreground">轉帳紀錄</span>
-      <div className="flex flex-col divide-y overflow-hidden rounded-2xl border bg-card">
+      <div className="flex flex-col divide-y">
         {transfers.map((t) => {
           const from = accountsById[t.fromAccountId];
           const to = t.toAccountId ? accountsById[t.toAccountId] : undefined;

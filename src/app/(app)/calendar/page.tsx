@@ -20,7 +20,6 @@ import { CategoryIcon } from "@/components/category-icon";
 import { TodayTransactionRow } from "@/components/record/today-transaction-row";
 import { BearIllustration } from "@/components/bear-illustration";
 import { heatmapLevel, SEQUENTIAL_HEATMAP_STEPS, SEQUENTIAL_HEATMAP_TEXT } from "@/components/stats/chart-colors";
-import { Card, CardContent } from "@/components/ui/card";
 import { StaggerList } from "@/components/motion/stagger-list";
 import { getTodayInTaipei } from "@/lib/date";
 import { cn } from "@/lib/utils";
@@ -145,59 +144,57 @@ export default async function CalendarPage({
         </Link>
       </div>
 
-      <Card>
-        <CardContent className="flex flex-col gap-2">
-          <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
-            {weekdays.map((w) => (
-              <div key={w}>{w}</div>
-            ))}
-          </div>
+      <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
+          {weekdays.map((w) => (
+            <div key={w}>{w}</div>
+          ))}
+        </div>
 
-          <StaggerList className="grid grid-cols-7 gap-1">
-            {Array.from({ length: leadingBlanks }).map((_, i) => (
-              <div key={`blank-${i}`} />
-            ))}
-            {days.map((d) => {
-              const key = format(d, "yyyy-MM-dd");
-              const entry = byDay.get(key);
-              const isSelected = selectedDay === key;
-              const isToday = key === todayKey;
-              const level = heatmapLevel(entry?.expense ?? 0, maxExpense);
-              const textColor = SEQUENTIAL_HEATMAP_TEXT[level];
-              const titleParts = [
-                entry?.expense ? `支出 ${Math.round(entry.expense).toLocaleString("zh-TW")}` : null,
-                entry?.income ? `收入 ${Math.round(entry.income).toLocaleString("zh-TW")}` : null,
-              ].filter(Boolean);
-              return (
-                <Link
-                  key={key}
-                  href={`/calendar?month=${monthKey}&day=${key}`}
-                  title={titleParts.length > 0 ? `${key}・${titleParts.join("・")}` : key}
-                  className={cn(
-                    "relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg text-center tabular-nums transition-all",
-                    isSelected
-                      ? "z-10 scale-105 shadow-md ring-2 ring-primary ring-offset-2 ring-offset-card"
-                      : "hover:ring-1 hover:ring-muted-foreground/30",
-                  )}
-                  style={{ backgroundColor: SEQUENTIAL_HEATMAP_STEPS[level], color: textColor }}
-                >
-                  <span className={cn("text-xs", level >= 3 && "font-medium")}>{format(d, "d")}</span>
-                  {/* "Today" no longer relies on a ring (that's the isSelected
-                      signal now) — a small dot in the day's own text color
-                      stays visible no matter how intense that day's heat
-                      color is. */}
-                  {isToday && (
-                    <span className="size-1 rounded-full" style={{ backgroundColor: textColor }} />
-                  )}
-                  {entry?.income ? (
-                    <span className="absolute top-1 right-1 size-1.5 rounded-full bg-emerald-500" />
-                  ) : null}
-                </Link>
-              );
-            })}
-          </StaggerList>
-        </CardContent>
-      </Card>
+        <StaggerList className="grid grid-cols-7 gap-1">
+          {Array.from({ length: leadingBlanks }).map((_, i) => (
+            <div key={`blank-${i}`} />
+          ))}
+          {days.map((d) => {
+            const key = format(d, "yyyy-MM-dd");
+            const entry = byDay.get(key);
+            const isSelected = selectedDay === key;
+            const isToday = key === todayKey;
+            const level = heatmapLevel(entry?.expense ?? 0, maxExpense);
+            const textColor = SEQUENTIAL_HEATMAP_TEXT[level];
+            const titleParts = [
+              entry?.expense ? `支出 ${Math.round(entry.expense).toLocaleString("zh-TW")}` : null,
+              entry?.income ? `收入 ${Math.round(entry.income).toLocaleString("zh-TW")}` : null,
+            ].filter(Boolean);
+            return (
+              <Link
+                key={key}
+                href={`/calendar?month=${monthKey}&day=${key}`}
+                title={titleParts.length > 0 ? `${key}・${titleParts.join("・")}` : key}
+                className={cn(
+                  "relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg text-center tabular-nums transition-all",
+                  isSelected
+                    ? "z-10 scale-105 shadow-md ring-2 ring-primary ring-offset-2 ring-offset-card"
+                    : "hover:ring-1 hover:ring-muted-foreground/30",
+                )}
+                style={{ backgroundColor: SEQUENTIAL_HEATMAP_STEPS[level], color: textColor }}
+              >
+                <span className={cn("text-xs", level >= 3 && "font-medium")}>{format(d, "d")}</span>
+                {/* "Today" no longer relies on a ring (that's the isSelected
+                    signal now) — a small dot in the day's own text color
+                    stays visible no matter how intense that day's heat
+                    color is. */}
+                {isToday && (
+                  <span className="size-1 rounded-full" style={{ backgroundColor: textColor }} />
+                )}
+                {entry?.income ? (
+                  <span className="absolute top-1 right-1 size-1.5 rounded-full bg-emerald-500" />
+                ) : null}
+              </Link>
+            );
+          })}
+        </StaggerList>
+      </div>
 
       {selectedDay && (
         <div className="flex flex-col gap-2">
@@ -219,14 +216,14 @@ export default async function CalendarPage({
             })()}
           </div>
           {selectedTransactions.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 rounded-2xl border bg-card p-6 text-center shadow-md shadow-foreground/10">
+            <div className="flex flex-col items-center gap-2 py-8 text-center">
               <BearIllustration name="empty" size={96} />
               <p className="text-muted-foreground text-sm">這天還沒有記帳紀錄喔！</p>
             </div>
           ) : (
             <>
               {editableTransactions.length > 0 && (
-                <StaggerList className="flex flex-col divide-y overflow-hidden rounded-2xl border bg-card">
+                <StaggerList className="flex flex-col divide-y">
                   {editableTransactions.map((t) => (
                     <TodayTransactionRow
                       key={t.id}
@@ -241,7 +238,7 @@ export default async function CalendarPage({
               )}
 
               {transferTransactions.length > 0 && (
-                <StaggerList className="flex flex-col divide-y overflow-hidden rounded-2xl border bg-card">
+                <StaggerList className="flex flex-col divide-y">
                   {transferTransactions.map((t) => (
                     <div key={t.id} className="flex items-center justify-between px-4 py-3">
                       <div className="flex items-center gap-2">

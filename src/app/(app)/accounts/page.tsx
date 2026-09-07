@@ -85,7 +85,7 @@ export default async function AccountsPage() {
       {accounts.length > 0 && <NetWorthSummary total={netWorth} accountCount={accounts.length} />}
 
       {accounts.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-2xl border bg-card p-6 text-center shadow-md shadow-foreground/10">
+        <div className="flex flex-col items-center gap-2 py-8 text-center">
           <BearIllustration name="empty" size={96} />
           <p className="text-muted-foreground text-sm">還沒有任何帳戶。</p>
         </div>
