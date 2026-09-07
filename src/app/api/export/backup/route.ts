@@ -133,6 +133,8 @@ export async function GET() {
         isSettled: sharedExpenses.isSettled,
         settledAt: sharedExpenses.settledAt,
         linkedTransactionId: sharedExpenses.linkedTransactionId,
+        settlementTransactionId: sharedExpenses.settlementTransactionId,
+        settlementBatchId: sharedExpenses.settlementBatchId,
       })
       .from(sharedExpenses)
       .where(eq(sharedExpenses.userId, userId)),

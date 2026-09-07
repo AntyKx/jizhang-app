@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deleteGoal, updateGoal } from "@/app/(app)/goals/actions";
+import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 
 type Goal = { id: string; name: string; targetAmount: string; targetDate: string | null };
@@ -36,12 +37,16 @@ export function EditGoalDialog({ goal, onClose }: { goal: Goal | null; onClose: 
   function handleSave() {
     if (!goal || !name.trim() || !targetAmount || Number(targetAmount) <= 0) return;
     startTransition(async () => {
-      await updateGoal({
+      const result = await updateGoal({
         id: goal.id,
         name: name.trim(),
         targetAmount: Number(targetAmount),
         targetDate: targetDate || null,
       });
+      if (isFail(result)) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("已更新目標");
       onClose();
     });

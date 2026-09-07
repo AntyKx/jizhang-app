@@ -16,6 +16,7 @@ import {
 import { requireUserId } from "@/lib/auth";
 import { requireCoreAccess } from "@/lib/entitlements";
 import { backupSchema } from "@/lib/backup-schema";
+import { fail } from "@/lib/action-result";
 
 // The neon-http driver has no interactive `db.transaction`, but does support
 // `db.batch([...])` — multiple statements sent as one request and executed
@@ -54,7 +55,7 @@ export async function restoreBackup(backupJson: string) {
   try {
     parsed = backupSchema.parse(JSON.parse(backupJson));
   } catch {
-    throw new Error("備份檔案格式錯誤，無法還原");
+    return fail("備份檔案格式錯誤，無法還原");
   }
 
   await db.batch([

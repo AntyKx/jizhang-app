@@ -6,6 +6,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { savingsGoals } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
+import { fail } from "@/lib/action-result";
 
 function revalidateGoalPaths() {
   revalidatePath("/goals");
@@ -57,7 +58,7 @@ export async function updateGoal(input: {
     .select({ currentAmount: savingsGoals.currentAmount })
     .from(savingsGoals)
     .where(and(eq(savingsGoals.id, parsed.id), eq(savingsGoals.userId, userId)));
-  if (!goal) throw new Error("找不到指定的目標");
+  if (!goal) return fail("找不到指定的目標");
 
   await db
     .update(savingsGoals)

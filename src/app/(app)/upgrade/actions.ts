@@ -69,6 +69,12 @@ export async function createBillingPortalSession() {
     .select({ stripeCustomerId: userSettings.stripeCustomerId })
     .from(userSettings)
     .where(eq(userSettings.userId, userId));
+  // Kept as a throw (not fail()) — this runs from a raw <form action={...}>
+  // wired directly in a Server Component page, with no client-side handler
+  // to ever read a returned Fail. A thrown error at least still surfaces the
+  // generic Next.js error page; returning data here would just vanish
+  // silently. Effectively unreachable in normal use anyway — the button
+  // this backs only renders when isSubscribed is already true.
   if (!row?.stripeCustomerId) throw new Error("尚未建立訂閱");
 
   const origin = await getSiteOrigin();

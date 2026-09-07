@@ -19,6 +19,7 @@ import {
 } from "@/components/record/edit-transaction-dialog";
 import { SwipeToDelete } from "@/components/transactions/swipe-to-delete";
 import { deleteTransaction, loadMoreTransactions } from "@/app/(app)/transactions/actions";
+import { isFail } from "@/lib/action-result";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { cn } from "@/lib/utils";
 import type {
@@ -47,13 +48,13 @@ function TransferRow({
   const to = item.toAccountId ? accountsById[item.toAccountId] : undefined;
 
   async function handleDelete() {
-    try {
-      await deleteTransaction(item.id);
-      toast.success("已刪除轉帳紀錄");
-      router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "刪除失敗");
+    const result = await deleteTransaction(item.id);
+    if (isFail(result)) {
+      toast.error(result.error);
+      return;
     }
+    toast.success("已刪除轉帳紀錄");
+    router.refresh();
   }
 
   return (
@@ -232,13 +233,13 @@ export function TransactionsList({
   }
 
   async function handleDeleteRegular(id: string) {
-    try {
-      await deleteTransaction(id);
-      toast.success("已刪除交易");
-      router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "刪除失敗");
+    const result = await deleteTransaction(id);
+    if (isFail(result)) {
+      toast.error(result.error);
+      return;
     }
+    toast.success("已刪除交易");
+    router.refresh();
   }
 
   const searchableText = (item: ListItem) =>

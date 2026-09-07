@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cancelRecurringRule, updateRecurringRule } from "@/app/(app)/subscriptions/actions";
+import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
 import { PaymentMethodIcon } from "@/components/transactions/payment-method-icon";
@@ -89,7 +90,11 @@ export function EditRuleDialog({
         <form
           ref={formRef}
           action={async (formData) => {
-            await updateRecurringRule(formData);
+            const result = await updateRecurringRule(formData);
+            if (isFail(result)) {
+              toast.error(result.error);
+              return;
+            }
             toast.success("已更新");
             onOpenChange(false);
           }}

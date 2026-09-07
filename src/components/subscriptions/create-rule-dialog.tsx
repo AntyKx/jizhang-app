@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createRecurringRule } from "@/app/(app)/subscriptions/actions";
+import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
 import { PaymentMethodIcon } from "@/components/transactions/payment-method-icon";
@@ -64,7 +66,11 @@ export function CreateRuleDialog({
         <form
           ref={formRef}
           action={async (formData) => {
-            await createRecurringRule(formData);
+            const result = await createRecurringRule(formData);
+            if (isFail(result)) {
+              toast.error(result.error);
+              return;
+            }
             setOpen(false);
             formRef.current?.reset();
             setAmount("");

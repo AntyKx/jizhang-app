@@ -10,7 +10,8 @@ import { requireCoreAccess } from "@/lib/entitlements";
 import { getDefaultAccountId } from "@/lib/account";
 import { todayInTaipeiString } from "@/lib/date";
 import { computeNetBalance } from "@/lib/shared-balance";
-import { createTransaction } from "@/app/(app)/transactions/actions";
+import { createTransaction, deleteSettlementTransaction } from "@/app/(app)/transactions/actions";
+import { fail, isFail } from "@/lib/action-result";
 
 function revalidateSharedPaths() {
   revalidatePath("/shared");
@@ -42,7 +43,10 @@ async function createSettlementTransaction(userId: string, expense: SettleableEx
   }
   if (!accountId) accountId = await getDefaultAccountId(userId);
 
-  await createTransaction({
+  // Returned so the caller can stamp it onto settlementTransactionId —
+  // unsettleSharedExpense needs it to know exactly which transaction to
+  // delete when reverting a mistaken settlement.
+  return createTransaction({
     categoryId: expense.categoryId ?? undefined,
     type: expense.paidByMe ? "income" : "expense",
     amount: half,
@@ -126,8 +130,8 @@ export async function updateSharedExpense(input: {
     .select({ isSettled: sharedExpenses.isSettled })
     .from(sharedExpenses)
     .where(and(eq(sharedExpenses.id, parsed.id), eq(sharedExpenses.userId, userId)));
-  if (!existing) throw new Error("找不到指定的分帳支出");
-  if (existing.isSettled) throw new Error("已結清的項目無法編輯");
+  if (!existing) return fail("找不到指定的分帳支出");
+  if (existing.isSettled) return fail("已結清的項目無法編輯");
 
   await db
     .update(sharedExpenses)
@@ -153,14 +157,18 @@ export async function settleSharedExpense(expenseId: string) {
     .where(and(eq(sharedExpenses.id, expenseId), eq(sharedExpenses.userId, userId)));
   if (!expense || expense.isSettled) return;
 
-  // Record the reimbursement first — if it throws (e.g. an FX lookup fails
+  // Record the reimbursement first — if it fails (e.g. an FX lookup fails
   // for a foreign-currency account), the expense stays unsettled instead of
   // silently losing the money it was supposed to represent.
-  await createSettlementTransaction(userId, expense);
+  const settlement = await createSettlementTransaction(userId, expense);
+  if (isFail(settlement)) return settlement;
 
+  // settlementTransactionId is what lets unsettleSharedExpense find and
+  // remove exactly this reimbursement later, if this settle turns out to be
+  // a mistake.
   await db
     .update(sharedExpenses)
-    .set({ isSettled: true, settledAt: new Date() })
+    .set({ isSettled: true, settledAt: new Date(), settlementTransactionId: settlement.id })
     .where(and(eq(sharedExpenses.id, expenseId), eq(sharedExpenses.userId, userId)));
 
   revalidateSharedPaths();
@@ -188,21 +196,69 @@ export async function settleAllSharedExpenses(range?: { from?: string; to?: stri
   // Same ordering fix as settleSharedExpense: record the net reimbursement
   // first, only mark everything settled once that succeeds.
   const net = computeNetBalance(unsettled);
+  let settlementTransactionId: string | null = null;
   if (Math.abs(net) >= 1) {
     const accountId = await getDefaultAccountId(userId);
-    await createTransaction({
+    const settlement = await createTransaction({
       type: net > 0 ? "income" : "expense",
       amount: Math.abs(net),
       accountId,
       note: `分帳一鍵結清（共 ${unsettled.length} 筆）`,
       occurredAt: todayInTaipeiString(),
     });
+    if (isFail(settlement)) return settlement;
+    settlementTransactionId = settlement.id;
   }
+
+  // All items settled in this call share one settlementBatchId (and, when
+  // there was a nonzero net, the same single settlementTransactionId) —
+  // unsettleSharedExpense uses that to revert the whole batch together,
+  // since there's no way to split that one net transaction back out per
+  // item.
+  const settlementBatchId = crypto.randomUUID();
 
   await db
     .update(sharedExpenses)
-    .set({ isSettled: true, settledAt: new Date() })
+    .set({ isSettled: true, settledAt: new Date(), settlementTransactionId, settlementBatchId })
     .where(and(...conditions));
+
+  revalidateSharedPaths();
+}
+
+// Reverts a mistaken settle — removes the reimbursement transaction it
+// produced (reversing its balance effect) and puts the shared-expense row(s)
+// back to unsettled. A batch-settled item shares its settlementBatchId with
+// every other item settled in the same settleAllSharedExpenses call, all
+// funded by one net transaction that can't be split back out per item, so
+// reverting any one of them reverts the whole batch together.
+export async function unsettleSharedExpense(expenseId: string) {
+  const userId = await requireUserId();
+  await requireCoreAccess(userId, "shared");
+
+  const [expense] = await db
+    .select()
+    .from(sharedExpenses)
+    .where(and(eq(sharedExpenses.id, expenseId), eq(sharedExpenses.userId, userId)));
+  if (!expense || !expense.isSettled) return;
+
+  // Remove the reimbursement first — if it throws, the item stays settled
+  // instead of silently pretending the money never moved. A perfectly
+  // net-zero batch never had a settlement transaction to begin with (see
+  // settleAllSharedExpenses), hence the null check. Uses the unguarded
+  // deleteSettlementTransaction rather than the public deleteTransaction,
+  // since this *is* the sanctioned way to remove one.
+  if (expense.settlementTransactionId) {
+    await deleteSettlementTransaction(expense.settlementTransactionId);
+  }
+
+  const batchCondition = expense.settlementBatchId
+    ? and(eq(sharedExpenses.settlementBatchId, expense.settlementBatchId), eq(sharedExpenses.userId, userId))
+    : and(eq(sharedExpenses.id, expenseId), eq(sharedExpenses.userId, userId));
+
+  await db
+    .update(sharedExpenses)
+    .set({ isSettled: false, settledAt: null, settlementTransactionId: null, settlementBatchId: null })
+    .where(batchCondition);
 
   revalidateSharedPaths();
 }
@@ -219,7 +275,7 @@ export async function deleteSharedExpense(expenseId: string) {
     .from(sharedExpenses)
     .where(and(eq(sharedExpenses.id, expenseId), eq(sharedExpenses.userId, userId)));
   if (!existing) return;
-  if (existing.isSettled) throw new Error("已結清的項目無法刪除");
+  if (existing.isSettled) return fail("已結清的項目無法刪除");
 
   await db
     .delete(sharedExpenses)

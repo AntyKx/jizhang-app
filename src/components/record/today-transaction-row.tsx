@@ -14,6 +14,7 @@ import {
 import { QuickCategoryDialog } from "@/components/record/quick-category-dialog";
 import { SwipeToDelete } from "@/components/transactions/swipe-to-delete";
 import { deleteTransaction, duplicateTransaction } from "@/app/(app)/transactions/actions";
+import { isFail } from "@/lib/action-result";
 import { paymentMethodLabel } from "@/lib/payment-methods";
 import { formatTimeInTaipei } from "@/lib/date";
 import { type AccountType } from "@/lib/account-type";
@@ -59,31 +60,31 @@ export function TodayTransactionRow({
   const [quickCategoryOpen, setQuickCategoryOpen] = useState(false);
 
   async function handleDelete() {
-    try {
-      await deleteTransaction(t.id);
-      toast.success("已刪除交易");
-      router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "刪除失敗");
+    const result = await deleteTransaction(t.id);
+    if (isFail(result)) {
+      toast.error(result.error);
+      return;
     }
+    toast.success("已刪除交易");
+    router.refresh();
   }
 
   async function handleDuplicate() {
-    try {
-      const created = await duplicateTransaction(t.id);
-      toast.success(`已複製「${t.merchant || t.note || t.categoryName || "這筆交易"}」`, {
-        action: {
-          label: "復原",
-          onClick: async () => {
-            await deleteTransaction(created.id);
-            router.refresh();
-          },
-        },
-      });
-      router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "複製失敗");
+    const created = await duplicateTransaction(t.id);
+    if (isFail(created)) {
+      toast.error(created.error);
+      return;
     }
+    toast.success(`已複製「${t.merchant || t.note || t.categoryName || "這筆交易"}」`, {
+      action: {
+        label: "復原",
+        onClick: async () => {
+          await deleteTransaction(created.id);
+          router.refresh();
+        },
+      },
+    });
+    router.refresh();
   }
 
   const editableTransaction: EditableTransaction = {

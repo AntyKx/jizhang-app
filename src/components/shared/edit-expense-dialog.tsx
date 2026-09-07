@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deleteSharedExpense, updateSharedExpense } from "@/app/(app)/shared/actions";
+import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
 import { cn } from "@/lib/utils";
@@ -63,35 +64,35 @@ export function EditSharedExpenseDialog({
   function handleSave() {
     if (!expense || !name.trim() || !amount || Number(amount) <= 0) return;
     startTransition(async () => {
-      try {
-        await updateSharedExpense({
-          id: expense.id,
-          name: name.trim(),
-          amount: Number(amount),
-          paidByMe,
-          categoryId: categoryId || undefined,
-          occurredAt,
-        });
-        toast.success("已更新");
-        onClose();
-        router.refresh();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "更新失敗");
+      const result = await updateSharedExpense({
+        id: expense.id,
+        name: name.trim(),
+        amount: Number(amount),
+        paidByMe,
+        categoryId: categoryId || undefined,
+        occurredAt,
+      });
+      if (isFail(result)) {
+        toast.error(result.error);
+        return;
       }
+      toast.success("已更新");
+      onClose();
+      router.refresh();
     });
   }
 
   function handleDelete() {
     if (!expense) return;
     startTransition(async () => {
-      try {
-        await deleteSharedExpense(expense.id);
-        toast.success("已刪除");
-        onClose();
-        router.refresh();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "刪除失敗");
+      const result = await deleteSharedExpense(expense.id);
+      if (isFail(result)) {
+        toast.error(result.error);
+        return;
       }
+      toast.success("已刪除");
+      onClose();
+      router.refresh();
     });
   }
 

@@ -103,6 +103,8 @@ export const backupSchema = z.object({
       isSettled: z.boolean(),
       settledAt: z.string().nullable(),
       linkedTransactionId: z.string().uuid().nullable(),
+      settlementTransactionId: z.string().uuid().nullable(),
+      settlementBatchId: z.string().uuid().nullable(),
     }),
   ),
   settings: z

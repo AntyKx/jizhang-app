@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { CategoryIcon } from "@/components/category-icon";
 import { Button } from "@/components/ui/button";
 import { postRecurringOccurrence, skipRecurringOccurrence } from "@/app/(app)/subscriptions/actions";
+import { isFail } from "@/lib/action-result";
 
 export type DueRule = {
   id: string;
@@ -26,15 +27,14 @@ export function DueSubscriptionsCard({ rules }: { rules: DueRule[] }) {
   function handlePost(rule: DueRule) {
     setBusyId(rule.id);
     startTransition(async () => {
-      try {
-        await postRecurringOccurrence(rule.id);
+      const result = await postRecurringOccurrence(rule.id);
+      if (isFail(result)) {
+        toast.error(result.error);
+      } else {
         toast.success(`已記上「${rule.name}」`);
         router.refresh();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "記帳失敗");
-      } finally {
-        setBusyId(null);
       }
+      setBusyId(null);
     });
   }
 

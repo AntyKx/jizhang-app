@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { settleAllSharedExpenses } from "@/app/(app)/shared/actions";
+import { isFail } from "@/lib/action-result";
 
 export function BalanceCard({
   partnerName,
@@ -24,13 +25,13 @@ export function BalanceCard({
 
   function handleSettleAll() {
     startTransition(async () => {
-      try {
-        await settleAllSharedExpenses({ from: dateFrom, to: dateTo });
-        toast.success("已標記結清");
-        router.refresh();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "結清失敗");
+      const result = await settleAllSharedExpenses({ from: dateFrom, to: dateTo });
+      if (isFail(result)) {
+        toast.error(result.error);
+        return;
       }
+      toast.success("已標記結清");
+      router.refresh();
     });
   }
 

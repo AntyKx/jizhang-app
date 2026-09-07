@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { updateAccount } from "@/app/(app)/accounts/actions";
+import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { accountTypeLabels, type AccountType } from "@/lib/account-type";
 import { cn } from "@/lib/utils";
@@ -54,13 +55,17 @@ export function EditAccountDialog({
   function handleSave() {
     if (!account || !name.trim() || !initialBalance) return;
     startTransition(async () => {
-      await updateAccount({
+      const result = await updateAccount({
         id: account.id,
         name: name.trim(),
         type,
         excludeFromNetWorth,
         initialBalance: Number(initialBalance),
       });
+      if (isFail(result)) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("已更新帳戶");
       onClose();
     });

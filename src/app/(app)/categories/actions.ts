@@ -9,6 +9,7 @@ import { requireUserId } from "@/lib/auth";
 import { pickCategoryColor } from "@/lib/category-color";
 import { bearIcons } from "@/lib/bear-icons";
 import { categoryIconRegistry } from "@/lib/category-icons";
+import { fail } from "@/lib/action-result";
 
 const dataImagePattern = /^data:image\/(png|jpeg|jpg|webp);base64,/;
 // Bear paths stay accepted (not just the current Lucide slugs) so existing
@@ -73,7 +74,7 @@ export async function updateCategory(input: { id: string; name: string; icon: st
     .set({ name: parsed.name, icon: parsed.icon, color: pickCategoryColor(parsed.name) })
     .where(and(eq(categories.id, parsed.id), eq(categories.userId, userId)))
     .returning({ id: categories.id });
-  if (!updated) throw new Error("系統預設分類無法編輯，或找不到指定的分類");
+  if (!updated) return fail("系統預設分類無法編輯，或找不到指定的分類");
 
   revalidateCategoryPaths();
 }
@@ -85,7 +86,7 @@ export async function deleteCategory(id: string) {
     .delete(categories)
     .where(and(eq(categories.id, id), eq(categories.userId, userId)))
     .returning({ id: categories.id });
-  if (!deleted) throw new Error("系統預設分類無法刪除，或找不到指定的分類");
+  if (!deleted) return fail("系統預設分類無法刪除，或找不到指定的分類");
 
   revalidateCategoryPaths();
 }

@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createTransaction, deleteTransaction, deleteUnlinkedSharedExpense } from "@/app/(app)/transactions/actions";
+import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
 import { paymentMethods, type PaymentMethod } from "@/lib/payment-methods";
@@ -142,28 +143,26 @@ export function TextQuickAdd({
     // knows which delete function to call.
     const isPartnerPaidShare = draft.type === "expense" && isSharedExpense && !paidByMe;
     startTransition(async () => {
-      let created: { id: string };
-      try {
-        created = await createTransaction({
-          categoryId: categoryId || undefined,
-          type: draft.type,
-          amount: draft.amount,
-          paymentMethod: draft.paymentMethod,
-          accountId,
-          // Only `note` is shown/edited in this form (the merchant guess
-          // already got folded into it back in handleParse), but the
-          // merchant itself is still worth persisting on its own column —
-          // it's what lets a future quick-add from the same merchant get
-          // its category remembered instead of re-guessed (see
-          // merchant-category-memory.ts).
-          merchant: draft.merchant ?? undefined,
-          note: draft.note ?? undefined,
-          occurredAt: draft.occurredAt,
-          isSharedExpense: draft.type === "expense" ? isSharedExpense : undefined,
-          paidByMe: draft.type === "expense" ? paidByMe : undefined,
-        });
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "記帳失敗，請稍後再試");
+      const created = await createTransaction({
+        categoryId: categoryId || undefined,
+        type: draft.type,
+        amount: draft.amount,
+        paymentMethod: draft.paymentMethod,
+        accountId,
+        // Only `note` is shown/edited in this form (the merchant guess
+        // already got folded into it back in handleParse), but the
+        // merchant itself is still worth persisting on its own column —
+        // it's what lets a future quick-add from the same merchant get
+        // its category remembered instead of re-guessed (see
+        // merchant-category-memory.ts).
+        merchant: draft.merchant ?? undefined,
+        note: draft.note ?? undefined,
+        occurredAt: draft.occurredAt,
+        isSharedExpense: draft.type === "expense" ? isSharedExpense : undefined,
+        paidByMe: draft.type === "expense" ? paidByMe : undefined,
+      });
+      if (isFail(created)) {
+        toast.error(created.error);
         return;
       }
       toast.success(`已新增「${draft.note || "這筆"} NT$${draft.amount.toLocaleString("zh-TW")}」`, {

@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { deleteSharedExpense, settleSharedExpense } from "@/app/(app)/shared/actions";
+import { deleteSharedExpense, settleSharedExpense, unsettleSharedExpense } from "@/app/(app)/shared/actions";
+import { isFail } from "@/lib/action-result";
 import { EditSharedExpenseDialog } from "@/components/shared/edit-expense-dialog";
 import { SwipeToDelete } from "@/components/transactions/swipe-to-delete";
 
@@ -41,24 +42,40 @@ export function SharedExpenseRow({
   function handleSettle(e: React.MouseEvent) {
     e.stopPropagation();
     startTransition(async () => {
-      try {
-        await settleSharedExpense(expense.id);
-        toast.success("已標記結清");
-        router.refresh();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "結清失敗");
+      const result = await settleSharedExpense(expense.id);
+      if (isFail(result)) {
+        toast.error(result.error);
+        return;
       }
+      toast.success("已標記結清");
+      router.refresh();
+    });
+  }
+
+  // Reverts a mistaken 結清 — if this item was part of a "一鍵結清" batch,
+  // the whole batch reverts together (see unsettleSharedExpense), which
+  // shows up here simply as more than one row moving back to 未結清.
+  function handleUnsettle(e: React.MouseEvent) {
+    e.stopPropagation();
+    startTransition(async () => {
+      const result = await unsettleSharedExpense(expense.id);
+      if (isFail(result)) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("已復原結清");
+      router.refresh();
     });
   }
 
   async function handleDelete() {
-    try {
-      await deleteSharedExpense(expense.id);
-      toast.success("已刪除");
-      router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "刪除失敗");
+    const result = await deleteSharedExpense(expense.id);
+    if (isFail(result)) {
+      toast.error(result.error);
+      return;
     }
+    toast.success("已刪除");
+    router.refresh();
   }
 
   return (
@@ -93,7 +110,7 @@ export function SharedExpenseRow({
             <span className="text-sm font-semibold tabular-nums">
               NT$ {Number(expense.amount).toLocaleString("zh-TW")}
             </span>
-            {!expense.isSettled && (
+            {!expense.isSettled ? (
               <Button
                 size="sm"
                 variant="secondary"
@@ -102,6 +119,16 @@ export function SharedExpenseRow({
                 onClick={handleSettle}
               >
                 結清
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={pending}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={handleUnsettle}
+              >
+                回復結清
               </Button>
             )}
           </div>

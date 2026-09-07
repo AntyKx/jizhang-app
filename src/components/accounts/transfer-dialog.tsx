@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createTransfer } from "@/app/(app)/transactions/actions";
+import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { type AccountType } from "@/lib/account-type";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
@@ -53,21 +54,21 @@ export function TransferDialog({ accounts }: { accounts: Account[] }) {
   function handleSubmit() {
     if (!fromId || !toId || !amount || Number(amount) <= 0) return;
     startTransition(async () => {
-      try {
-        await createTransfer({
-          fromAccountId: fromId,
-          toAccountId: toId,
-          amount: Number(amount),
-          fee: fee ? Number(fee) : undefined,
-          note: note || undefined,
-          occurredAt,
-        });
-        toast.success("已轉帳");
-        reset();
-        setOpen(false);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "轉帳失敗");
+      const result = await createTransfer({
+        fromAccountId: fromId,
+        toAccountId: toId,
+        amount: Number(amount),
+        fee: fee ? Number(fee) : undefined,
+        note: note || undefined,
+        occurredAt,
+      });
+      if (isFail(result)) {
+        toast.error(result.error);
+        return;
       }
+      toast.success("已轉帳");
+      reset();
+      setOpen(false);
     });
   }
 

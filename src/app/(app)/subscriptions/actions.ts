@@ -9,18 +9,19 @@ import { requireUserId } from "@/lib/auth";
 import { getDefaultAccountId } from "@/lib/account";
 import { advanceOccurrence } from "@/lib/recurrence";
 import { createTransaction } from "@/app/(app)/transactions/actions";
+import { fail, isFail, type Fail } from "@/lib/action-result";
 
 // Shared ownership check for a user-supplied accountId — the create/edit
 // dialogs now let the user pick which account a rule draws from, so a
 // malicious/stale FormData value needs verifying against this user's own
 // accounts before trusting it, same as createTransaction/updateTransaction
 // already do for regular transactions.
-async function requireOwnedAccountId(userId: string, accountId: string): Promise<string> {
+async function requireOwnedAccountId(userId: string, accountId: string): Promise<string | Fail> {
   const [owned] = await db
     .select({ id: accounts.id })
     .from(accounts)
     .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)));
-  if (!owned) throw new Error("找不到指定的帳戶");
+  if (!owned) return fail("找不到指定的帳戶");
   return owned.id;
 }
 
@@ -84,9 +85,11 @@ export async function createRecurringRule(formData: FormData) {
   // Falls back to the default account only if the form somehow didn't send
   // one (the dialog always does once at least one account exists) — never
   // silently overrides an explicit user choice.
-  const accountId = parsed.accountId
+  const accountIdResult = parsed.accountId
     ? await requireOwnedAccountId(userId, parsed.accountId)
     : await getDefaultAccountId(userId);
+  if (isFail(accountIdResult)) return accountIdResult;
+  const accountId = accountIdResult;
 
   await db.insert(recurringRules).values({
     userId,
@@ -137,6 +140,7 @@ export async function updateRecurringRule(formData: FormData) {
     nextOccurrence: formData.get("nextOccurrence"),
   });
   const accountId = await requireOwnedAccountId(userId, parsed.accountId);
+  if (isFail(accountId)) return accountId;
 
   await db
     .update(recurringRules)
@@ -178,8 +182,8 @@ export async function postRecurringOccurrence(ruleId: string) {
     .select()
     .from(recurringRules)
     .where(and(eq(recurringRules.id, ruleId), eq(recurringRules.userId, userId)));
-  if (!rule || !rule.isActive) throw new Error("找不到指定的定期收支項目");
-  if (rule.type === "transfer") throw new Error("轉帳類型的定期項目尚不支援一鍵入帳");
+  if (!rule || !rule.isActive) return fail("找不到指定的定期收支項目");
+  if (rule.type === "transfer") return fail("轉帳類型的定期項目尚不支援一鍵入帳");
 
   const created = await createTransaction({
     categoryId: rule.categoryId ?? undefined,
@@ -190,6 +194,7 @@ export async function postRecurringOccurrence(ruleId: string) {
     note: rule.name,
     occurredAt: rule.nextOccurrence,
   });
+  if (isFail(created)) return created;
 
   await advanceRule(userId, rule);
 

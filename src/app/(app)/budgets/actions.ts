@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { budgets } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { getTodayInTaipei } from "@/lib/date";
+import { fail } from "@/lib/action-result";
 
 function revalidateBudgetPaths() {
   revalidatePath("/budgets");
@@ -39,7 +40,7 @@ export async function createBudget(formData: FormData) {
 
 export async function updateBudget(id: string, limitAmount: number) {
   const userId = await requireUserId();
-  if (!(limitAmount > 0)) throw new Error("預算上限需大於 0");
+  if (!(limitAmount > 0)) return fail("預算上限需大於 0");
 
   await db
     .update(budgets)

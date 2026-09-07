@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
 import { deleteTransaction, updateTransaction } from "@/app/(app)/transactions/actions";
+import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { SharedExpenseToggle } from "@/components/record/shared-expense-toggle";
 import { paymentMethods, type PaymentMethod } from "@/lib/payment-methods";
@@ -105,43 +106,43 @@ export function EditTransactionDialog({
   function handleSave() {
     if (!transaction || !amount || Number(amount) <= 0) return;
     startTransition(async () => {
-      try {
-        await updateTransaction({
-          id: transaction.id,
-          categoryId: categoryId || null,
-          type,
-          amount: Number(amount),
-          paymentMethod,
-          accountId,
-          // No UI to edit this here (see 商家 field removal) — pass the
-          // original value straight through so saving other fields doesn't
-          // clobber it.
-          merchant: transaction.merchant,
-          note: note || null,
-          occurredAt,
-          isSharedExpense: type === "expense" ? isSharedExpense : undefined,
-          paidByMe: type === "expense" ? paidByMe : undefined,
-        });
-        toast.success("已更新交易");
-        onSaved();
-        onOpenChange(false);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "更新失敗");
+      const result = await updateTransaction({
+        id: transaction.id,
+        categoryId: categoryId || null,
+        type,
+        amount: Number(amount),
+        paymentMethod,
+        accountId,
+        // No UI to edit this here (see 商家 field removal) — pass the
+        // original value straight through so saving other fields doesn't
+        // clobber it.
+        merchant: transaction.merchant,
+        note: note || null,
+        occurredAt,
+        isSharedExpense: type === "expense" ? isSharedExpense : undefined,
+        paidByMe: type === "expense" ? paidByMe : undefined,
+      });
+      if (isFail(result)) {
+        toast.error(result.error);
+        return;
       }
+      toast.success("已更新交易");
+      onSaved();
+      onOpenChange(false);
     });
   }
 
   function handleDelete() {
     if (!transaction) return;
     startTransition(async () => {
-      try {
-        await deleteTransaction(transaction.id);
-        toast.success("已刪除交易");
-        onSaved();
-        onOpenChange(false);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "刪除失敗");
+      const result = await deleteTransaction(transaction.id);
+      if (isFail(result)) {
+        toast.error(result.error);
+        return;
       }
+      toast.success("已刪除交易");
+      onSaved();
+      onOpenChange(false);
     });
   }
 

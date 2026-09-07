@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CategoryIcon } from "@/components/category-icon";
 import { updateTransactionCategory } from "@/app/(app)/transactions/actions";
+import { isFail } from "@/lib/action-result";
 
 type Category = { id: string; name: string; icon: string | null; type: "income" | "expense" };
 
@@ -28,7 +29,11 @@ export function QuickCategoryDialog({
   function pick(categoryId: string) {
     if (!transaction || pending) return;
     startTransition(async () => {
-      await updateTransactionCategory(transaction.id, categoryId);
+      const result = await updateTransactionCategory(transaction.id, categoryId);
+      if (isFail(result)) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("已更改分類");
       onSaved();
       onOpenChange(false);

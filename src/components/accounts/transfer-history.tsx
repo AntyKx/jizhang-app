@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowRight, Trash2 } from "lucide-react";
 import { deleteTransaction } from "@/app/(app)/transactions/actions";
+import { isFail } from "@/lib/action-result";
 import { type AccountType } from "@/lib/account-type";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { SwipeToDelete } from "@/components/transactions/swipe-to-delete";
@@ -29,13 +30,13 @@ export function TransferHistory({
   const router = useRouter();
 
   async function handleDelete(id: string) {
-    try {
-      await deleteTransaction(id);
-      toast.success("已刪除轉帳紀錄");
-      router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "刪除失敗");
+    const result = await deleteTransaction(id);
+    if (isFail(result)) {
+      toast.error(result.error);
+      return;
     }
+    toast.success("已刪除轉帳紀錄");
+    router.refresh();
   }
 
   return (

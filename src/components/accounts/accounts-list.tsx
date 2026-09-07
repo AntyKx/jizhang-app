@@ -20,6 +20,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { archiveAccount, reorderAccounts } from "@/app/(app)/accounts/actions";
+import { isFail } from "@/lib/action-result";
 import { accountTypeLabels, type AccountType } from "@/lib/account-type";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -178,14 +179,13 @@ export function AccountsList({ accounts }: { accounts: Account[] }) {
   function handleArchive(id: string) {
     setArchivingId(id);
     startTransition(async () => {
-      try {
-        await archiveAccount(id);
+      const result = await archiveAccount(id);
+      if (isFail(result)) {
+        toast.error(result.error);
+      } else {
         toast.success("已封存帳戶");
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "封存失敗");
-      } finally {
-        setArchivingId(null);
       }
+      setArchivingId(null);
     });
   }
 

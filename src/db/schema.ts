@@ -215,6 +215,21 @@ export const sharedExpenses = pgTable("shared_expenses", {
   linkedTransactionId: uuid("linked_transaction_id").references(() => transactions.id, {
     onDelete: "cascade",
   }),
+  // The reimbursement transaction settleSharedExpense/settleAllSharedExpenses
+  // produced when this item was marked settled — lets unsettleSharedExpense
+  // find and delete exactly that transaction (reversing its balance effect)
+  // when reverting a mistaken settlement. "set null" (not cascade) so
+  // deleting the transaction some other way doesn't also silently delete
+  // this shared-expense row — see the settlement-transaction guard in
+  // transactions/actions.ts's deleteTransaction, which blocks that path.
+  settlementTransactionId: uuid("settlement_transaction_id").references(() => transactions.id, {
+    onDelete: "set null",
+  }),
+  // Shared by every item settled together in one settleAllSharedExpenses
+  // call — they all point at the same settlementTransactionId (one net
+  // transaction for the whole batch), so reverting any one of them has to
+  // revert the whole batch at once, not just that row.
+  settlementBatchId: uuid("settlement_batch_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("shared_expenses_user_idx").on(table.userId),

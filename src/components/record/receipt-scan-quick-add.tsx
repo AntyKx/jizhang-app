@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createTransaction, deleteTransaction, deleteUnlinkedSharedExpense } from "@/app/(app)/transactions/actions";
+import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
 import { paymentMethods, type PaymentMethod } from "@/lib/payment-methods";
@@ -156,6 +157,10 @@ export function ReceiptScanQuickAdd({
           isSharedExpense: draft.type === "expense" ? isSharedExpense : undefined,
           paidByMe: draft.type === "expense" ? paidByMe : undefined,
         });
+        if (isFail(created)) {
+          toast.error(created.error);
+          return;
+        }
         toast.success(`已新增「${draft.merchant || draft.note || "這筆"} NT$${draft.amount.toLocaleString("zh-TW")}」`, {
           action: {
             label: "復原",

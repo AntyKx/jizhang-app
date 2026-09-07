@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BottomSheet, BottomSheetContent, BottomSheetTitle } from "@/components/ui/bottom-sheet";
 import { createTransaction, deleteTransaction, deleteUnlinkedSharedExpense } from "@/app/(app)/transactions/actions";
+import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { SharedExpenseToggle } from "@/components/record/shared-expense-toggle";
 import { CategoryIconBadge } from "@/components/category-icon";
@@ -129,21 +130,19 @@ export function QuickAddCategoryFlow({
     // knows which delete function to call after state resets on close.
     const isPartnerPaidShare = selected.type === "expense" && isSharedExpense && !paidByMe;
     startTransition(async () => {
-      let created: { id: string };
-      try {
-        created = await createTransaction({
-          categoryId: selected.id,
-          type: selected.type,
-          amount: Number(savedAmount),
-          paymentMethod,
-          accountId,
-          note: note || undefined,
-          occurredAt,
-          isSharedExpense: selected.type === "expense" ? isSharedExpense : undefined,
-          paidByMe: selected.type === "expense" ? paidByMe : undefined,
-        });
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "記帳失敗，請稍後再試");
+      const created = await createTransaction({
+        categoryId: selected.id,
+        type: selected.type,
+        amount: Number(savedAmount),
+        paymentMethod,
+        accountId,
+        note: note || undefined,
+        occurredAt,
+        isSharedExpense: selected.type === "expense" ? isSharedExpense : undefined,
+        paidByMe: selected.type === "expense" ? paidByMe : undefined,
+      });
+      if (isFail(created)) {
+        toast.error(created.error);
         return;
       }
       toast.success(`已新增「${selected.name} NT$${Number(savedAmount).toLocaleString("zh-TW")}」`, {

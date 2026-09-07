@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { restoreBackup } from "@/app/(app)/data-export/actions";
+import { isFail } from "@/lib/action-result";
 
 const CONFIRM_PHRASE = "取代還原";
 
@@ -34,16 +35,16 @@ export function RestoreBackupDialog() {
   function handleRestore() {
     if (!file) return;
     startTransition(async () => {
-      try {
-        const text = await file.text();
-        await restoreBackup(text);
-        toast.success("已還原備份");
-        setOpen(false);
-        router.push("/record");
-        router.refresh();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "還原失敗");
+      const text = await file.text();
+      const result = await restoreBackup(text);
+      if (isFail(result)) {
+        toast.error(result.error);
+        return;
       }
+      toast.success("已還原備份");
+      setOpen(false);
+      router.push("/record");
+      router.refresh();
     });
   }
 

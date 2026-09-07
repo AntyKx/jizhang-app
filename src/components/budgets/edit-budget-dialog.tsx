@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { deleteBudget, updateBudget } from "@/app/(app)/budgets/actions";
+import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 
 type Budget = { id: string; categoryName: string | null; limitAmount: string };
@@ -29,7 +30,11 @@ export function EditBudgetDialog({ budget, onClose }: { budget: Budget | null; o
   function handleSave() {
     if (!budget || !limitAmount || Number(limitAmount) <= 0) return;
     startTransition(async () => {
-      await updateBudget(budget.id, Number(limitAmount));
+      const result = await updateBudget(budget.id, Number(limitAmount));
+      if (isFail(result)) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("已更新預算");
       onClose();
     });

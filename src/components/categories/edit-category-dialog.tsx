@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateCategory } from "@/app/(app)/categories/actions";
+import { isFail } from "@/lib/action-result";
 import { IconPicker } from "@/components/categories/icon-picker";
 
 type Category = { id: string; name: string; icon: string | null };
@@ -39,13 +40,13 @@ export function EditCategoryDialog({
   function handleSave() {
     if (!category || !name.trim() || !icon) return;
     startTransition(async () => {
-      try {
-        await updateCategory({ id: category.id, name: name.trim(), icon });
-        toast.success("已更新分類");
-        onClose();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "更新分類失敗");
+      const result = await updateCategory({ id: category.id, name: name.trim(), icon });
+      if (isFail(result)) {
+        toast.error(result.error);
+        return;
       }
+      toast.success("已更新分類");
+      onClose();
     });
   }
 

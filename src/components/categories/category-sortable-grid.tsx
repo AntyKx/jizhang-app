@@ -21,6 +21,7 @@ import { GripVertical, X } from "lucide-react";
 import { CategoryIcon } from "@/components/category-icon";
 import { EditCategoryDialog } from "@/components/categories/edit-category-dialog";
 import { deleteCategory, reorderCategories } from "@/app/(app)/categories/actions";
+import { isFail } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 
 type Category = { id: string; name: string; icon: string | null; userId: string | null };
@@ -147,7 +148,14 @@ export function CategorySortableGrid({ categories }: { categories: Category[] })
     setConfirmDeleteId(null);
     setItems((prev) => prev.filter((i) => i.id !== id));
     startTransition(async () => {
-      await deleteCategory(id);
+      const result = await deleteCategory(id);
+      if (isFail(result)) {
+        toast.error(result.error);
+        // Removed optimistically above — put it back since the delete
+        // didn't actually happen (e.g. a system default category).
+        setItems((prev) => (prev.some((i) => i.id === id) ? prev : [...prev, ...categories.filter((c) => c.id === id)]));
+        return;
+      }
       toast.success("已刪除分類");
     });
   }

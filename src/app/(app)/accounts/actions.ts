@@ -11,6 +11,20 @@ import { supportedCurrencies } from "@/lib/currency";
 import { getExchangeRateToTwd } from "@/lib/fx";
 import { hasCoreAccess } from "@/lib/entitlements";
 import { listAccounts } from "@/lib/account";
+import { fail, isFail, type Fail } from "@/lib/action-result";
+
+// getExchangeRateToTwd throws its own user-facing message (unreachable FX
+// API, unsupported currency) — converted to the same fail() shape as this
+// file's own validation checks, without changing fx.ts's own signature
+// (it's also called from accounts/page.tsx, a plain render path where
+// throwing is the correct/existing behavior).
+async function tryExchangeRate(currency: string, date: string): Promise<number | Fail> {
+  try {
+    return await getExchangeRateToTwd(currency, date);
+  } catch (err) {
+    return fail(err instanceof Error ? err.message : "無法取得匯率，請稍後再試");
+  }
+}
 
 const accountTypeSchema = z.enum(["cash", "bank", "credit_card", "e_wallet", "investment"]);
 const currencySchema = z.enum(
@@ -46,11 +60,12 @@ export async function createAccount(input: {
   if (!(await hasCoreAccess(userId))) {
     const existing = await listAccounts(userId);
     if (existing.length >= 1) {
-      throw new Error("免費版限用 1 個帳戶，升級解鎖多帳戶");
+      return fail("免費版限用 1 個帳戶，升級解鎖多帳戶");
     }
   }
 
-  const initialExchangeRate = await getExchangeRateToTwd(parsed.currency, "latest");
+  const initialExchangeRate = await tryExchangeRate(parsed.currency, "latest");
+  if (isFail(initialExchangeRate)) return initialExchangeRate;
 
   await db.insert(accounts).values({
     userId,
@@ -89,7 +104,7 @@ export async function updateAccount(input: {
     .select({ initialBalance: accounts.initialBalance })
     .from(accounts)
     .where(and(eq(accounts.id, parsed.id), eq(accounts.userId, userId)));
-  if (!existing) throw new Error("找不到指定的帳戶");
+  if (!existing) return fail("找不到指定的帳戶");
 
   // `currentBalance` is a running total (initialBalance + every transaction
   // since), never recomputed from scratch — so correcting a mistyped
@@ -122,7 +137,7 @@ export async function archiveAccount(id: string) {
     .where(and(eq(accounts.userId, userId), eq(accounts.isArchived, false)));
 
   if (activeAccounts.length <= 1 && activeAccounts.some((a) => a.id === id)) {
-    throw new Error("至少要保留一個帳戶，無法封存最後一個帳戶");
+    return fail("至少要保留一個帳戶，無法封存最後一個帳戶");
   }
 
   await db

@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createAccount } from "@/app/(app)/accounts/actions";
+import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { accountTypeLabels } from "@/lib/account-type";
 import { supportedCurrencies } from "@/lib/currency";
@@ -41,21 +42,21 @@ export function CreateAccountDialog() {
         <form
           ref={formRef}
           action={async (formData) => {
-            try {
-              await createAccount({
-                name: String(formData.get("name") ?? ""),
-                type: (formData.get("type") as keyof typeof accountTypeLabels) ?? "cash",
-                currency: String(formData.get("currency") ?? "TWD"),
-                initialBalance: Number(initialBalance) || 0,
-                excludeFromNetWorth,
-              });
-              setOpen(false);
-              formRef.current?.reset();
-              setInitialBalance("");
-              setExcludeFromNetWorth(false);
-            } catch (err) {
-              toast.error(err instanceof Error ? err.message : "建立帳戶失敗，請稍後再試");
+            const result = await createAccount({
+              name: String(formData.get("name") ?? ""),
+              type: (formData.get("type") as keyof typeof accountTypeLabels) ?? "cash",
+              currency: String(formData.get("currency") ?? "TWD"),
+              initialBalance: Number(initialBalance) || 0,
+              excludeFromNetWorth,
+            });
+            if (isFail(result)) {
+              toast.error(result.error);
+              return;
             }
+            setOpen(false);
+            formRef.current?.reset();
+            setInitialBalance("");
+            setExcludeFromNetWorth(false);
           }}
           className="flex flex-col gap-4"
         >

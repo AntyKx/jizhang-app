@@ -15,6 +15,20 @@ import {
   type TransactionsFilter,
 } from "@/lib/transactions/list-types";
 import { transactionsFilterConditions } from "@/lib/transactions/filter";
+import { fail, isFail, type Fail } from "@/lib/action-result";
+
+// getExchangeRateToTwd throws its own user-facing message (unreachable FX
+// API, unsupported currency) — converted to the same fail() shape as this
+// file's own validation checks, without changing fx.ts's own signature
+// (it's also called from accounts/page.tsx, a plain render path where
+// throwing is the correct/existing behavior).
+async function tryExchangeRate(currency: string, date: string): Promise<number | Fail> {
+  try {
+    return await getExchangeRateToTwd(currency, date);
+  } catch (err) {
+    return fail(err instanceof Error ? err.message : "無法取得匯率，請稍後再試");
+  }
+}
 
 function revalidateTransactionPaths() {
   revalidatePath("/record");
@@ -85,9 +99,10 @@ export async function createTransaction(input: {
     .select({ id: accounts.id, currency: accounts.currency })
     .from(accounts)
     .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)));
-  if (!ownedAccount) throw new Error("找不到指定的帳戶");
+  if (!ownedAccount) return fail("找不到指定的帳戶");
 
-  const exchangeRate = await getExchangeRateToTwd(ownedAccount.currency, parsed.occurredAt);
+  const exchangeRate = await tryExchangeRate(ownedAccount.currency, parsed.occurredAt);
+  if (isFail(exchangeRate)) return exchangeRate;
 
   const delta = parsed.type === "expense" ? -parsed.amount : parsed.amount;
   // Generated up front (instead of relying on the DB default) so the shared-
@@ -164,7 +179,7 @@ export async function createTransfer(input: {
   const userId = await requireUserId();
   const parsed = createTransferSchema.parse(input);
   if (parsed.fromAccountId === parsed.toAccountId) {
-    throw new Error("轉出與轉入帳戶不能相同");
+    return fail("轉出與轉入帳戶不能相同");
   }
 
   const ownedAccounts = await db
@@ -176,19 +191,20 @@ export async function createTransfer(input: {
         eq(accounts.userId, userId),
       ),
     );
-  if (ownedAccounts.length !== 2) throw new Error("找不到指定的帳戶");
+  if (ownedAccounts.length !== 2) return fail("找不到指定的帳戶");
   // Converting between currencies mid-transfer needs its own rate-entry UI
   // (which side does the amount refer to?) that doesn't exist yet — block it
   // rather than silently transferring the same number across currencies.
   if (ownedAccounts[0].currency !== ownedAccounts[1].currency) {
-    throw new Error("目前只支援同幣別帳戶之間轉帳");
+    return fail("目前只支援同幣別帳戶之間轉帳");
   }
 
   // Needed so a non-TWD transfer fee (see below) converts correctly in net
   // worth — the transferred amount itself always nets to zero across the
   // portfolio regardless of this rate, but the fee doesn't.
   const fromAccountCurrency = ownedAccounts.find((a) => a.id === parsed.fromAccountId)!.currency;
-  const exchangeRate = await getExchangeRateToTwd(fromAccountCurrency, parsed.occurredAt);
+  const exchangeRate = await tryExchangeRate(fromAccountCurrency, parsed.occurredAt);
+  if (isFail(exchangeRate)) return exchangeRate;
 
   // The fee is money that leaves the source account but never arrives at
   // the destination (paid to the bank/service, not to either account), so
@@ -259,15 +275,16 @@ export async function updateTransaction(input: {
     .select()
     .from(transactions)
     .where(and(eq(transactions.id, parsed.id), eq(transactions.userId, userId)));
-  if (!existing) throw new Error("找不到指定的交易");
+  if (!existing) return fail("找不到指定的交易");
 
   const [ownedAccount] = await db
     .select({ id: accounts.id, currency: accounts.currency })
     .from(accounts)
     .where(and(eq(accounts.id, parsed.accountId), eq(accounts.userId, userId)));
-  if (!ownedAccount) throw new Error("找不到指定的帳戶");
+  if (!ownedAccount) return fail("找不到指定的帳戶");
 
-  const exchangeRate = await getExchangeRateToTwd(ownedAccount.currency, parsed.occurredAt);
+  const exchangeRate = await tryExchangeRate(ownedAccount.currency, parsed.occurredAt);
+  if (isFail(exchangeRate)) return exchangeRate;
 
   // A settled shared-ledger entry already has a reimbursement transaction
   // recorded against the original amount/category — letting the source
@@ -278,7 +295,7 @@ export async function updateTransaction(input: {
     .from(sharedExpenses)
     .where(and(eq(sharedExpenses.linkedTransactionId, parsed.id), eq(sharedExpenses.userId, userId)));
   if (linkedShared?.isSettled) {
-    throw new Error("這筆交易已建立分帳結算紀錄，請先到分帳頁面處理再編輯");
+    return fail("這筆交易已建立分帳結算紀錄，請先到分帳頁面處理再編輯");
   }
 
   const oldDelta = existing.type === "expense" ? -Number(existing.amount) : Number(existing.amount);
@@ -396,7 +413,7 @@ export async function updateTransactionCategory(transactionId: string, categoryI
     .select({ id: transactions.id })
     .from(transactions)
     .where(and(eq(transactions.id, transactionId), eq(transactions.userId, userId)));
-  if (!existing) throw new Error("找不到指定的交易");
+  if (!existing) return fail("找不到指定的交易");
 
   await db
     .update(transactions)
@@ -413,15 +430,16 @@ export async function duplicateTransaction(transactionId: string) {
     .select()
     .from(transactions)
     .where(and(eq(transactions.id, transactionId), eq(transactions.userId, userId)));
-  if (!existing) throw new Error("找不到指定的交易");
-  if (existing.type === "transfer") throw new Error("轉帳紀錄不能複製");
+  if (!existing) return fail("找不到指定的交易");
+  if (existing.type === "transfer") return fail("轉帳紀錄不能複製");
 
+  const today = todayInTaipeiString();
   const [account] = await db
     .select({ currency: accounts.currency })
     .from(accounts)
     .where(and(eq(accounts.id, existing.accountId), eq(accounts.userId, userId)));
-  const today = todayInTaipeiString();
-  const exchangeRate = account ? await getExchangeRateToTwd(account.currency, today) : 1;
+  const exchangeRate = account ? await tryExchangeRate(account.currency, today) : 1;
+  if (isFail(exchangeRate)) return exchangeRate;
 
   const delta = existing.type === "expense" ? -Number(existing.amount) : Number(existing.amount);
 
@@ -472,31 +490,15 @@ export async function deleteUnlinkedSharedExpense(sharedExpenseId: string) {
   revalidateTransactionPaths();
 }
 
-export async function deleteTransaction(transactionId: string) {
-  const userId = await requireUserId();
-
-  const [tx] = await db
-    .select()
-    .from(transactions)
-    .where(and(eq(transactions.id, transactionId), eq(transactions.userId, userId)));
-
-  if (!tx) return;
-
-  // Deleting cascades (see schema.ts) to remove any linked shared-ledger
-  // copy — fine for an unsettled one, but a settled one already has a real
-  // reimbursement transaction recorded against it, and losing that record
-  // silently would leave the reimbursement looking unexplained.
-  const [linkedShared] = await db
-    .select({ isSettled: sharedExpenses.isSettled })
-    .from(sharedExpenses)
-    .where(and(eq(sharedExpenses.linkedTransactionId, transactionId), eq(sharedExpenses.userId, userId)));
-  if (linkedShared?.isSettled) {
-    throw new Error("這筆交易已建立分帳結算紀錄，請先到分帳頁面處理再刪除");
-  }
-
+// Shared by deleteTransaction and shared/actions.ts's unsettleSharedExpense
+// — both need to delete a transaction row and reverse its balance effect
+// exactly the same way, just gated by different guards (or none, for the
+// settlement-revert path, which is itself the sanctioned way to remove a
+// settlement transaction).
+async function deleteTransactionRow(userId: string, tx: typeof transactions.$inferSelect) {
   const deleteTx = db
     .delete(transactions)
-    .where(and(eq(transactions.id, transactionId), eq(transactions.userId, userId)));
+    .where(and(eq(transactions.id, tx.id), eq(transactions.userId, userId)));
 
   if (tx.type === "transfer") {
     // Undo both legs: give the amount (+ any fee, which only ever left the
@@ -534,7 +536,62 @@ export async function deleteTransaction(transactionId: string) {
         .where(and(eq(accounts.id, tx.accountId), eq(accounts.userId, userId))),
     ]);
   }
+}
 
+export async function deleteTransaction(transactionId: string) {
+  const userId = await requireUserId();
+
+  const [tx] = await db
+    .select()
+    .from(transactions)
+    .where(and(eq(transactions.id, transactionId), eq(transactions.userId, userId)));
+
+  if (!tx) return;
+
+  // Deleting cascades (see schema.ts) to remove any linked shared-ledger
+  // copy — fine for an unsettled one, but a settled one already has a real
+  // reimbursement transaction recorded against it, and losing that record
+  // silently would leave the reimbursement looking unexplained.
+  const [linkedShared] = await db
+    .select({ isSettled: sharedExpenses.isSettled })
+    .from(sharedExpenses)
+    .where(and(eq(sharedExpenses.linkedTransactionId, transactionId), eq(sharedExpenses.userId, userId)));
+  if (linkedShared?.isSettled) {
+    return fail("這筆交易已建立分帳結算紀錄，請先到分帳頁面處理再刪除");
+  }
+
+  // This transaction might instead *be* a settlement reimbursement (see
+  // shared/actions.ts's settleSharedExpense) — deleting it out from under
+  // its shared-expense row would leave that row stuck showing "已結清" with
+  // no reimbursement to back it up. Revert the settlement from /shared
+  // instead, which removes this transaction the same way but also resets
+  // the shared-expense row.
+  const [settledFrom] = await db
+    .select({ id: sharedExpenses.id })
+    .from(sharedExpenses)
+    .where(and(eq(sharedExpenses.settlementTransactionId, transactionId), eq(sharedExpenses.userId, userId)));
+  if (settledFrom) {
+    return fail("這是分帳結算交易，請到分帳頁面用「回復結清」處理");
+  }
+
+  await deleteTransactionRow(userId, tx);
+  revalidateTransactionPaths();
+}
+
+// Used only by shared/actions.ts's unsettleSharedExpense to remove exactly
+// the settlement transaction a (possibly now-reverted) settle produced —
+// skips deleteTransaction's settlement-transaction guard above, since this
+// *is* the sanctioned way to remove one.
+export async function deleteSettlementTransaction(transactionId: string) {
+  const userId = await requireUserId();
+
+  const [tx] = await db
+    .select()
+    .from(transactions)
+    .where(and(eq(transactions.id, transactionId), eq(transactions.userId, userId)));
+  if (!tx) return;
+
+  await deleteTransactionRow(userId, tx);
   revalidateTransactionPaths();
 }
 
