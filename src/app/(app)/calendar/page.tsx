@@ -151,7 +151,14 @@ export default async function CalendarPage({
           ))}
         </div>
 
-        <StaggerList className="grid grid-cols-7 gap-1">
+        {/* Plain div, not StaggerList — a 30+ cell month grid is functional
+            content (every day needs to stay tappable), not a decorative
+            list. StaggerList's GSAP entrance animates from opacity:0, and
+            if that tween ever gets interrupted/throttled (backgrounded
+            tab, low-power mode) before finishing, whatever cells hadn't
+            animated in yet are stuck permanently invisible — which is
+            exactly the "later days don't show up" bug this replaces. */}
+        <div className="grid grid-cols-7 gap-1">
           {Array.from({ length: leadingBlanks }).map((_, i) => (
             <div key={`blank-${i}`} />
           ))}
@@ -193,7 +200,7 @@ export default async function CalendarPage({
               </Link>
             );
           })}
-        </StaggerList>
+        </div>
       </div>
 
       {selectedDay && (
