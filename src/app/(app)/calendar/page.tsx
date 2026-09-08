@@ -206,71 +206,92 @@ export default async function CalendarPage({
       </div>
   );
 
-  const detail = selectedDay && (
-    <div className="flex flex-col gap-2 pt-2">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-muted-foreground">{selectedDay}</span>
-        {(() => {
-          const dayTotals = byDay.get(selectedDay);
-          if (!dayTotals || (dayTotals.expense === 0 && dayTotals.income === 0)) return null;
-          return (
-            <div className="flex gap-3 text-sm font-semibold tabular-nums">
-              {dayTotals.expense > 0 && (
-                <span className="text-destructive">-{Math.round(dayTotals.expense).toLocaleString("zh-TW")}</span>
-              )}
-              {dayTotals.income > 0 && (
-                <span className="text-emerald-600">+{Math.round(dayTotals.income).toLocaleString("zh-TW")}</span>
-              )}
-            </div>
-          );
-        })()}
-      </div>
-      {selectedTransactions.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-8 text-center">
-          <BearIllustration name="empty" size={96} />
-          <p className="text-muted-foreground text-sm">這天還沒有記帳紀錄喔！</p>
-        </div>
-      ) : (
-        <>
-          {editableTransactions.length > 0 && (
-            <StaggerList className="flex flex-col divide-y">
-              {editableTransactions.map((t) => (
-                <TodayTransactionRow
-                  key={t.id}
-                  transaction={t}
-                  categories={userCategories}
-                  accounts={userAccounts.filter((a) => !a.excludeFromNetWorth)}
-                  showAccount={userAccounts.length > 1}
-                  partnerName={partnerName}
-                />
-              ))}
-            </StaggerList>
-          )}
-
-          {transferTransactions.length > 0 && (
-            <StaggerList className="flex flex-col divide-y">
-              {transferTransactions.map((t) => (
-                <div key={t.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <CategoryIcon icon={t.categoryIcon} className="h-6 w-6 text-xl" />
-                    <span className="text-sm">{t.merchant || t.note || "轉帳"}</span>
-                    <PaymentMethodIcon method={t.paymentMethod} className="text-muted-foreground" />
-                  </div>
-                  <span className="text-sm font-semibold">
-                    {Number(t.amount).toLocaleString("zh-TW")}
-                  </span>
-                </div>
-              ))}
-            </StaggerList>
-          )}
-        </>
-      )}
+  // Split so CalendarScrollPane can pin dateRow in place the same way it
+  // already pins the month grid — only the actual transaction list should
+  // scroll, not the date/amount line above it.
+  const dateRow = selectedDay && (
+    <div className="flex items-center justify-between pb-2">
+      <span className="text-sm font-medium text-muted-foreground">{selectedDay}</span>
+      {(() => {
+        const dayTotals = byDay.get(selectedDay);
+        if (!dayTotals || (dayTotals.expense === 0 && dayTotals.income === 0)) return null;
+        return (
+          <div className="flex gap-3 text-sm font-semibold tabular-nums">
+            {dayTotals.expense > 0 && (
+              <span className="text-destructive">-{Math.round(dayTotals.expense).toLocaleString("zh-TW")}</span>
+            )}
+            {dayTotals.income > 0 && (
+              <span className="text-emerald-600">+{Math.round(dayTotals.income).toLocaleString("zh-TW")}</span>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 
+  const list = selectedDay && (
+    selectedTransactions.length === 0 ? (
+      <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+        <BearIllustration name="empty" size={96} />
+        <p className="text-muted-foreground text-sm">這天還沒有記帳紀錄喔！</p>
+      </div>
+    ) : (
+      <>
+        {editableTransactions.length > 0 && (
+          <StaggerList className="flex flex-col divide-y">
+            {editableTransactions.map((t) => (
+              <TodayTransactionRow
+                key={t.id}
+                transaction={t}
+                categories={userCategories}
+                accounts={userAccounts.filter((a) => !a.excludeFromNetWorth)}
+                showAccount={userAccounts.length > 1}
+                partnerName={partnerName}
+              />
+            ))}
+          </StaggerList>
+        )}
+
+        {transferTransactions.length > 0 && (
+          <StaggerList className="flex flex-col divide-y">
+            {transferTransactions.map((t) => (
+              <div key={t.id} className="flex items-center justify-between px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <CategoryIcon icon={t.categoryIcon} className="h-6 w-6 text-xl" />
+                  <span className="text-sm">{t.merchant || t.note || "轉帳"}</span>
+                  <PaymentMethodIcon method={t.paymentMethod} className="text-muted-foreground" />
+                </div>
+                <span className="text-sm font-semibold">
+                  {Number(t.amount).toLocaleString("zh-TW")}
+                </span>
+              </div>
+            ))}
+          </StaggerList>
+        )}
+      </>
+    )
+  );
+
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col">
-      <CalendarScrollPane header={header} detail={detail} />
+    // Fixed to the viewport, not a normal-flow page — a drag over the
+    // (short, in-flow) header inside it was still bubbling up to scroll
+    // the actual document (nothing else on the page was tall enough to
+    // need scrolling, but the page could still be dragged a little,
+    // enough to visibly shift the calendar while trying to scroll the
+    // detail pane below it). Taking this whole page out of flow the same
+    // way the detail pane already is means body genuinely has zero
+    // flow content left to scroll, with no JS touching body's own
+    // styles this time — that's what broke env(safe-area-inset-bottom)
+    // for the fixed bottom nav previously.
+    <div
+      className="fixed inset-0 mx-auto flex w-full max-w-md flex-col overflow-hidden px-4"
+      // Being fixed/viewport-relative means this no longer sits inside
+      // <main>'s own py-6 + body's safe-area-inset-top padding — without
+      // reproducing it here, the header would render flush against the
+      // true top edge, back under the status bar/notch on a real phone.
+      style={{ paddingTop: "calc(1.5rem + env(safe-area-inset-top))" }}
+    >
+      <CalendarScrollPane header={header} dateRow={dateRow} list={list} />
     </div>
   );
 }

@@ -116,6 +116,7 @@ export function SharedExpenseRow({
                 variant="secondary"
                 disabled={pending}
                 onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => e.stopPropagation()}
                 onClick={handleSettle}
               >
                 結清
@@ -126,6 +127,7 @@ export function SharedExpenseRow({
                 variant="ghost"
                 disabled={pending}
                 onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => e.stopPropagation()}
                 onClick={handleUnsettle}
               >
                 回復結清

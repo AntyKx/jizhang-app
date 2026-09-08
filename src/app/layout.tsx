@@ -37,8 +37,12 @@ export const viewport: Viewport = {
   themeColor: "#e2874f",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // Reverted maximumScale/userScalable — on iPhones with a Dynamic Island,
+  // disabling zoom alongside viewport-fit=cover breaks the safe-area
+  // calculation (a known WebKit interaction, not a screen-size thing),
+  // shoving content up under the status bar/island on every page, not
+  // just wherever the zoom lock itself was needed. Not worth it for a
+  // "can't pinch-zoom" convenience.
   viewportFit: "cover",
 };
 

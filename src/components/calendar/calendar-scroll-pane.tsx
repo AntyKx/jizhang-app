@@ -6,67 +6,52 @@ import { useEffect, useRef, useState } from "react";
 // sticky header, the whole page is still one scroll gesture, so a swipe
 // that starts over the calendar grid just scrolls the page (the grid stays
 // visually pinned, but the *gesture* doesn't feel scoped to the detail
-// list below it). This measures where the header actually ends and gives
-// the detail pane its own bounded, independently-scrollable box instead,
-// so a touch on the grid does nothing and only the detail list responds.
+// list below it). The outer pane (month grid vs. everything below it) is
+// fixed to the viewport with its own top/bottom offsets — that lets the
+// browser compute its height directly (viewport height minus those two
+// offsets), rather than us trying to reproduce that arithmetic ourselves
+// via 100dvh, which came out a bit tall on a real phone (leftover blank
+// space at the bottom) since dvh doesn't track 1:1 with what's actually
+// visible once the page can no longer scroll to reveal/hide browser
+// chrome.
+//
+// Inside that pane, dateRow (the selected day + its total) gets the same
+// treatment one level down: it's normal-flow content (shrink-0), and only
+// `list` — a second, nested overflow-y-auto region — actually scrolls.
+// Since the outer pane already has a real, CSS-computed height (from its
+// own top/bottom), this inner split can just use plain flexbox
+// (flex-1 + min-h-0), no second measurement needed.
+//
+// No JS body-scroll-lock here (there used to be one, forcing body to
+// position:fixed) — it was a safety net from when the pane's height was
+// only an estimate and could leave a few px of real page overflow. Now
+// that the pane is `position:fixed` with explicit top+bottom, it's
+// removed from normal document flow entirely and can't make the page
+// taller than the header's own (short) natural height, so there's
+// nothing left to scroll and nothing to lock. The lock itself turned out
+// to be actively harmful on a real device — it left a large unexplained
+// gap under the bottom nav (locking body's own box appears to disrupt
+// how iOS resolves the fixed bottom nav's env(safe-area-inset-bottom)
+// padding), which is worse than the problem it was guarding against.
 export function CalendarScrollPane({
   header,
-  detail,
+  dateRow,
+  list,
 }: {
   header: React.ReactNode;
-  detail: React.ReactNode;
+  dateRow: React.ReactNode;
+  list: React.ReactNode;
 }) {
   const headerRef = useRef<HTMLDivElement>(null);
   const [headerBottom, setHeaderBottom] = useState<number | null>(null);
 
   useEffect(() => {
-    // Hard lock, not just "make the math add up to zero overflow" — the
-    // headerBottom-based height below is still an estimate (address-bar
-    // show/hide, safe-area quirks, PWA vs. browser-tab chrome all shift it
-    // a few px in practice), and on a real phone a few px of residual
-    // overflow is enough for the whole page to still drag/bounce. Pinning
-    // body in place is the standard cross-browser modal-scroll-lock
-    // recipe and guarantees the page can't move regardless of how exact
-    // that estimate turns out to be.
-    const scrollY = window.scrollY;
-    const body = document.body;
-    const prev = {
-      position: body.style.position,
-      top: body.style.top,
-      left: body.style.left,
-      right: body.style.right,
-      width: body.style.width,
-      overflow: body.style.overflow,
-    };
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.left = "0";
-    body.style.right = "0";
-    body.style.width = "100%";
-    body.style.overflow = "hidden";
-    return () => {
-      body.style.position = prev.position;
-      body.style.top = prev.top;
-      body.style.left = prev.left;
-      body.style.right = prev.right;
-      body.style.width = prev.width;
-      body.style.overflow = prev.overflow;
-      window.scrollTo(0, scrollY);
-    };
-  }, []);
-
-  useEffect(() => {
     const el = headerRef.current;
     if (!el) return;
-    // Where the pane should start is the header's bottom edge, not the
-    // wrapper's top — measuring the wrapper's top gave the same (roughly
-    // constant) value regardless of the header's actual rendered height,
-    // so the pane's calculated height silently ignored how tall the
-    // header really was and either clipped into it or left it short.
-    // ResizeObserver (not a one-off measure + window resize listener) so
-    // switching months — a 5-row vs. 6-row grid changes the header's own
-    // height, with this same client component instance staying mounted
-    // across that client-side navigation — keeps the measurement correct.
+    // ResizeObserver (not a one-off measurement) so switching months — a
+    // 5-row vs. 6-row grid changes the header's own height, with this
+    // same client component instance staying mounted across that client-
+    // side navigation — keeps the measurement correct.
     const measure = () => setHeaderBottom(el.getBoundingClientRect().bottom);
     measure();
     const observer = new ResizeObserver(measure);
@@ -79,30 +64,34 @@ export function CalendarScrollPane({
   }, []);
 
   return (
-    <div className="flex flex-col">
-      <div ref={headerRef} className="shrink-0">
+    <>
+      {/* touch-none — a drag starting on the grid shouldn't pan anything
+          (this element has nothing to scroll itself, but without this a
+          drag here can still bubble up and move the page/body instead of
+          being scoped to the detail pane below, per the user's report).
+          Taps (month prev/next, picking a day) are unaffected — touch-
+          action only governs drag/pan gestures, not simple taps. */}
+      <div ref={headerRef} className="touch-none">
         {header}
       </div>
       <div
-        // No flex-1 here — `flex: 1 1 0%` makes flex-basis 0%, which then
-        // wins over the explicit inline height below for this flex item's
-        // sizing, so the pane silently grows to fit its content instead of
-        // clipping/scrolling at the computed height. The inline height is
-        // the actual sizing mechanism; this is a plain (non-growing) flex
-        // item that just happens to get an explicit height.
-        className="overflow-y-auto overscroll-contain"
-        // Height comes from where this pane actually starts (measured,
-        // since the header above it isn't a fixed size) down to the
-        // viewport bottom, minus the same bottom-nav/FAB reservation
-        // (app)/layout.tsx's <main> already carries in its own padding.
+        // Fixed to the viewport, not a normal-flow flex child — see the
+        // file-level comment. left/right + mx-auto + max-w-md + px-4
+        // reproduce (app)/layout.tsx's <main> centering/padding, since a
+        // fixed element positions against the viewport directly and
+        // doesn't inherit that from its actual DOM ancestors. flex-col
+        // itself doesn't scroll (dateRow is touch-none, same reasoning as
+        // the grid above) — only the nested list div below does.
+        className="fixed inset-x-0 mx-auto flex w-full max-w-md flex-col px-4"
         style={
           headerBottom != null
-            ? { height: `calc(100dvh - ${headerBottom}px - 6rem - env(safe-area-inset-bottom))` }
-            : undefined
+            ? { top: headerBottom, bottom: "calc(6rem + env(safe-area-inset-bottom))" }
+            : { visibility: "hidden" }
         }
       >
-        {detail}
+        <div className="touch-none pt-2">{dateRow}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{list}</div>
       </div>
-    </div>
+    </>
   );
 }

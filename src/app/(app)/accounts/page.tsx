@@ -12,6 +12,7 @@ import { BearIllustration } from "@/components/bear-illustration";
 import { NetWorthSummary } from "@/components/accounts/net-worth-summary";
 import { getExchangeRateToTwd } from "@/lib/fx";
 import { todayInTaipeiString } from "@/lib/date";
+import type { AccountType } from "@/lib/account-type";
 
 export default async function AccountsPage() {
   const userId = await requireUserId();
@@ -45,14 +46,19 @@ export default async function AccountsPage() {
   // Total across active accounts, in TWD. `getExchangeRateToTwd` short-
   // circuits to 1 for TWD without any network call, so an all-TWD setup (the
   // common case) costs nothing here. Rates are resolved once per distinct
-  // currency, in parallel, so a mixed-currency portfolio doesn't serialise a
-  // lookup per account. If any lookup fails we show the total as unavailable
-  // rather than silently summing mixed currencies.
+  // currency (across *all* active accounts, not just net-worth-counted
+  // ones — the per-type group subtotals below need excluded accounts'
+  // rates too), in parallel, so a mixed-currency portfolio doesn't
+  // serialise a lookup per account. If any lookup fails we show the
+  // totals as unavailable rather than silently summing mixed currencies.
   let netWorth: number | null;
+  let totalAssets: number | null;
+  let totalLiabilities: number | null;
+  let groupSubtotals: Partial<Record<AccountType, number>> = {};
   try {
     const today = todayInTaipeiString();
     const netWorthAccounts = accounts.filter((a) => !a.excludeFromNetWorth);
-    const currencies = [...new Set(netWorthAccounts.map((a) => a.currency))];
+    const currencies = [...new Set(accounts.map((a) => a.currency))];
     const rates = new Map(
       await Promise.all(
         currencies.map(
@@ -60,12 +66,21 @@ export default async function AccountsPage() {
         ),
       ),
     );
-    netWorth = netWorthAccounts.reduce(
-      (sum, a) => sum + Number(a.currentBalance) * (rates.get(a.currency) ?? 1),
-      0,
-    );
+    const toTwd = (a: (typeof accounts)[number]) => Number(a.currentBalance) * (rates.get(a.currency) ?? 1);
+
+    netWorth = netWorthAccounts.reduce((sum, a) => sum + toTwd(a), 0);
+    totalAssets = netWorthAccounts.reduce((sum, a) => sum + Math.max(0, toTwd(a)), 0);
+    totalLiabilities = netWorthAccounts.reduce((sum, a) => sum + Math.min(0, toTwd(a)), 0);
+
+    groupSubtotals = {};
+    for (const a of accounts) {
+      groupSubtotals[a.type] = (groupSubtotals[a.type] ?? 0) + toTwd(a);
+    }
   } catch {
     netWorth = null;
+    totalAssets = null;
+    totalLiabilities = null;
+    groupSubtotals = {};
   }
 
   return (
@@ -82,7 +97,14 @@ export default async function AccountsPage() {
         </div>
       </div>
 
-      {accounts.length > 0 && <NetWorthSummary total={netWorth} accountCount={accounts.length} />}
+      {accounts.length > 0 && (
+        <NetWorthSummary
+          total={netWorth}
+          accountCount={accounts.length}
+          assets={totalAssets}
+          liabilities={totalLiabilities}
+        />
+      )}
 
       {accounts.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-8 text-center">
@@ -91,6 +113,7 @@ export default async function AccountsPage() {
         </div>
       ) : (
         <AccountsList
+          groupSubtotals={groupSubtotals}
           accounts={accounts.map((a) => ({
             id: a.id,
             name: a.name,

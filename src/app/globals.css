@@ -160,5 +160,30 @@
   }
   html {
     @apply font-sans;
+    /* App-like touch behavior, not a webpage's — kills double-tap-to-zoom
+       and the ~300ms tap delay (manipulation still allows normal single-
+       axis panning/scrolling, unlike touch-action:none which would break
+       every scrollable list). Deliberately CSS-only: the earlier attempt
+       at this used the viewport meta's user-scalable=no, which broke
+       env(safe-area-inset-*) on notch/Dynamic-Island phones — this
+       doesn't touch the viewport at all, so that risk doesn't apply here.
+       Individual elements can still set a *more* restrictive touch-action
+       (e.g. calendar's touch-none) since touch-action isn't inherited —
+       each element's own computed value is what's used. */
+    touch-action: manipulation;
+    /* Long-press text-selection/copy popup and iOS's "Copy/Share" callout
+       read as a webpage, not an app — off everywhere except actual text
+       inputs, which still need normal select/edit behavior. */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    /* The gray/blue flash a tap leaves on iOS/Android Chrome by default. */
+    -webkit-tap-highlight-color: transparent;
+  }
+  input,
+  textarea,
+  [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
   }
 }

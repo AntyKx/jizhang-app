@@ -38,10 +38,22 @@ export function HomeSummary({
   const overBudget = remaining != null && remaining < 0;
 
   return (
-    <div className="relative -mx-4 -mt-6 overflow-hidden rounded-b-[28px] bg-gradient-to-br from-secondary via-secondary/45 to-transparent">
+    <div
+      className="relative -mx-4 overflow-hidden rounded-b-[28px] bg-gradient-to-br from-secondary via-secondary/45 to-transparent"
+      // -mt-6 alone only cancels <main>'s own py-6 — body (src/app/layout.tsx)
+      // separately carries its own pt-[env(safe-area-inset-top)], which
+      // -mt-6 never touched, so the banner's top edge sat one safe-area's
+      // worth below the true screen top. This banner's own inner
+      // pt-[env(safe-area-inset-top)] below was then adding that same
+      // amount *again* on top of that already-offset starting position —
+      // the safe area was being reserved twice. Cancelling both ancestors'
+      // padding here is what makes this a genuine full-bleed edge, so the
+      // one env(safe-area-inset-top) inside is the only place it's paid.
+      style={{ marginTop: "calc(-1.5rem - env(safe-area-inset-top))" }}
+    >
       <div className="absolute -top-20 -right-8 size-[150px] rounded-full bg-[color-mix(in_oklch,var(--secondary)_70%,transparent)]" />
 
-      <div className="relative flex flex-col gap-4 px-5 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-5">
+      <div className="relative flex flex-col gap-4 px-5 pt-[env(safe-area-inset-top)] pb-5">
         <div className="flex items-start justify-between">
           <div className="flex flex-col gap-0.5 pt-0.5">
             <span className="text-sm font-bold">
