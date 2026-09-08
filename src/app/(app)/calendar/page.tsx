@@ -21,6 +21,7 @@ import { TodayTransactionRow } from "@/components/record/today-transaction-row";
 import { BearIllustration } from "@/components/bear-illustration";
 import { heatmapLevel, SEQUENTIAL_HEATMAP_STEPS, SEQUENTIAL_HEATMAP_TEXT } from "@/components/stats/chart-colors";
 import { StaggerList } from "@/components/motion/stagger-list";
+import { CalendarScrollPane } from "@/components/calendar/calendar-scroll-pane";
 import { getTodayInTaipei } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
@@ -124,8 +125,8 @@ export default async function CalendarPage({
   );
   const transferTransactions = selectedTransactions.filter((t) => t.type === "transfer");
 
-  return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+  const header = (
+    <div className="flex flex-col gap-2 pb-4">
       <div className="flex items-center justify-between">
         <Link
           href={`/calendar?month=${prevMonthKey}`}
@@ -144,126 +145,132 @@ export default async function CalendarPage({
         </Link>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
-          {weekdays.map((w) => (
-            <div key={w}>{w}</div>
-          ))}
-        </div>
+        <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
+            {weekdays.map((w) => (
+              <div key={w}>{w}</div>
+            ))}
+          </div>
 
-        {/* Plain div, not StaggerList — a 30+ cell month grid is functional
-            content (every day needs to stay tappable), not a decorative
-            list. StaggerList's GSAP entrance animates from opacity:0, and
-            if that tween ever gets interrupted/throttled (backgrounded
-            tab, low-power mode) before finishing, whatever cells hadn't
-            animated in yet are stuck permanently invisible — which is
-            exactly the "later days don't show up" bug this replaces. */}
-        <div className="grid grid-cols-7 gap-1">
-          {Array.from({ length: leadingBlanks }).map((_, i) => (
-            <div key={`blank-${i}`} />
-          ))}
-          {days.map((d) => {
-            const key = format(d, "yyyy-MM-dd");
-            const entry = byDay.get(key);
-            const isSelected = selectedDay === key;
-            const isToday = key === todayKey;
-            const level = heatmapLevel(entry?.expense ?? 0, maxExpense);
-            const textColor = SEQUENTIAL_HEATMAP_TEXT[level];
-            const titleParts = [
-              entry?.expense ? `支出 ${Math.round(entry.expense).toLocaleString("zh-TW")}` : null,
-              entry?.income ? `收入 ${Math.round(entry.income).toLocaleString("zh-TW")}` : null,
-            ].filter(Boolean);
-            return (
-              <Link
-                key={key}
-                href={`/calendar?month=${monthKey}&day=${key}`}
-                title={titleParts.length > 0 ? `${key}・${titleParts.join("・")}` : key}
-                className={cn(
-                  "relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg text-center tabular-nums transition-all",
-                  isSelected
-                    ? "z-10 scale-105 shadow-md ring-2 ring-primary ring-offset-2 ring-offset-card"
-                    : "hover:ring-1 hover:ring-muted-foreground/30",
-                )}
-                style={{ backgroundColor: SEQUENTIAL_HEATMAP_STEPS[level], color: textColor }}
-              >
-                <span className={cn("text-xs", level >= 3 && "font-medium")}>{format(d, "d")}</span>
-                {/* "Today" no longer relies on a ring (that's the isSelected
-                    signal now) — a small dot in the day's own text color
-                    stays visible no matter how intense that day's heat
-                    color is. */}
-                {isToday && (
-                  <span className="size-1 rounded-full" style={{ backgroundColor: textColor }} />
-                )}
-                {entry?.income ? (
-                  <span className="absolute top-1 right-1 size-1.5 rounded-full bg-emerald-500" />
-                ) : null}
-              </Link>
-            );
-          })}
+          {/* Plain div, not StaggerList — a 30+ cell month grid is functional
+              content (every day needs to stay tappable), not a decorative
+              list. StaggerList's GSAP entrance animates from opacity:0, and
+              if that tween ever gets interrupted/throttled (backgrounded
+              tab, low-power mode) before finishing, whatever cells hadn't
+              animated in yet are stuck permanently invisible — which is
+              exactly the "later days don't show up" bug this replaces. */}
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: leadingBlanks }).map((_, i) => (
+              <div key={`blank-${i}`} />
+            ))}
+            {days.map((d) => {
+              const key = format(d, "yyyy-MM-dd");
+              const entry = byDay.get(key);
+              const isSelected = selectedDay === key;
+              const isToday = key === todayKey;
+              const level = heatmapLevel(entry?.expense ?? 0, maxExpense);
+              const textColor = SEQUENTIAL_HEATMAP_TEXT[level];
+              const titleParts = [
+                entry?.expense ? `支出 ${Math.round(entry.expense).toLocaleString("zh-TW")}` : null,
+                entry?.income ? `收入 ${Math.round(entry.income).toLocaleString("zh-TW")}` : null,
+              ].filter(Boolean);
+              return (
+                <Link
+                  key={key}
+                  href={`/calendar?month=${monthKey}&day=${key}`}
+                  title={titleParts.length > 0 ? `${key}・${titleParts.join("・")}` : key}
+                  className={cn(
+                    "relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg text-center tabular-nums transition-all",
+                    isSelected
+                      ? "z-10 scale-105 shadow-md ring-2 ring-primary ring-offset-2 ring-offset-card"
+                      : "hover:ring-1 hover:ring-muted-foreground/30",
+                  )}
+                  style={{ backgroundColor: SEQUENTIAL_HEATMAP_STEPS[level], color: textColor }}
+                >
+                  <span className={cn("text-xs", level >= 3 && "font-medium")}>{format(d, "d")}</span>
+                  {/* "Today" no longer relies on a ring (that's the isSelected
+                      signal now) — a small dot in the day's own text color
+                      stays visible no matter how intense that day's heat
+                      color is. */}
+                  {isToday && (
+                    <span className="size-1 rounded-full" style={{ backgroundColor: textColor }} />
+                  )}
+                  {entry?.income ? (
+                    <span className="absolute top-1 right-1 size-1.5 rounded-full bg-emerald-500" />
+                  ) : null}
+                </Link>
+              );
+            })}
+          </div>
         </div>
       </div>
+  );
 
-      {selectedDay && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">{selectedDay}</span>
-            {(() => {
-              const dayTotals = byDay.get(selectedDay);
-              if (!dayTotals || (dayTotals.expense === 0 && dayTotals.income === 0)) return null;
-              return (
-                <div className="flex gap-3 text-sm font-semibold tabular-nums">
-                  {dayTotals.expense > 0 && (
-                    <span className="text-destructive">-{Math.round(dayTotals.expense).toLocaleString("zh-TW")}</span>
-                  )}
-                  {dayTotals.income > 0 && (
-                    <span className="text-emerald-600">+{Math.round(dayTotals.income).toLocaleString("zh-TW")}</span>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-          {selectedTransactions.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-8 text-center">
-              <BearIllustration name="empty" size={96} />
-              <p className="text-muted-foreground text-sm">這天還沒有記帳紀錄喔！</p>
+  const detail = selectedDay && (
+    <div className="flex flex-col gap-2 pt-2">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-muted-foreground">{selectedDay}</span>
+        {(() => {
+          const dayTotals = byDay.get(selectedDay);
+          if (!dayTotals || (dayTotals.expense === 0 && dayTotals.income === 0)) return null;
+          return (
+            <div className="flex gap-3 text-sm font-semibold tabular-nums">
+              {dayTotals.expense > 0 && (
+                <span className="text-destructive">-{Math.round(dayTotals.expense).toLocaleString("zh-TW")}</span>
+              )}
+              {dayTotals.income > 0 && (
+                <span className="text-emerald-600">+{Math.round(dayTotals.income).toLocaleString("zh-TW")}</span>
+              )}
             </div>
-          ) : (
-            <>
-              {editableTransactions.length > 0 && (
-                <StaggerList className="flex flex-col divide-y">
-                  {editableTransactions.map((t) => (
-                    <TodayTransactionRow
-                      key={t.id}
-                      transaction={t}
-                      categories={userCategories}
-                      accounts={userAccounts.filter((a) => !a.excludeFromNetWorth)}
-                      showAccount={userAccounts.length > 1}
-                      partnerName={partnerName}
-                    />
-                  ))}
-                </StaggerList>
-              )}
-
-              {transferTransactions.length > 0 && (
-                <StaggerList className="flex flex-col divide-y">
-                  {transferTransactions.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <CategoryIcon icon={t.categoryIcon} className="h-6 w-6 text-xl" />
-                        <span className="text-sm">{t.merchant || t.note || "轉帳"}</span>
-                        <PaymentMethodIcon method={t.paymentMethod} className="text-muted-foreground" />
-                      </div>
-                      <span className="text-sm font-semibold">
-                        {Number(t.amount).toLocaleString("zh-TW")}
-                      </span>
-                    </div>
-                  ))}
-                </StaggerList>
-              )}
-            </>
-          )}
+          );
+        })()}
+      </div>
+      {selectedTransactions.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-8 text-center">
+          <BearIllustration name="empty" size={96} />
+          <p className="text-muted-foreground text-sm">這天還沒有記帳紀錄喔！</p>
         </div>
+      ) : (
+        <>
+          {editableTransactions.length > 0 && (
+            <StaggerList className="flex flex-col divide-y">
+              {editableTransactions.map((t) => (
+                <TodayTransactionRow
+                  key={t.id}
+                  transaction={t}
+                  categories={userCategories}
+                  accounts={userAccounts.filter((a) => !a.excludeFromNetWorth)}
+                  showAccount={userAccounts.length > 1}
+                  partnerName={partnerName}
+                />
+              ))}
+            </StaggerList>
+          )}
+
+          {transferTransactions.length > 0 && (
+            <StaggerList className="flex flex-col divide-y">
+              {transferTransactions.map((t) => (
+                <div key={t.id} className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <CategoryIcon icon={t.categoryIcon} className="h-6 w-6 text-xl" />
+                    <span className="text-sm">{t.merchant || t.note || "轉帳"}</span>
+                    <PaymentMethodIcon method={t.paymentMethod} className="text-muted-foreground" />
+                  </div>
+                  <span className="text-sm font-semibold">
+                    {Number(t.amount).toLocaleString("zh-TW")}
+                  </span>
+                </div>
+              ))}
+            </StaggerList>
+          )}
+        </>
       )}
+    </div>
+  );
+
+  return (
+    <div className="mx-auto flex w-full max-w-2xl flex-col">
+      <CalendarScrollPane header={header} detail={detail} />
     </div>
   );
 }
