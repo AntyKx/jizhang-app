@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { SlidingIndicator } from "@/components/motion/sliding-indicator";
 import { TransactionsList } from "@/components/transactions/transactions-list";
 import type { Account, AccountInfo, Category, ListItem } from "@/lib/transactions/list-types";
@@ -62,42 +61,38 @@ export function AccountDetailTabs({
 
       {active === "overview" ? (
         <div className="flex flex-col gap-4">
-          <Card>
-            <CardContent className="flex flex-col gap-1 pt-6">
-              <span className="text-muted-foreground text-sm">目前餘額</span>
-              <span className="text-3xl font-semibold tabular-nums">
-                {currency !== "TWD" && <span className="mr-1 text-base font-normal text-muted-foreground">{currency}</span>}
-                {Number(currentBalance).toLocaleString("zh-TW")}
-              </span>
-            </CardContent>
-          </Card>
+          <div className="flex flex-col gap-1 rounded-3xl bg-muted/40 p-5">
+            <span className="text-muted-foreground text-sm">目前餘額</span>
+            <span className="text-3xl font-semibold tabular-nums">
+              {currency !== "TWD" && <span className="mr-1 text-base font-normal text-muted-foreground">{currency}</span>}
+              {Number(currentBalance).toLocaleString("zh-TW")}
+            </span>
+          </div>
 
-          <Card>
-            <CardContent className="flex flex-col gap-3 pt-6">
-              <span className="text-muted-foreground text-sm">{monthLabel}收支</span>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="flex flex-col gap-1">
-                  <span className="text-muted-foreground text-xs">收入</span>
-                  <span className="font-semibold tabular-nums text-emerald-600">
-                    {monthIncome.toLocaleString("zh-TW")}
-                  </span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-muted-foreground text-xs">支出</span>
-                  <span className="font-semibold tabular-nums text-destructive">
-                    {monthExpense.toLocaleString("zh-TW")}
-                  </span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-muted-foreground text-xs">淨額</span>
-                  <span className={cn("font-semibold tabular-nums", net >= 0 ? "text-emerald-600" : "text-destructive")}>
-                    {net >= 0 ? "+" : ""}
-                    {net.toLocaleString("zh-TW")}
-                  </span>
-                </div>
+          <div className="flex flex-col gap-3 rounded-3xl bg-muted/40 p-5">
+            <span className="text-muted-foreground text-sm">{monthLabel}收支</span>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="flex flex-col gap-1">
+                <span className="text-muted-foreground text-xs">收入</span>
+                <span className="font-semibold tabular-nums text-emerald-600">
+                  {monthIncome.toLocaleString("zh-TW")}
+                </span>
               </div>
-            </CardContent>
-          </Card>
+              <div className="flex flex-col gap-1">
+                <span className="text-muted-foreground text-xs">支出</span>
+                <span className="font-semibold tabular-nums text-destructive">
+                  {monthExpense.toLocaleString("zh-TW")}
+                </span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-muted-foreground text-xs">淨額</span>
+                <span className={cn("font-semibold tabular-nums", net >= 0 ? "text-emerald-600" : "text-destructive")}>
+                  {net >= 0 ? "+" : ""}
+                  {net.toLocaleString("zh-TW")}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       ) : (
         <TransactionsList

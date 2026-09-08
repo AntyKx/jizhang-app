@@ -3,7 +3,6 @@ import { resolveStatsRange } from "@/lib/stats/range";
 import { getIncomeExpenseTrend } from "@/lib/stats/overview-queries";
 import { getCategoryBreakdown, getCategoryDrilldowns, getPaymentMethodBreakdown } from "@/lib/stats/category-queries";
 import { getDailyHeatmap, getWeekdayPattern } from "@/lib/stats/trend-queries";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IncomeExpenseTrendChart } from "@/components/stats/income-expense-trend-chart";
 import { CategoryBreakdownPanel } from "@/components/stats/category-breakdown-panel";
 import { SecondaryChartsTabs } from "@/components/stats/secondary-charts-tabs";
@@ -35,23 +34,15 @@ export default async function StatsDailyPage({
       <StatsRangeSwitcher basePath="/stats/daily" range={range} />
 
       <StaggerList className="flex flex-col gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>收支趨勢</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <IncomeExpenseTrendChart data={trend} />
-          </CardContent>
-        </Card>
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold text-muted-foreground">收支趨勢</h2>
+          <IncomeExpenseTrendChart data={trend} />
+        </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>支出分類</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CategoryBreakdownPanel rows={categoryRows} drilldowns={drilldowns} />
-          </CardContent>
-        </Card>
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold text-muted-foreground">支出分類</h2>
+          <CategoryBreakdownPanel rows={categoryRows} drilldowns={drilldowns} />
+        </section>
 
         <SecondaryChartsTabs
           heatmapDays={heatmapDays}

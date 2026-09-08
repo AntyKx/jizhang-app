@@ -5,7 +5,6 @@ import { requireUserId } from "@/lib/auth";
 import { requireCoreAccess } from "@/lib/entitlements";
 import { resolveStatsRange } from "@/lib/stats/range";
 import { getBudgetVsActualTrend, getSavingsGoalsSnapshot } from "@/lib/stats/budget-goal-queries";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { BudgetVsActualChart } from "@/components/stats/budget-vs-actual-chart";
 import { CollapsibleProgressList } from "@/components/stats/collapsible-progress-list";
@@ -71,73 +70,61 @@ export default async function StatsBudgetsGoalsPage({
       <StatsRangeSwitcher basePath="/stats/budgets-goals" range={range} />
 
       <StaggerList className="flex flex-col gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>整體預算 vs 實際（近 6 個月）</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <BudgetVsActualChart data={budgetTrend} />
-          </CardContent>
-        </Card>
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold text-muted-foreground">整體預算 vs 實際（近 6 個月）</h2>
+          <BudgetVsActualChart data={budgetTrend} />
+        </section>
 
         {monthBudgets.length > 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>本期預算</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CollapsibleProgressList
-                gapClassName="gap-4"
-                items={monthBudgets.map((b) => {
-                  const spent = b.categoryId ? spentByCategory.get(b.categoryId) ?? 0 : expense;
-                  const pct = Math.min(100, (spent / Number(b.limitAmount)) * 100);
-                  return {
-                    key: b.id,
-                    node: (
-                      <div className="flex flex-col gap-1">
-                        <div className="flex justify-between text-sm">
-                          <span>{b.categoryName ?? "整體預算"}</span>
-                          <span className={pct >= 100 ? "text-destructive" : "text-muted-foreground"}>
-                            <CountUpNumber value={spent} /> / <CountUpNumber value={Number(b.limitAmount)} />
-                          </span>
-                        </div>
-                        <Progress value={pct} />
+          <section className="flex flex-col gap-2">
+            <h2 className="text-sm font-semibold text-muted-foreground">本期預算</h2>
+            <CollapsibleProgressList
+              gapClassName="gap-4"
+              items={monthBudgets.map((b) => {
+                const spent = b.categoryId ? spentByCategory.get(b.categoryId) ?? 0 : expense;
+                const pct = Math.min(100, (spent / Number(b.limitAmount)) * 100);
+                return {
+                  key: b.id,
+                  node: (
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between text-sm">
+                        <span>{b.categoryName ?? "整體預算"}</span>
+                        <span className={pct >= 100 ? "text-destructive" : "text-muted-foreground"}>
+                          <CountUpNumber value={spent} /> / <CountUpNumber value={Number(b.limitAmount)} />
+                        </span>
                       </div>
-                    ),
-                  };
-                })}
-              />
-            </CardContent>
-          </Card>
+                      <Progress value={pct} />
+                    </div>
+                  ),
+                };
+              })}
+            />
+          </section>
         ) : (
           <p className="text-muted-foreground text-sm">這個範圍還沒有設定預算。</p>
         )}
 
         {goals.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>儲蓄目標</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CollapsibleProgressList
-                gapClassName="gap-4"
-                items={goals.map((g) => ({
-                  key: g.id,
-                  node: (
-                    <div className="flex flex-col gap-1">
-                      <div className="flex justify-between text-sm">
-                        <span>{g.name}</span>
-                        <span className="text-muted-foreground">
-                          <CountUpNumber value={g.currentAmount} /> / <CountUpNumber value={g.targetAmount} />
-                        </span>
-                      </div>
-                      <Progress value={g.pct} />
+          <section className="flex flex-col gap-2">
+            <h2 className="text-sm font-semibold text-muted-foreground">儲蓄目標</h2>
+            <CollapsibleProgressList
+              gapClassName="gap-4"
+              items={goals.map((g) => ({
+                key: g.id,
+                node: (
+                  <div className="flex flex-col gap-1">
+                    <div className="flex justify-between text-sm">
+                      <span>{g.name}</span>
+                      <span className="text-muted-foreground">
+                        <CountUpNumber value={g.currentAmount} /> / <CountUpNumber value={g.targetAmount} />
+                      </span>
                     </div>
-                  ),
-                }))}
-              />
-            </CardContent>
-          </Card>
+                    <Progress value={g.pct} />
+                  </div>
+                ),
+              }))}
+            />
+          </section>
         )}
       </StaggerList>
     </>

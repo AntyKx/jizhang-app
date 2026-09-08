@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DailySpendHeatmap } from "@/components/stats/daily-spend-heatmap";
 import { WeekdayPatternChart } from "@/components/stats/weekday-pattern-chart";
 import { CategoryBreakdown } from "@/components/stats/category-breakdown";
@@ -54,31 +53,27 @@ export function SecondaryChartsTabs({
   }, [active]);
 
   return (
-    <Card ref={cardRef}>
-      <CardHeader>
-        <div ref={containerRef} className="relative isolate flex w-fit items-center gap-[3px] rounded-lg bg-muted p-[3px]">
-          <SlidingIndicator activeKey={active} containerRef={containerRef} className="-z-10 rounded-md bg-background shadow-sm" />
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              data-key={t.key}
-              onClick={() => setActive(t.key)}
-              className={cn(
-                "relative rounded-md px-2.5 py-1 text-sm font-medium transition-colors",
-                active === t.key ? "text-foreground" : "text-foreground/60 hover:text-foreground",
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </CardHeader>
-      <CardContent>
-        {active === "heatmap" && <DailySpendHeatmap days={heatmapDays} />}
-        {active === "weekday" && <WeekdayPatternChart data={weekdayPattern} />}
-        {active === "payment" && <CategoryBreakdown rows={paymentRows} />}
-      </CardContent>
-    </Card>
+    <div ref={cardRef} className="flex flex-col gap-3">
+      <div ref={containerRef} className="relative isolate flex w-fit items-center gap-[3px] rounded-lg bg-muted p-[3px]">
+        <SlidingIndicator activeKey={active} containerRef={containerRef} className="-z-10 rounded-md bg-background shadow-sm" />
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            data-key={t.key}
+            onClick={() => setActive(t.key)}
+            className={cn(
+              "relative rounded-md px-2.5 py-1 text-sm font-medium transition-colors",
+              active === t.key ? "text-foreground" : "text-foreground/60 hover:text-foreground",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {active === "heatmap" && <DailySpendHeatmap days={heatmapDays} />}
+      {active === "weekday" && <WeekdayPatternChart data={weekdayPattern} />}
+      {active === "payment" && <CategoryBreakdown rows={paymentRows} />}
+    </div>
   );
 }

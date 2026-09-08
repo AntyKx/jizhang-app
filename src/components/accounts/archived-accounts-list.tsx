@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { unarchiveAccount } from "@/app/(app)/accounts/actions";
 import { accountTypeLabels, type AccountType } from "@/lib/account-type";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EditAccountDialog } from "@/components/accounts/edit-account-dialog";
 
@@ -41,35 +40,37 @@ export function ArchivedAccountsList({ accounts }: { accounts: Account[] }) {
 
   return (
     <>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col divide-y opacity-70">
         {accounts.map((a) => (
-          <Card key={a.id} className="opacity-70">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle
-                className="flex flex-1 cursor-pointer items-center gap-2 text-base"
-                onClick={() => setSelected(a)}
-              >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                  <AccountTypeIcon type={a.type} />
+          <div key={a.id} className="flex items-center justify-between gap-3 py-3.5">
+            <div
+              className="flex flex-1 cursor-pointer items-center gap-2"
+              onClick={() => setSelected(a)}
+            >
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <AccountTypeIcon type={a.type} />
+              </span>
+              <div className="flex flex-col">
+                <span className="flex items-baseline gap-1.5 text-sm font-medium">
+                  {a.name}
+                  <span className="text-muted-foreground text-xs font-normal">
+                    {accountTypeLabels[a.type]}
+                  </span>
                 </span>
-                <span>{a.name}</span>
-                <span className="text-muted-foreground text-xs font-normal">
-                  {accountTypeLabels[a.type]}
+                <span className="text-sm font-semibold tabular-nums">
+                  {Number(a.currentBalance).toLocaleString("zh-TW")}
                 </span>
-              </CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={pending && restoringId === a.id}
-                onClick={() => handleUnarchive(a.id)}
-              >
-                {pending && restoringId === a.id ? "還原中…" : "取消封存"}
-              </Button>
-            </CardHeader>
-            <CardContent className="text-2xl font-semibold tabular-nums">
-              {Number(a.currentBalance).toLocaleString("zh-TW")}
-            </CardContent>
-          </Card>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={pending && restoringId === a.id}
+              onClick={() => handleUnarchive(a.id)}
+            >
+              {pending && restoringId === a.id ? "還原中…" : "取消封存"}
+            </Button>
+          </div>
         ))}
       </div>
 

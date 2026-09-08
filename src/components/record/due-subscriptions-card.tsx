@@ -59,7 +59,7 @@ export function DueSubscriptionsCard({ rules }: { rules: DueRule[] }) {
       <span className="text-sm font-medium text-muted-foreground">
         {rules.length} 筆定期收支到期了
       </span>
-      <div className="flex flex-col divide-y overflow-hidden rounded-2xl border bg-card">
+      <div className="flex flex-col divide-y">
         {rules.map((r) => (
           <div key={r.id} className="flex items-center justify-between gap-2 px-4 py-3">
             <div className="flex items-center gap-2">

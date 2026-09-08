@@ -8,13 +8,10 @@ export default function CalendarLoading() {
         <Skeleton className="h-7 w-32" />
         <Skeleton className="size-9 rounded-full" />
       </div>
-      {/* month grid inside its card */}
-      <div className="rounded-2xl border bg-card p-4">
-        <div className="grid grid-cols-7 gap-1">
-          {Array.from({ length: 35 }).map((_, i) => (
-            <Skeleton key={i} className="aspect-square w-full rounded-xl" />
-          ))}
-        </div>
+      <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: 35 }).map((_, i) => (
+          <Skeleton key={i} className="aspect-square w-full rounded-xl" />
+        ))}
       </div>
       <Skeleton className="h-32 w-full rounded-2xl" />
     </div>

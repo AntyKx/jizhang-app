@@ -4,7 +4,6 @@ import { db } from "@/db";
 import { userSettings, aiSubscriptionStatusEnum } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { isDevAdmin } from "@/lib/entitlements";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { setOwnAiSubscriptionStatus, setOwnCoreUnlock } from "./actions";
@@ -40,41 +39,33 @@ export default async function DevToolsPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>核心解鎖</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">目前狀態：{unlocked ? "已解鎖" : "未解鎖"}</p>
-          <form action={setOwnCoreUnlock.bind(null, !unlocked)}>
-            <Button type="submit" variant={unlocked ? "outline" : "default"} className="w-full">
-              {unlocked ? "設為未解鎖" : "設為已解鎖"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold text-muted-foreground">核心解鎖</h2>
+        <p className="text-sm text-muted-foreground">目前狀態：{unlocked ? "已解鎖" : "未解鎖"}</p>
+        <form action={setOwnCoreUnlock.bind(null, !unlocked)}>
+          <Button type="submit" variant={unlocked ? "outline" : "default"} className="w-full">
+            {unlocked ? "設為未解鎖" : "設為已解鎖"}
+          </Button>
+        </form>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>AI 訂閱狀態</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          <p className="text-sm text-muted-foreground">目前狀態：{statusLabel[currentStatus]}</p>
-          <div className="grid grid-cols-2 gap-2">
-            {aiSubscriptionStatusEnum.enumValues.map((status) => (
-              <form key={status} action={setOwnAiSubscriptionStatus.bind(null, status)}>
-                <Button
-                  type="submit"
-                  variant="outline"
-                  className={cn("w-full", status === currentStatus && "border-primary text-primary")}
-                >
-                  {statusLabel[status]}
-                </Button>
-              </form>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted-foreground">AI 訂閱狀態</h2>
+        <p className="text-sm text-muted-foreground">目前狀態：{statusLabel[currentStatus]}</p>
+        <div className="grid grid-cols-2 gap-2">
+          {aiSubscriptionStatusEnum.enumValues.map((status) => (
+            <form key={status} action={setOwnAiSubscriptionStatus.bind(null, status)}>
+              <Button
+                type="submit"
+                variant="outline"
+                className={cn("w-full", status === currentStatus && "border-primary text-primary")}
+              >
+                {statusLabel[status]}
+              </Button>
+            </form>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

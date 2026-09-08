@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BearIllustration } from "@/components/bear-illustration";
 import type { StatsRangeUnit } from "@/lib/stats/range";
 
@@ -52,25 +51,23 @@ export function MonthlySummaryCard({
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>AI 摘要</CardTitle>
+    <section className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-muted-foreground">AI 摘要</h2>
         <Button size="sm" variant="secondary" onClick={handleGenerate} disabled={loading}>
           {loading ? "分析中…" : summary ? "重新產生" : "產生摘要"}
         </Button>
-      </CardHeader>
+      </div>
       {summary ? (
-        <CardContent>
-          <p className="text-sm leading-relaxed">{summary}</p>
-        </CardContent>
+        <p className="text-sm leading-relaxed">{summary}</p>
       ) : (
-        <CardContent className="flex flex-col items-center gap-2 text-center">
+        <div className="flex flex-col items-center gap-2 text-center">
           <BearIllustration name="ai-analysis" size={80} />
           <p className="text-sm text-muted-foreground">
             讓小熊幫你分析「{label}」的收支，點上面的「產生摘要」試試看！
           </p>
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </section>
   );
 }
