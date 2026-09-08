@@ -29,12 +29,12 @@ export default async function MorePage() {
         <BearIllustration name="account-management" size={120} />
         <h1 className="text-2xl font-semibold">更多</h1>
       </div>
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col divide-y">
         {links.map(({ href, Icon, label, desc, lockable }) => (
           <Link
             key={href}
             href={href}
-            className="flex items-center gap-3 rounded-2xl border bg-card p-4 transition-transform hover:-translate-y-0.5 hover:shadow-md"
+            className="flex items-center gap-3 px-1 py-3.5 transition-colors hover:bg-muted/50"
           >
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Icon className="size-5" strokeWidth={1.75} />
@@ -49,7 +49,7 @@ export default async function MorePage() {
         {showDevTools && (
           <Link
             href="/dev-tools"
-            className="flex items-center gap-3 rounded-2xl border border-dashed p-4 transition-transform hover:-translate-y-0.5 hover:shadow-md"
+            className="flex items-center gap-3 px-1 py-3.5 transition-colors hover:bg-muted/50"
           >
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
               <Wrench className="size-5" strokeWidth={1.75} />

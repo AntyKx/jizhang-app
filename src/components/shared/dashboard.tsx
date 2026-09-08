@@ -67,7 +67,7 @@ export function SharedLedgerDashboard({
               <span className="text-sm font-medium text-muted-foreground">
                 未結清（{unsettled.length}）
               </span>
-              <div className="flex flex-col divide-y overflow-hidden rounded-2xl border bg-card">
+              <div className="flex flex-col divide-y">
                 {unsettled.map((e) => (
                   <SharedExpenseRow key={e.id} expense={e} partnerName={partnerName} categories={categories} />
                 ))}
@@ -79,7 +79,7 @@ export function SharedLedgerDashboard({
               <span className="text-sm font-medium text-muted-foreground">
                 已結清（{settled.length}）
               </span>
-              <div className="flex flex-col divide-y overflow-hidden rounded-2xl border bg-card opacity-70">
+              <div className="flex flex-col divide-y opacity-70">
                 {settled.map((e) => (
                   <SharedExpenseRow key={e.id} expense={e} partnerName={partnerName} categories={categories} />
                 ))}

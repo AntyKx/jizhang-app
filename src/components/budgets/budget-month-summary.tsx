@@ -24,7 +24,7 @@ export function BudgetMonthSummary({
   const overPace = spentPct > timePct;
 
   return (
-    <div className="flex flex-col gap-3 rounded-3xl border bg-gradient-to-br from-primary/10 via-card to-card p-5 shadow-md shadow-foreground/10">
+    <div className="flex flex-col gap-3 rounded-3xl bg-gradient-to-br from-primary/10 via-card to-card p-5">
       <div className="flex items-end justify-between">
         <div className="flex flex-col gap-1">
           <span className="text-sm text-muted-foreground">
