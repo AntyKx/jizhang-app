@@ -1,15 +1,22 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { Camera, LogOut, Trash2 } from "lucide-react";
 import { deleteAllUserData } from "@/app/(app)/data-export/actions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { updateBaseCurrency, updateDefaultAccountId } from "@/app/(app)/account/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -18,10 +25,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isFail } from "@/lib/action-result";
+import { supportedCurrencies } from "@/lib/currency";
 
 const DELETE_CONFIRM_PHRASE = "刪除帳號";
 
-export function AccountSettings() {
+// "" stands in for "no preference" (null) in the account picker — Select
+// values must be strings, and this sentinel never collides with a real
+// account id (a UUID).
+const AUTO_ACCOUNT_VALUE = "";
+
+export function AccountSettings({
+  baseCurrency,
+  defaultAccountId,
+  accounts,
+}: {
+  baseCurrency: string;
+  defaultAccountId: string | null;
+  accounts: { id: string; name: string }[];
+}) {
   const { isLoaded, user } = useUser();
   const { signOut } = useClerk();
   const router = useRouter();
@@ -35,16 +57,17 @@ export function AccountSettings() {
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
 
+  const [currency, setCurrency] = useState(baseCurrency);
+  const [savingCurrency, startSavingCurrency] = useTransition();
+  const [preferredAccountId, setPreferredAccountId] = useState(defaultAccountId ?? AUTO_ACCOUNT_VALUE);
+  const [savingAccount, startSavingAccount] = useTransition();
+
   if (!isLoaded || !user) {
     return (
-      <div className="flex flex-col gap-6">
-        <Card>
-          <CardContent className="flex flex-col items-center gap-4 pt-6">
-            <Skeleton className="size-24 rounded-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </CardContent>
-        </Card>
+      <div className="flex flex-col gap-4">
+        <Skeleton className="mx-auto size-24 rounded-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
       </div>
     );
   }
@@ -87,6 +110,35 @@ export function AccountSettings() {
     }
   }
 
+  function handleCurrencyChange(value: string | null) {
+    if (!value) return;
+    setCurrency(value);
+    startSavingCurrency(async () => {
+      const result = await updateBaseCurrency(value);
+      if (isFail(result)) {
+        toast.error(result.error);
+        setCurrency(baseCurrency);
+        return;
+      }
+      toast.success("預設幣別已更新");
+    });
+  }
+
+  function handlePreferredAccountChange(value: string | null) {
+    if (value === null) return;
+    setPreferredAccountId(value);
+    startSavingAccount(async () => {
+      const result = await updateDefaultAccountId(value === AUTO_ACCOUNT_VALUE ? null : value);
+      if (isFail(result)) {
+        toast.error(result.error);
+        setPreferredAccountId(defaultAccountId ?? AUTO_ACCOUNT_VALUE);
+        return;
+      }
+      toast.success("快速記帳預設帳戶已更新");
+      router.refresh();
+    });
+  }
+
   async function handleSignOut() {
     setSigningOut(true);
     await signOut(() => router.push("/sign-in"));
@@ -113,83 +165,132 @@ export function AccountSettings() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card>
-        <CardContent className="flex flex-col items-center gap-4 pt-6">
+      <div className="flex flex-col items-center gap-4">
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploadingImage}
+          className="group relative size-24 shrink-0 overflow-hidden rounded-full border bg-muted"
+          aria-label="更換大頭貼"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={user.imageUrl} alt="" className="size-full object-cover" />
+          <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+            <Camera className="size-6 text-white" />
+          </span>
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImagePick}
+        />
+
+        <div className="flex w-full flex-col gap-2">
+          <Label htmlFor="display-name">顯示名稱</Label>
+          <div className="flex gap-2">
+            <Input
+              id="display-name"
+              value={displayName}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={50}
+              className="border-0 bg-muted/60"
+            />
+            <Button
+              onClick={handleSaveName}
+              disabled={savingName || displayName.trim() === (user.firstName ?? "")}
+            >
+              {savingName ? "儲存中…" : "儲存"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex w-full flex-col gap-2">
+          <Label>Email</Label>
+          <div className="rounded-lg bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
+            {email}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col divide-y">
+        <span className="px-1 pb-1 text-xs font-semibold text-muted-foreground">偏好設定</span>
+        <div className="flex items-center justify-between gap-3 px-1 py-3.5">
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">預設幣別</span>
+            <span className="text-xs text-muted-foreground">新增帳戶時預先選好</span>
+          </div>
+          <Select
+            value={currency}
+            onValueChange={handleCurrencyChange}
+            items={supportedCurrencies}
+            disabled={savingCurrency}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(supportedCurrencies).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center justify-between gap-3 px-1 py-3.5">
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">快速記帳預設帳戶</span>
+            <span className="text-xs text-muted-foreground">首頁「＋」記帳時預先選好</span>
+          </div>
+          <Select
+            value={preferredAccountId}
+            onValueChange={handlePreferredAccountChange}
+            items={{
+              [AUTO_ACCOUNT_VALUE]: "自動",
+              ...Object.fromEntries(accounts.map((a) => [a.id, a.name])),
+            }}
+            disabled={savingAccount}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={AUTO_ACCOUNT_VALUE}>自動</SelectItem>
+              {accounts.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="flex flex-col divide-y">
+        <span className="px-1 pb-1 text-xs font-semibold text-muted-foreground">帳號</span>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          disabled={signingOut}
+          className="flex items-center gap-2 px-1 py-3.5 text-left text-sm transition-colors hover:bg-muted/50 disabled:opacity-50"
+        >
+          <LogOut className="size-4" />
+          {signingOut ? "登出中…" : "登出"}
+        </button>
+
+        {user.deleteSelfEnabled && (
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploadingImage}
-            className="group relative size-24 shrink-0 overflow-hidden rounded-full border bg-muted"
-            aria-label="更換大頭貼"
+            onClick={() => setDeleteOpen(true)}
+            className="flex items-center gap-2 px-1 py-3.5 text-left text-sm text-destructive transition-colors hover:bg-destructive/5"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={user.imageUrl} alt="" className="size-full object-cover" />
-            <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-              <Camera className="size-6 text-white" />
-            </span>
+            <Trash2 className="size-4" />
+            刪除帳號
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleImagePick}
-          />
-
-          <div className="flex w-full flex-col gap-2">
-            <Label htmlFor="display-name">顯示名稱</Label>
-            <div className="flex gap-2">
-              <Input
-                id="display-name"
-                value={displayName}
-                onChange={(e) => setName(e.target.value)}
-                maxLength={50}
-              />
-              <Button
-                onClick={handleSaveName}
-                disabled={savingName || displayName.trim() === (user.firstName ?? "")}
-              >
-                {savingName ? "儲存中…" : "儲存"}
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex w-full flex-col gap-2">
-            <Label>Email</Label>
-            <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-              {email}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">帳號</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          <Button
-            variant="outline"
-            className="justify-start gap-2"
-            onClick={handleSignOut}
-            disabled={signingOut}
-          >
-            <LogOut className="size-4" />
-            {signingOut ? "登出中…" : "登出"}
-          </Button>
-
-          {user.deleteSelfEnabled && (
-            <Button
-              variant="destructive"
-              className="justify-start gap-2"
-              onClick={() => setDeleteOpen(true)}
-            >
-              <Trash2 className="size-4" />
-              刪除帳號
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+        )}
+      </div>
 
       <Dialog
         open={deleteOpen}

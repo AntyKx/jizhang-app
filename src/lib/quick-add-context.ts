@@ -44,7 +44,10 @@ export const getQuickAddContext = cache(async (userId: string): Promise<{
   const [initialCategories, accountRows, settingsRows] = await Promise.all([
     listCategories(userId),
     listAccounts(userId),
-    db.select({ partnerName: userSettings.partnerName }).from(userSettings).where(eq(userSettings.userId, userId)),
+    db
+      .select({ partnerName: userSettings.partnerName, defaultAccountId: userSettings.defaultAccountId })
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId)),
   ]);
 
   // A brand-new user has zero categories of their own — seed the starter
@@ -66,6 +69,19 @@ export const getQuickAddContext = cache(async (userId: string): Promise<{
   if (userAccounts.length === 0) {
     await getDefaultAccountId(userId);
     userAccounts = (await listAccounts(userId)).filter((a) => !a.excludeFromNetWorth);
+  }
+
+  // A user-chosen preferred account (set in /account) takes priority over
+  // just picking whichever one sorts first — every quick-add surface reads
+  // `accounts[0]` as its initial selection, so moving it to the front here
+  // is the one place that needs to know about the preference at all.
+  const preferredId = settingsRows[0]?.defaultAccountId;
+  if (preferredId) {
+    const preferredIndex = userAccounts.findIndex((a) => a.id === preferredId);
+    if (preferredIndex > 0) {
+      const [preferred] = userAccounts.splice(preferredIndex, 1);
+      userAccounts = [preferred, ...userAccounts];
+    }
   }
 
   return {

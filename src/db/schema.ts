@@ -52,8 +52,18 @@ export const aiSubscriptionStatusEnum = pgEnum("ai_subscription_status", [
 
 export const userSettings = pgTable("user_settings", {
   userId: text("user_id").primaryKey(), // Clerk user id
+  // Preselected in CreateAccountDialog's currency picker so a user who
+  // mostly opens foreign-currency accounts doesn't have to reselect it
+  // every time — otherwise unrelated to net-worth math, which always
+  // converts to TWD regardless of this value.
   baseCurrency: text("base_currency").notNull().default("TWD"),
   monthStartDay: integer("month_start_day").notNull().default(1),
+  // Preferred account for quick-add's initial selection — nullable, and
+  // `() => accounts.id` defers resolution past this table's own
+  // declaration since `accounts` is defined further down this file.
+  // set null on delete so removing the account just falls back to
+  // getDefaultAccountId's oldest-account behavior instead of erroring.
+  defaultAccountId: uuid("default_account_id").references(() => accounts.id, { onDelete: "set null" }),
   // Display name for the other half of a single-user "分帳本" — a nominal
   // counterparty, not a real second account (see sharedExpenses).
   partnerName: text("partner_name"),

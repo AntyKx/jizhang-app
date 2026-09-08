@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { transactions } from "@/db/schema";
+import { transactions, userSettings } from "@/db/schema";
 import { listAccounts, listArchivedAccounts } from "@/lib/account";
 import { requireUserId } from "@/lib/auth";
 import { CreateAccountDialog } from "@/components/accounts/create-account-dialog";
@@ -19,7 +19,7 @@ export default async function AccountsPage() {
   // Transfers are fetched unconditionally so all three reads share one round
   // trip — with fewer than two accounts the result is empty anyway, which the
   // render already handles.
-  const [accounts, archivedAccounts, transfers] = await Promise.all([
+  const [accounts, archivedAccounts, transfers, settingsRows] = await Promise.all([
     listAccounts(userId),
     listArchivedAccounts(userId),
     db
@@ -36,7 +36,9 @@ export default async function AccountsPage() {
       .where(and(eq(transactions.userId, userId), eq(transactions.type, "transfer")))
       .orderBy(desc(transactions.occurredAt), desc(transactions.createdAt))
       .limit(20),
+    db.select({ baseCurrency: userSettings.baseCurrency }).from(userSettings).where(eq(userSettings.userId, userId)),
   ]);
+  const defaultCurrency = settingsRows[0]?.baseCurrency ?? "TWD";
 
   const allAccounts = [...accounts, ...archivedAccounts];
   const accountsById = Object.fromEntries(
@@ -93,7 +95,7 @@ export default async function AccountsPage() {
               accounts={accounts.map((a) => ({ id: a.id, name: a.name, type: a.type, currency: a.currency }))}
             />
           )}
-          <CreateAccountDialog />
+          <CreateAccountDialog defaultCurrency={defaultCurrency} />
         </div>
       </div>
 

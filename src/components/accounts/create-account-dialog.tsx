@@ -30,7 +30,7 @@ const statementDayItems = Object.fromEntries(
   Array.from({ length: 31 }, (_, i) => [String(i + 1), `${i + 1} 日`]),
 );
 
-export function CreateAccountDialog() {
+export function CreateAccountDialog({ defaultCurrency = "TWD" }: { defaultCurrency?: string }) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<AccountType>("bank");
   const [initialBalance, setInitialBalance] = useState("");
@@ -51,7 +51,7 @@ export function CreateAccountDialog() {
             const result = await createAccount({
               name: String(formData.get("name") ?? ""),
               type: (formData.get("type") as keyof typeof accountTypeLabels) ?? "cash",
-              currency: String(formData.get("currency") ?? "TWD"),
+              currency: String(formData.get("currency") ?? defaultCurrency),
               initialBalance: Number(initialBalance) || 0,
               excludeFromNetWorth,
               statementDay: statementDay ? Number(statementDay) : null,
@@ -116,7 +116,7 @@ export function CreateAccountDialog() {
           )}
           <div className="flex flex-col gap-2">
             <Label htmlFor="currency">幣別</Label>
-            <Select name="currency" defaultValue="TWD" items={supportedCurrencies}>
+            <Select name="currency" defaultValue={defaultCurrency} items={supportedCurrencies}>
               <SelectTrigger id="currency">
                 <SelectValue />
               </SelectTrigger>
