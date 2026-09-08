@@ -95,6 +95,11 @@ export const accounts = pgTable("accounts", {
   // transfer, never spend from directly. Still a real account: still shows
   // up in account management and the transfer dialog.
   excludeFromNetWorth: boolean("exclude_from_net_worth").notNull().default(false),
+  // Day of month (1-31) a credit card's statement closes — only ever set
+  // when type is "credit_card"; null for every other account type, and
+  // forced back to null if an account's type is ever changed away from
+  // credit_card (see updateAccount).
+  statementDay: integer("statement_day"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [

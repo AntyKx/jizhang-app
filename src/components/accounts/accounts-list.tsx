@@ -35,6 +35,7 @@ type Account = {
   currentBalance: string;
   excludeFromNetWorth: boolean;
   initialBalance: string;
+  statementDay: number | null;
 };
 
 // Display order for the grouped sections — liquid cash first, then debt
@@ -110,9 +111,16 @@ function SortableAccountRow({
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium">{a.name}</span>
-            {a.excludeFromNetWorth && (
-              <span className="text-xs text-muted-foreground">不記入資產</span>
-            )}
+            {(a.type === "credit_card" && a.statementDay != null) || a.excludeFromNetWorth ? (
+              <span className="block truncate text-xs text-muted-foreground">
+                {[
+                  a.type === "credit_card" && a.statementDay != null ? `結帳日 ${a.statementDay} 日` : null,
+                  a.excludeFromNetWorth ? "不記入資產" : null,
+                ]
+                  .filter(Boolean)
+                  .join("・")}
+              </span>
+            ) : null}
           </span>
           <span
             className={cn("shrink-0 text-sm font-semibold tabular-nums", balance < 0 && "text-destructive")}

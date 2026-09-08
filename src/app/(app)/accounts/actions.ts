@@ -37,12 +37,15 @@ function revalidateAccountPaths() {
   revalidatePath("/record");
 }
 
+const statementDaySchema = z.coerce.number().int().min(1).max(31).nullable().optional();
+
 const createAccountSchema = z.object({
   name: z.string().min(1).max(30),
   type: accountTypeSchema,
   currency: currencySchema.default("TWD"),
   initialBalance: z.coerce.number().default(0),
   excludeFromNetWorth: z.boolean().default(false),
+  statementDay: statementDaySchema,
 });
 
 export async function createAccount(input: {
@@ -51,6 +54,9 @@ export async function createAccount(input: {
   currency?: string;
   initialBalance?: number;
   excludeFromNetWorth?: boolean;
+  // Only meaningful for type "credit_card" — ignored (stored as null) for
+  // every other type regardless of what's passed in, see below.
+  statementDay?: number | null;
 }) {
   const userId = await requireUserId();
   const parsed = createAccountSchema.parse(input);
@@ -77,6 +83,7 @@ export async function createAccount(input: {
     currentBalance: parsed.initialBalance.toString(),
     color: pickCategoryColor(parsed.name),
     excludeFromNetWorth: parsed.excludeFromNetWorth,
+    statementDay: parsed.type === "credit_card" ? (parsed.statementDay ?? null) : null,
   });
 
   revalidateAccountPaths();
@@ -88,6 +95,7 @@ const updateAccountSchema = z.object({
   type: accountTypeSchema,
   excludeFromNetWorth: z.boolean(),
   initialBalance: z.coerce.number(),
+  statementDay: statementDaySchema,
 });
 
 export async function updateAccount(input: {
@@ -96,6 +104,7 @@ export async function updateAccount(input: {
   type: "cash" | "bank" | "credit_card" | "e_wallet" | "investment";
   excludeFromNetWorth: boolean;
   initialBalance: number;
+  statementDay?: number | null;
 }) {
   const userId = await requireUserId();
   const parsed = updateAccountSchema.parse(input);
@@ -122,6 +131,9 @@ export async function updateAccount(input: {
       excludeFromNetWorth: parsed.excludeFromNetWorth,
       initialBalance: parsed.initialBalance.toString(),
       currentBalance: sql`${accounts.currentBalance} + ${delta}`,
+      // Forced to null whenever type isn't (or is changed away from)
+      // credit_card, so it can't linger stale if the type changes later.
+      statementDay: parsed.type === "credit_card" ? (parsed.statementDay ?? null) : null,
     })
     .where(and(eq(accounts.id, parsed.id), eq(accounts.userId, userId)));
 

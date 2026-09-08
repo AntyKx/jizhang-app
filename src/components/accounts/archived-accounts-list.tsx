@@ -17,6 +17,7 @@ type Account = {
   currentBalance: string;
   excludeFromNetWorth: boolean;
   initialBalance: string;
+  statementDay: number | null;
 };
 
 export function ArchivedAccountsList({ accounts }: { accounts: Account[] }) {

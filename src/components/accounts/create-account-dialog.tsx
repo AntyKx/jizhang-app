@@ -22,14 +22,20 @@ import {
 import { createAccount } from "@/app/(app)/accounts/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
-import { accountTypeLabels } from "@/lib/account-type";
+import { accountTypeLabels, type AccountType } from "@/lib/account-type";
 import { supportedCurrencies } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
+const statementDayItems = Object.fromEntries(
+  Array.from({ length: 31 }, (_, i) => [String(i + 1), `${i + 1} 日`]),
+);
+
 export function CreateAccountDialog() {
   const [open, setOpen] = useState(false);
+  const [type, setType] = useState<AccountType>("bank");
   const [initialBalance, setInitialBalance] = useState("");
   const [excludeFromNetWorth, setExcludeFromNetWorth] = useState(false);
+  const [statementDay, setStatementDay] = useState<string | undefined>(undefined);
   const formRef = useRef<HTMLFormElement>(null);
 
   return (
@@ -48,6 +54,7 @@ export function CreateAccountDialog() {
               currency: String(formData.get("currency") ?? "TWD"),
               initialBalance: Number(initialBalance) || 0,
               excludeFromNetWorth,
+              statementDay: statementDay ? Number(statementDay) : null,
             });
             if (isFail(result)) {
               toast.error(result.error);
@@ -57,6 +64,8 @@ export function CreateAccountDialog() {
             formRef.current?.reset();
             setInitialBalance("");
             setExcludeFromNetWorth(false);
+            setType("bank");
+            setStatementDay(undefined);
           }}
           className="flex flex-col gap-4"
         >
@@ -66,7 +75,12 @@ export function CreateAccountDialog() {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="type">類型</Label>
-            <Select name="type" defaultValue="bank" items={accountTypeLabels}>
+            <Select
+              name="type"
+              defaultValue="bank"
+              items={accountTypeLabels}
+              onValueChange={(v) => setType(v as AccountType)}
+            >
               <SelectTrigger id="type">
                 <SelectValue />
               </SelectTrigger>
@@ -79,6 +93,27 @@ export function CreateAccountDialog() {
               </SelectContent>
             </Select>
           </div>
+          {type === "credit_card" && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="statementDay">結帳日</Label>
+              <Select
+                value={statementDay}
+                onValueChange={(v) => setStatementDay(v ?? undefined)}
+                items={statementDayItems}
+              >
+                <SelectTrigger id="statementDay">
+                  <SelectValue placeholder="選擇結帳日" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(statementDayItems).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="flex flex-col gap-2">
             <Label htmlFor="currency">幣別</Label>
             <Select name="currency" defaultValue="TWD" items={supportedCurrencies}>

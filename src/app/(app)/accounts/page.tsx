@@ -122,6 +122,7 @@ export default async function AccountsPage() {
             currentBalance: a.currentBalance,
             excludeFromNetWorth: a.excludeFromNetWorth,
             initialBalance: a.initialBalance,
+            statementDay: a.statementDay,
           }))}
         />
       )}

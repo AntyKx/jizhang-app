@@ -28,6 +28,7 @@ export default async function ArchivedAccountsPage() {
             currentBalance: a.currentBalance,
             excludeFromNetWorth: a.excludeFromNetWorth,
             initialBalance: a.initialBalance,
+            statementDay: a.statementDay,
           }))}
         />
       )}

@@ -26,7 +26,12 @@ type Account = {
   excludeFromNetWorth: boolean;
   initialBalance: string;
   currency: string;
+  statementDay: number | null;
 };
+
+const statementDayItems = Object.fromEntries(
+  Array.from({ length: 31 }, (_, i) => [String(i + 1), `${i + 1} 日`]),
+);
 
 export function EditAccountDialog({
   account,
@@ -39,6 +44,7 @@ export function EditAccountDialog({
   const [type, setType] = useState<AccountType>("cash");
   const [excludeFromNetWorth, setExcludeFromNetWorth] = useState(false);
   const [initialBalance, setInitialBalance] = useState("");
+  const [statementDay, setStatementDay] = useState<string | undefined>(undefined);
   const [prevAccount, setPrevAccount] = useState(account);
   const [pending, startTransition] = useTransition();
 
@@ -49,6 +55,7 @@ export function EditAccountDialog({
       setType(account.type);
       setExcludeFromNetWorth(account.excludeFromNetWorth);
       setInitialBalance(account.initialBalance);
+      setStatementDay(account.statementDay != null ? String(account.statementDay) : undefined);
     }
   }
 
@@ -61,6 +68,7 @@ export function EditAccountDialog({
         type,
         excludeFromNetWorth,
         initialBalance: Number(initialBalance),
+        statementDay: statementDay ? Number(statementDay) : null,
       });
       if (isFail(result)) {
         toast.error(result.error);
@@ -108,6 +116,28 @@ export function EditAccountDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {type === "credit_card" && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="edit-account-statement-day">結帳日</Label>
+              <Select
+                value={statementDay}
+                onValueChange={(v) => setStatementDay(v ?? undefined)}
+                items={statementDayItems}
+              >
+                <SelectTrigger id="edit-account-statement-day">
+                  <SelectValue placeholder="選擇結帳日" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(statementDayItems).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="flex flex-col gap-2">
             <Label>期初餘額</Label>
