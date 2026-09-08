@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 
 export const metadata = {
   title: "服務條款 - 小熊記帳本",
@@ -22,6 +23,7 @@ function Fill({ children }: { children: React.ReactNode }) {
 export default function TermsPage() {
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-8">
+      <BackLink href="/more" label="更多功能" />
       <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4 text-sm text-amber-600">
         <strong className="font-semibold">草稿・尚未經法律專業審閱。</strong>
         本文件僅供參考，正式生效前將經法律專業審閱確認。文中 <Fill>〔　　　〕</Fill> 標示之處尚待補充確認。
@@ -47,7 +49,7 @@ export default function TermsPage() {
         <p>
           本服務提供個人財務記帳相關功能，包括但不限於：交易紀錄、多帳戶／多幣別管理、預算設定、儲蓄目標、訂閱與定期收支提醒、行事曆與統計報表、分帳本，以及 AI 輔助記帳（文字快速記帳、收據辨識）與資料匯出。
         </p>
-        <div className="rounded-2xl border bg-card p-4 text-muted-foreground">
+        <div className="rounded-2xl bg-muted/40 p-4 text-muted-foreground">
           <strong className="text-foreground">AI 功能的準確性提醒：</strong>
           文字快速記帳與收據辨識功能是將您輸入的文字或上傳的收據照片，透過第三方 AI 服務進行解析後產生建議的記帳內容。AI
           解析結果可能有誤判、遺漏或不準確之情形，最終記帳內容仍由您確認送出。我們不保證 AI 解析結果之正確性，您應自行核對金額、分類等資訊後再確認儲存。

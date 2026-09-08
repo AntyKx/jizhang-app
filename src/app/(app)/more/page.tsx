@@ -2,7 +2,6 @@ import Link from "next/link";
 import { ChartNoAxesColumn, DatabaseBackup, FileText, HeartHandshake, Lock, PiggyBank, ReceiptText, RefreshCw, ShieldCheck, Sparkles, Tags, UserCog, Wrench } from "lucide-react";
 import { requireUserId } from "@/lib/auth";
 import { hasCoreAccess, isDevAdmin } from "@/lib/entitlements";
-import { BearIllustration } from "@/components/bear-illustration";
 
 const links = [
   { href: "/account", Icon: UserCog, label: "帳號設定", desc: "大頭貼、姓名、Email、登出" },
@@ -25,10 +24,7 @@ export default async function MorePage() {
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <BearIllustration name="account-management" size={120} />
-        <h1 className="text-2xl font-semibold">更多</h1>
-      </div>
+      <h1 className="text-2xl font-semibold">更多功能</h1>
       <div className="flex flex-col divide-y">
         {links.map(({ href, Icon, label, desc, lockable }) => (
           <Link

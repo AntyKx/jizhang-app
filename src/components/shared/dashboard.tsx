@@ -8,7 +8,7 @@ import { SharedExpenseRow, type SharedExpense } from "@/components/shared/expens
 import { SharedMonthlyTrendChart } from "@/components/shared/monthly-trend-chart";
 import { PartnerNameDialog } from "@/components/shared/partner-name-dialog";
 import { BearIllustration } from "@/components/bear-illustration";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BackLink } from "@/components/back-link";
 
 type Category = { id: string; name: string; icon: string | null; color: string | null };
 
@@ -34,6 +34,7 @@ export function SharedLedgerDashboard({
 
   return (
     <div className="flex flex-col gap-6">
+      <BackLink href="/more" label="更多功能" />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">分帳本</h1>
         <PartnerNameDialog partnerName={partnerName} />
@@ -54,7 +55,7 @@ export function SharedLedgerDashboard({
       <AddSharedExpenseDialog partnerName={partnerName} categories={categories} />
 
       {expenses.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-2xl border bg-card p-6 text-center shadow-md shadow-foreground/10">
+        <div className="flex flex-col items-center gap-2 py-8 text-center">
           <BearIllustration name="multi-account" size={96} />
           <p className="text-sm text-muted-foreground">
             {isFiltered ? "這個區間沒有分帳支出。" : "還沒有分帳支出，新增第一筆吧！"}
@@ -89,14 +90,10 @@ export function SharedLedgerDashboard({
         </>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">近 6 個月分帳支出</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <SharedMonthlyTrendChart data={monthlyTrend} partnerName={partnerName} />
-        </CardContent>
-      </Card>
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted-foreground">近 6 個月分帳支出</h2>
+        <SharedMonthlyTrendChart data={monthlyTrend} partnerName={partnerName} />
+      </section>
     </div>
   );
 }

@@ -2,8 +2,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { userSettings } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { BackHistoryLink } from "@/components/back-history-link";
 import {
   createAiSubscriptionCheckoutSession,
   createBillingPortalSession,
@@ -38,6 +38,7 @@ export default async function UpgradePage({
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6">
+      <BackHistoryLink label="返回" />
       <h1 className="text-2xl font-semibold">升級</h1>
 
       {status === "success" && (
@@ -46,16 +47,14 @@ export default async function UpgradePage({
         </div>
       )}
       {from && featureFromLabel[from] && (
-        <div className="rounded-2xl border bg-card p-4 text-sm text-muted-foreground">
+        <div className="rounded-2xl bg-muted/40 p-4 text-sm text-muted-foreground">
           「{featureFromLabel[from]}」是核心解鎖功能，解鎖後即可使用。
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>核心解鎖</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
+      <div className="flex flex-col divide-y">
+        <section className="flex flex-col gap-3 py-4 first:pt-0">
+          <h2 className="text-sm font-semibold text-muted-foreground">核心解鎖</h2>
           <p className="text-sm text-muted-foreground">
             一次性付費，永久解鎖多帳戶、進階統計、資料匯出、分帳本。
           </p>
@@ -71,14 +70,10 @@ export default async function UpgradePage({
               </Button>
             </form>
           )}
-        </CardContent>
-      </Card>
+        </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>AI 訂閱</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
+        <section className="flex flex-col gap-3 py-4">
+          <h2 className="text-sm font-semibold text-muted-foreground">AI 訂閱</h2>
           <p className="text-sm text-muted-foreground">每月訂閱，解鎖 AI 記帳與收據辨識的高額度使用。</p>
           <p className="text-2xl font-semibold tabular-nums">
             NT$30<span className="text-sm font-normal text-muted-foreground">/月</span>
@@ -96,8 +91,8 @@ export default async function UpgradePage({
               </Button>
             </form>
           )}
-        </CardContent>
-      </Card>
+        </section>
+      </div>
     </div>
   );
 }

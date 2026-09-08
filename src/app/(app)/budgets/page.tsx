@@ -7,6 +7,7 @@ import { CreateBudgetDialog } from "@/components/budgets/create-budget-dialog";
 import { BudgetsList } from "@/components/budgets/budgets-list";
 import { BudgetMonthSummary } from "@/components/budgets/budget-month-summary";
 import { BearIllustration } from "@/components/bear-illustration";
+import { BackLink } from "@/components/back-link";
 import { getTodayInTaipei } from "@/lib/date";
 
 export default async function BudgetsPage() {
@@ -75,6 +76,7 @@ export default async function BudgetsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <BackLink href="/more" label="更多功能" />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">預算</h1>
         <CreateBudgetDialog categories={expenseCategories} />
@@ -91,7 +93,7 @@ export default async function BudgetsPage() {
       )}
 
       {budgetsWithSpent.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-2xl border bg-card p-6 text-center shadow-md shadow-foreground/10">
+        <div className="flex flex-col items-center gap-2 py-8 text-center">
           <BearIllustration name="empty" size={96} />
           <p className="text-muted-foreground text-sm">本月還沒有設定預算。</p>
         </div>

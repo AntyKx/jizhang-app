@@ -5,6 +5,7 @@ import { requireUserId } from "@/lib/auth";
 import { listAccounts, listArchivedAccounts } from "@/lib/account";
 import { TransactionsList } from "@/components/transactions/transactions-list";
 import { TransactionsFilterHeader } from "@/components/transactions/transactions-filter-header";
+import { BackLink } from "@/components/back-link";
 import { TRANSACTIONS_PAGE_SIZE, type ListItemRow, type TransactionsFilter } from "@/lib/transactions/list-types";
 import { transactionsFilterConditions } from "@/lib/transactions/filter";
 
@@ -144,7 +145,10 @@ export default async function TransactionsPage({
           label={sp.label}
         />
       ) : (
-        <h1 className="text-2xl font-semibold">所有交易</h1>
+        <>
+          <BackLink href="/more" label="更多功能" />
+          <h1 className="text-2xl font-semibold">所有交易</h1>
+        </>
       )}
       <TransactionsList
         items={items}

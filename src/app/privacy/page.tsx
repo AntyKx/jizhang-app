@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 
 export const metadata = {
   title: "隱私權政策 - 小熊記帳本",
@@ -30,6 +31,7 @@ const subprocessors = [
 export default function PrivacyPage() {
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-8">
+      <BackLink href="/more" label="更多功能" />
       <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4 text-sm text-amber-600">
         <strong className="font-semibold">草稿・尚未經法律專業審閱。</strong>
         本文件僅供參考，正式生效前將經法律專業審閱確認。文中 <Fill>〔　　　〕</Fill> 標示之處尚待補充確認。
@@ -93,7 +95,7 @@ export default function PrivacyPage() {
 
       <Clause n={6} title="利用對象">
         <p>除本服務外，您的個人資料可能因服務運作需要，由下列第三方服務供應商處理：</p>
-        <dl className="divide-y overflow-hidden rounded-2xl border bg-card">
+        <dl className="divide-y">
           {subprocessors.map((s) => (
             <div key={s.name} className="flex flex-col gap-0.5 px-4 py-3">
               <dt className="font-medium">{s.name}</dt>
