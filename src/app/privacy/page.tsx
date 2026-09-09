@@ -16,32 +16,24 @@ function Clause({ n, title, children }: { n: number; title: string; children: Re
   );
 }
 
-function Fill({ children }: { children: React.ReactNode }) {
-  return <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary">{children}</span>;
-}
-
 const subprocessors = [
   { name: "Clerk", use: "使用者帳號登入與身分驗證" },
   { name: "Neon", use: "資料庫代管，儲存您的記帳資料" },
   { name: "Vercel", use: "應用程式代管、伺服器運算與 AI Gateway 轉發" },
   { name: "Anthropic", use: "AI 文字記帳與收據辨識之語意解析（透過 Vercel AI Gateway 轉發）" },
-  { name: "Stripe（規劃中）", use: "付費項目之金流處理，尚未上線，上線後將更新本政策" },
+  { name: "Stripe", use: "付費項目之金流處理，目前處於測試模式，尚未正式對使用者收款" },
 ];
 
 export default function PrivacyPage() {
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-8">
       <BackLink href="/more" label="更多功能" />
-      <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4 text-sm text-amber-600">
-        <strong className="font-semibold">草稿・尚未經法律專業審閱。</strong>
-        本文件僅供參考，正式生效前將經法律專業審閱確認。文中 <Fill>〔　　　〕</Fill> 標示之處尚待補充確認。
-      </div>
 
       <div className="flex flex-col gap-1">
         <p className="text-xs font-medium tracking-wide text-primary uppercase">小熊記帳本</p>
         <h1 className="text-2xl font-semibold">隱私權政策</h1>
         <p className="text-xs text-muted-foreground">
-          草擬日期：2026 年 7 月 29 日・資料控管者：個人開發者・聯絡信箱：antyk123@gmail.com
+          生效日期：2026 年 9 月 9 日・資料控管者：個人開發者・聯絡信箱：antyk123@gmail.com
         </p>
       </div>
 
@@ -130,7 +122,7 @@ export default function PrivacyPage() {
 
       <Clause n={12} title="未成年人使用">
         <p>
-          本服務不主動蒐集未滿<Fill>〔　　　〕</Fill>歲之兒童或少年之個人資料。如您為未成年人，請於法定代理人同意及陪同下使用本服務。
+          本服務不主動蒐集未滿 12 歲之兒童個人資料。如您為未成年人，請於法定代理人同意及陪同下使用本服務。
         </p>
       </Clause>
 

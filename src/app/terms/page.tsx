@@ -16,24 +16,16 @@ function Clause({ n, title, children }: { n: number; title: string; children: Re
   );
 }
 
-function Fill({ children }: { children: React.ReactNode }) {
-  return <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary">{children}</span>;
-}
-
 export default function TermsPage() {
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-8">
       <BackLink href="/more" label="更多功能" />
-      <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4 text-sm text-amber-600">
-        <strong className="font-semibold">草稿・尚未經法律專業審閱。</strong>
-        本文件僅供參考，正式生效前將經法律專業審閱確認。文中 <Fill>〔　　　〕</Fill> 標示之處尚待補充確認。
-      </div>
 
       <div className="flex flex-col gap-1">
         <p className="text-xs font-medium tracking-wide text-primary uppercase">小熊記帳本</p>
         <h1 className="text-2xl font-semibold">服務條款</h1>
         <p className="text-xs text-muted-foreground">
-          草擬日期：2026 年 7 月 29 日・資料控管者：個人開發者・聯絡信箱：antyk123@gmail.com
+          生效日期：2026 年 9 月 9 日・資料控管者：個人開發者・聯絡信箱：antyk123@gmail.com
         </p>
       </div>
 
@@ -69,11 +61,11 @@ export default function TermsPage() {
         </p>
         <p>
           <strong className="text-foreground">AI 訂閱：</strong>
-          AI 記帳相關進階額度採定期扣款訂閱制，按月自動續訂並扣款，您可隨時於<Fill>付款管理頁面</Fill>取消訂閱，取消後於當期到期後停止續訂，當期已扣款之費用原則上不予退還。
+          AI 記帳相關進階額度採定期扣款訂閱制，按月自動續訂並扣款，您可隨時於「更多功能」→「升級」頁面之付款管理功能取消訂閱，取消後於當期到期後停止續訂，當期已扣款之費用原則上不予退還。
         </p>
         <p>
           <strong className="text-foreground">退款：</strong>
-          依「通訊交易解除權合理例外情事適用準則」，數位服務／內容於您開始使用後，可能不適用一般網路交易之七日猶豫期。若您於購買後因服務有重大瑕疵無法正常使用，請於<Fill>〔　　　〕</Fill>日內來信聯絡我們協助處理。
+          依「通訊交易解除權合理例外情事適用準則」，數位服務／內容於您開始使用後，可能不適用一般網路交易之七日猶豫期。若您於購買後因服務有重大瑕疵無法正常使用，請於購買後 7 日內來信聯絡我們協助處理。
         </p>
       </Clause>
 
@@ -106,13 +98,13 @@ export default function TermsPage() {
 
       <Clause n={9} title="服務中止或終止">
         <p>
-          我們保留因技術維護、服務調整或終止營運而暫停或終止本服務之權利，並將於合理期間前以<Fill>App 內公告／email</Fill>通知已付費使用者。因服務終止而無法使用已付費之解鎖功能時，我們將依實際使用期間評估是否提供部分退款。
+          我們保留因技術維護、服務調整或終止營運而暫停或終止本服務之權利，並將於合理期間前以 App 內公告或電子郵件通知已付費使用者。因服務終止而無法使用已付費之解鎖功能時，我們將依實際使用期間評估是否提供部分退款。
         </p>
       </Clause>
 
       <Clause n={10} title="準據法與管轄法院">
         <p>
-          本條款之解釋與適用，以及與本條款有關之爭議，均應依照中華民國法律予以處理，並以<Fill>〔　　　地方法院〕</Fill>為第一審管轄法院。
+          本條款之解釋與適用，以及與本條款有關之爭議，均應依照中華民國法律予以處理，並以中華民國法院為管轄法院，但不得排除《消費者保護法》或其他法律賦予您得向自身住所地有管轄權法院起訴之權利。
         </p>
       </Clause>
 
