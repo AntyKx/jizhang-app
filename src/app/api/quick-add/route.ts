@@ -72,10 +72,15 @@ export async function POST(req: Request) {
 
   const today = validReferenceDate ?? format(getTodayInTaipei(), "yyyy-MM-dd");
 
-  const { object } = await generateObject({
-    model: "anthropic/claude-haiku-4-5",
-    schema: quickAddSchema,
-    prompt: `你是記帳助理，將使用者輸入的一句話解析成結構化的記帳資料。
+  // A model/gateway failure is an expected outcome here, not a bug — without
+  // this the route 500s and the client shows a raw error instead of
+  // something the user can act on.
+  let object: z.infer<typeof quickAddSchema>;
+  try {
+    ({ object } = await generateObject({
+      model: "anthropic/claude-haiku-4-5",
+      schema: quickAddSchema,
+      prompt: `你是記帳助理，將使用者輸入的一句話解析成結構化的記帳資料。
 今天日期是 ${today}。
 可用分類清單：${userCategories.map((c) => `${c.name}(${c.type})`).join("、")}
 可用帳戶清單：${userAccounts.map((a) => a.name).join("、")}
@@ -83,7 +88,10 @@ export async function POST(req: Request) {
 使用者輸入：「${text}」
 
 請解析出金額、收入或支出、最符合的分類名稱（須完全符合上述清單其中之一）、付款方式、最符合的帳戶名稱（只有使用者明確提到才選，須完全符合上述帳戶清單其中之一，否則為 null）、商家、備註與日期。`,
-  });
+    }));
+  } catch {
+    return NextResponse.json({ error: "AI 解析失敗，請稍後再試或手動記帳" }, { status: 502 });
+  }
 
   await recordAiUsage(userId, "quick_add");
 

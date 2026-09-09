@@ -23,6 +23,11 @@ export async function suggestCategoryForMerchant(
   const trimmed = merchant?.trim();
   if (!trimmed) return null;
 
+  // ilike treats % and _ as wildcards, so a merchant whose real name
+  // contains one ("50%off", "7_11") would match unrelated rows. Escaped
+  // here to keep this the exact-match lookup it's documented to be.
+  const escaped = trimmed.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+
   const [top] = await db
     .select({ name: categories.name, count: sql<number>`count(*)::int` })
     .from(transactions)
@@ -31,7 +36,7 @@ export async function suggestCategoryForMerchant(
       and(
         eq(transactions.userId, userId),
         eq(transactions.type, type),
-        ilike(transactions.merchant, trimmed),
+        ilike(transactions.merchant, escaped),
       ),
     )
     .groupBy(categories.name)

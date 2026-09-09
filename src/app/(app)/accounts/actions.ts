@@ -10,7 +10,6 @@ import { pickCategoryColor } from "@/lib/category-color";
 import { supportedCurrencies } from "@/lib/currency";
 import { getExchangeRateToTwd } from "@/lib/fx";
 import { hasCoreAccess } from "@/lib/entitlements";
-import { listAccounts } from "@/lib/account";
 import { fail, isFail, type Fail } from "@/lib/action-result";
 
 // getExchangeRateToTwd throws its own user-facing message (unreachable FX
@@ -62,10 +61,15 @@ export async function createAccount(input: {
   const parsed = createAccountSchema.parse(input);
 
   // Free tier is limited to a single account — multi-account is a
-  // core-unlock feature (see src/lib/entitlements.ts).
+  // core-unlock feature (see src/lib/entitlements.ts). Counts archived
+  // accounts too: counting only active ones let the limit be walked past
+  // by archiving one, creating another, then unarchiving the first.
   if (!(await hasCoreAccess(userId))) {
-    const existing = await listAccounts(userId);
-    if (existing.length >= 1) {
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(accounts)
+      .where(eq(accounts.userId, userId));
+    if (count >= 1) {
       return fail("免費版限用 1 個帳戶，升級解鎖多帳戶");
     }
   }

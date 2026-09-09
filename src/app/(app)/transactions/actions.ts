@@ -6,6 +6,7 @@ import { eq, and, or, lt, ne, desc, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, categories, sharedExpenses, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
+import { ownedCategoryId } from "@/lib/category";
 import { todayInTaipeiString } from "@/lib/date";
 import { getExchangeRateToTwd } from "@/lib/fx";
 import {
@@ -72,6 +73,7 @@ export async function createTransaction(input: {
   const userId = await requireUserId();
   const parsed = createTransactionSchema.parse(input);
   const { accountId } = parsed;
+  const categoryId = await ownedCategoryId(userId, parsed.categoryId);
 
   // Partner paid the whole thing — no money actually left any of my own
   // accounts, so this doesn't belong in my personal transaction ledger at
@@ -85,7 +87,7 @@ export async function createTransaction(input: {
       .values({
         userId,
         paidByMe: false,
-        categoryId: parsed.categoryId,
+        categoryId,
         name: parsed.merchant || parsed.note || "分帳支出",
         amount: parsed.amount.toString(),
         occurredAt: parsed.occurredAt,
@@ -115,7 +117,7 @@ export async function createTransaction(input: {
       id: transactionId,
       userId,
       accountId,
-      categoryId: parsed.categoryId,
+      categoryId,
       type: parsed.type,
       amount: parsed.amount.toString(),
       exchangeRate: exchangeRate.toString(),
@@ -143,7 +145,7 @@ export async function createTransaction(input: {
       db.insert(sharedExpenses).values({
         userId,
         paidByMe: true,
-        categoryId: parsed.categoryId,
+        categoryId,
         name: parsed.merchant || parsed.note || "分帳支出",
         amount: parsed.amount.toString(),
         occurredAt: parsed.occurredAt,
@@ -276,12 +278,20 @@ export async function updateTransaction(input: {
     .from(transactions)
     .where(and(eq(transactions.id, parsed.id), eq(transactions.userId, userId)));
   if (!existing) return fail("找不到指定的交易");
+  // A transfer debits its source by amount + fee and credits a second
+  // account — the income/expense reversal math below can't express that, so
+  // running it against one would corrupt both accounts' balances. The UI
+  // never opens this dialog for a transfer row; this is the same guard
+  // duplicateTransaction already has, for anything that calls in directly.
+  if (existing.type === "transfer") return fail("轉帳紀錄請用刪除後重新建立的方式修改");
 
   const [ownedAccount] = await db
     .select({ id: accounts.id, currency: accounts.currency })
     .from(accounts)
     .where(and(eq(accounts.id, parsed.accountId), eq(accounts.userId, userId)));
   if (!ownedAccount) return fail("找不到指定的帳戶");
+
+  const categoryId = await ownedCategoryId(userId, parsed.categoryId);
 
   const exchangeRate = await tryExchangeRate(ownedAccount.currency, parsed.occurredAt);
   if (isFail(exchangeRate)) return exchangeRate;
@@ -305,7 +315,7 @@ export async function updateTransaction(input: {
     .update(transactions)
     .set({
       accountId: parsed.accountId,
-      categoryId: parsed.categoryId,
+      categoryId,
       type: parsed.type,
       amount: parsed.amount.toString(),
       exchangeRate: exchangeRate.toString(),
@@ -346,7 +356,7 @@ export async function updateTransaction(input: {
       db.insert(sharedExpenses).values({
         userId,
         paidByMe: false,
-        categoryId: parsed.categoryId,
+        categoryId,
         name: parsed.merchant || parsed.note || "分帳支出",
         amount: parsed.amount.toString(),
         occurredAt: parsed.occurredAt,
@@ -367,7 +377,7 @@ export async function updateTransaction(input: {
         .set({
           name: parsed.merchant || parsed.note || "分帳支出",
           amount: parsed.amount.toString(),
-          categoryId: parsed.categoryId,
+          categoryId,
           occurredAt: parsed.occurredAt,
           paidByMe: parsed.paidByMe ?? true,
         })
@@ -392,7 +402,7 @@ export async function updateTransaction(input: {
       db.insert(sharedExpenses).values({
         userId,
         paidByMe: parsed.paidByMe ?? true,
-        categoryId: parsed.categoryId,
+        categoryId,
         name: parsed.merchant || parsed.note || "分帳支出",
         amount: parsed.amount.toString(),
         occurredAt: parsed.occurredAt,
@@ -578,11 +588,12 @@ export async function deleteTransaction(transactionId: string) {
   revalidateTransactionPaths();
 }
 
-// Used only by shared/actions.ts's unsettleSharedExpense to remove exactly
-// the settlement transaction a (possibly now-reverted) settle produced —
-// skips deleteTransaction's settlement-transaction guard above, since this
-// *is* the sanctioned way to remove one.
-export async function deleteSettlementTransaction(transactionId: string) {
+// Deletes a transaction and reverses its balance effect, skipping every
+// guard deleteTransaction applies. Only for callers that are themselves the
+// sanctioned way to remove the transaction they created — shared/actions.ts
+// reverting a settlement it made, and subscriptions/actions.ts undoing a
+// just-posted occurrence whose rule failed to advance.
+export async function deleteTransactionUnchecked(transactionId: string) {
   const userId = await requireUserId();
 
   const [tx] = await db
@@ -593,6 +604,11 @@ export async function deleteSettlementTransaction(transactionId: string) {
 
   await deleteTransactionRow(userId, tx);
   revalidateTransactionPaths();
+}
+
+// Kept as the name shared/actions.ts already calls; same unguarded delete.
+export async function deleteSettlementTransaction(transactionId: string) {
+  await deleteTransactionUnchecked(transactionId);
 }
 
 export async function loadMoreTransactions(cursor: TransactionsCursor, filter?: TransactionsFilter) {

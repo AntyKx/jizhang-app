@@ -7,8 +7,9 @@ import { db } from "@/db";
 import { accounts, recurringRules } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { getDefaultAccountId } from "@/lib/account";
+import { ownedCategoryId } from "@/lib/category";
 import { advanceOccurrence } from "@/lib/recurrence";
-import { createTransaction } from "@/app/(app)/transactions/actions";
+import { createTransaction, deleteTransactionUnchecked } from "@/app/(app)/transactions/actions";
 import { fail, isFail, type Fail } from "@/lib/action-result";
 
 // Shared ownership check for a user-supplied accountId — the create/edit
@@ -94,7 +95,7 @@ export async function createRecurringRule(formData: FormData) {
   await db.insert(recurringRules).values({
     userId,
     accountId,
-    categoryId: parsed.categoryId,
+    categoryId: await ownedCategoryId(userId, parsed.categoryId),
     name: parsed.name,
     amount: parsed.amount.toString(),
     type: parsed.type,
@@ -145,7 +146,7 @@ export async function updateRecurringRule(formData: FormData) {
   await db
     .update(recurringRules)
     .set({
-      categoryId: parsed.categoryId ?? null,
+      categoryId: await ownedCategoryId(userId, parsed.categoryId),
       accountId,
       name: parsed.name,
       amount: parsed.amount.toString(),
@@ -196,7 +197,16 @@ export async function postRecurringOccurrence(ruleId: string) {
   });
   if (isFail(created)) return created;
 
-  await advanceRule(userId, rule);
+  // If advancing fails after the transaction is already in, the rule stays
+  // due and the next "一鍵入帳" tap would post a *second* copy of the same
+  // charge. Undo the transaction instead so the whole action is all-or-
+  // nothing and the user can simply retry.
+  try {
+    await advanceRule(userId, rule);
+  } catch {
+    await deleteTransactionUnchecked(created.id);
+    return fail("入帳失敗，請稍後再試");
+  }
 
   revalidateOccurrencePaths();
 
