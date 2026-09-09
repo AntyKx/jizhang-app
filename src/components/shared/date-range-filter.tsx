@@ -10,13 +10,18 @@ export function DateRangeFilter({ from, to }: { from?: string; to?: string }) {
         <Label htmlFor="from" className="text-xs text-muted-foreground">
           起始日期
         </Label>
-        <Input id="from" name="from" type="date" defaultValue={from} className="w-[8.5rem] text-sm" />
+        {/* No text-sm override here — a sub-16px font on a real <input>
+            makes iOS Safari auto-zoom the whole page in on focus and never
+            zoom back out on its own, which is exactly the "webpage, not an
+            app" feel this project has been removing elsewhere. Widened to
+            fit the base component's larger text instead of shrinking it. */}
+        <Input id="from" name="from" type="date" defaultValue={from} className="w-[9.5rem]" />
       </div>
       <div className="flex flex-col gap-1">
         <Label htmlFor="to" className="text-xs text-muted-foreground">
           結束日期
         </Label>
-        <Input id="to" name="to" type="date" defaultValue={to} className="w-[8.5rem] text-sm" />
+        <Input id="to" name="to" type="date" defaultValue={to} className="w-[9.5rem]" />
       </div>
       <Button type="submit" size="sm">
         套用

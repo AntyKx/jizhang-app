@@ -163,17 +163,22 @@
   }
   html {
     @apply font-sans;
-    /* App-like touch behavior, not a webpage's — kills double-tap-to-zoom
-       and the ~300ms tap delay (manipulation still allows normal single-
-       axis panning/scrolling, unlike touch-action:none which would break
-       every scrollable list). Deliberately CSS-only: the earlier attempt
-       at this used the viewport meta's user-scalable=no, which broke
-       env(safe-area-inset-*) on notch/Dynamic-Island phones — this
+    /* App-like touch behavior, not a webpage's — kills double-tap-to-zoom,
+       pinch-zoom, and the ~300ms tap delay, while normal single-axis
+       panning/scrolling still works fine (unlike touch-action:none, which
+       would break every scrollable list). Listing pan-x/pan-y explicitly
+       (instead of the `manipulation` keyword) is what also drops
+       pinch-zoom — `manipulation` is *defined* to still permit it
+       alongside panning, only double-tap-zoom is excluded from that one;
+       plain user testing on a real phone confirmed pinch-zoom was still
+       live under it. Deliberately CSS-only, same as before: the earlier
+       attempt at this used the viewport meta's user-scalable=no, which
+       broke env(safe-area-inset-*) on notch/Dynamic-Island phones — this
        doesn't touch the viewport at all, so that risk doesn't apply here.
        Individual elements can still set a *more* restrictive touch-action
        (e.g. calendar's touch-none) since touch-action isn't inherited —
        each element's own computed value is what's used. */
-    touch-action: manipulation;
+    touch-action: pan-x pan-y;
     /* Kills iOS Safari's rubber-band bounce on the main document scroll.
        Without this, scrolling a normal page (e.g. /record's transaction
        list) to its edge and then tapping a nav tab mid-bounce can catch
