@@ -9,6 +9,7 @@ import {
   date,
   pgEnum,
   index,
+  unique,
 } from "drizzle-orm/pg-core";
 
 export const accountTypeEnum = pgEnum("account_type", [
@@ -212,6 +213,15 @@ export const budgets = pgTable("budgets", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("budgets_user_month_idx").on(table.userId, table.month),
+  // One budget per category per month (and one overall budget, where
+  // categoryId is null — hence NULLS NOT DISTINCT, since Postgres would
+  // otherwise treat every null as unique and let overall budgets pile up).
+  // Without this, re-submitting the create dialog silently produced a
+  // second row for the same category, which then double-counted in the
+  // budget totals on /budgets and /stats.
+  unique("budgets_user_category_month_key")
+    .on(table.userId, table.categoryId, table.month)
+    .nullsNotDistinct(),
 ]);
 
 export const sharedExpenses = pgTable("shared_expenses", {

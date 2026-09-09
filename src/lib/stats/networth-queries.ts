@@ -9,34 +9,17 @@ export type NetWorthPoint = {
   netWorth: number;
 };
 
-// Base-currency (TWD) delta this transaction contributes to its own
-// account's balance — transfers move money between two of the user's own
-// accounts, so the transferred amount itself nets to zero across the whole
-// portfolio, which is all this ever gets summed into (see getNetWorthTrend
-// below). A transfer fee is real money leaving the portfolio though (paid to
-// a bank/service, not to either account), so it still needs to be
-// subtracted — this only appears once, on the source account's own row,
-// since the fee is never applied to the destination account. No branch is
-// needed for transfers between different currencies either — createTransfer
-// only allows same-currency accounts.
-function transactionDeltaBase(t: {
-  type: string;
-  amount: string;
-  feeAmount: string;
-  exchangeRate: string;
-}): number {
-  if (t.type === "expense") return -Number(t.amount) * Number(t.exchangeRate);
-  if (t.type === "income") return Number(t.amount) * Number(t.exchangeRate);
-  if (t.type === "transfer") return -Number(t.feeAmount) * Number(t.exchangeRate);
-  return 0;
-}
-
 // Reconstructs net worth (in TWD) at each of the last N month-end boundaries
-// by walking each account's transactions FORWARD from its initial balance,
+// by walking transactions FORWARD from each account's initial balance,
 // rather than backward from `currentBalance` — both the initial balance and
 // every transaction already carry the exchange rate (account currency ->
 // TWD) that was in effect when they were recorded, so summing them converts
 // foreign-currency accounts into TWD terms without any live FX lookup here.
+//
+// "Counted" is deliberately the same set the /accounts headline totals use:
+// not archived, not flagged excludeFromNetWorth. Including archived accounts
+// here (as this used to) made the trend chart disagree with the headline
+// number on the very same screen.
 export async function getNetWorthTrend(userId: string, months = 6): Promise<NetWorthPoint[]> {
   const now = getTodayInTaipei();
 
@@ -56,10 +39,17 @@ export async function getNetWorthTrend(userId: string, months = 6): Promise<NetW
         createdAt: accounts.createdAt,
       })
       .from(accounts)
-      .where(and(eq(accounts.userId, userId), eq(accounts.excludeFromNetWorth, false))),
+      .where(
+        and(
+          eq(accounts.userId, userId),
+          eq(accounts.excludeFromNetWorth, false),
+          eq(accounts.isArchived, false),
+        ),
+      ),
     db
       .select({
         accountId: transactions.accountId,
+        toAccountId: transactions.toAccountId,
         type: transactions.type,
         amount: transactions.amount,
         feeAmount: transactions.feeAmount,
@@ -70,11 +60,37 @@ export async function getNetWorthTrend(userId: string, months = 6): Promise<NetW
       .where(eq(transactions.userId, userId)),
   ]);
 
-  const txByAccount = new Map<string, typeof txRows>();
-  for (const t of txRows) {
-    const list = txByAccount.get(t.accountId);
-    if (list) list.push(t);
-    else txByAccount.set(t.accountId, [t]);
+  // Counted at a given boundary means: in the counted set at all, and
+  // already created by then — an account's transactions only start counting
+  // from the same boundary its opening balance does, so a backdated entry
+  // can't land against an account that doesn't exist yet on that point of
+  // the curve.
+  const createdAtById = new Map(accountRows.map((a) => [a.id, formatDateInTaipei(a.createdAt)]));
+  const countsAt = (accountId: string | null, boundary: string) => {
+    if (!accountId) return false;
+    const createdAt = createdAtById.get(accountId);
+    return createdAt !== undefined && createdAt <= boundary;
+  };
+
+  // How much this transaction moved the *counted* portfolio, which is not
+  // the same as how much it moved its own account. A transfer between two
+  // counted accounts nets to just its fee (the amount leaves one and
+  // arrives in the other), but a transfer whose other side sits outside the
+  // counted set — say into a 定存 account flagged "不記入資產" — really does
+  // take that money out of net worth, so each leg has to be judged on its
+  // own rather than assumed to cancel.
+  function countedDelta(t: (typeof txRows)[number], boundary: string): number {
+    const rate = Number(t.exchangeRate);
+    if (t.type === "transfer") {
+      let delta = 0;
+      if (countsAt(t.accountId, boundary)) delta -= (Number(t.amount) + Number(t.feeAmount)) * rate;
+      if (countsAt(t.toAccountId, boundary)) delta += Number(t.amount) * rate;
+      return delta;
+    }
+    if (!countsAt(t.accountId, boundary)) return 0;
+    if (t.type === "expense") return -Number(t.amount) * rate;
+    if (t.type === "income") return Number(t.amount) * rate;
+    return 0;
   }
 
   return boundaries.map((b) => {
@@ -82,10 +98,9 @@ export async function getNetWorthTrend(userId: string, months = 6): Promise<NetW
     for (const acc of accountRows) {
       if (formatDateInTaipei(acc.createdAt) > b.dateStr) continue;
       netWorth += Number(acc.initialBalance) * Number(acc.initialExchangeRate);
-      const accountTxs = txByAccount.get(acc.id) ?? [];
-      for (const t of accountTxs) {
-        if (t.occurredAt <= b.dateStr) netWorth += transactionDeltaBase(t);
-      }
+    }
+    for (const t of txRows) {
+      if (t.occurredAt <= b.dateStr) netWorth += countedDelta(t, b.dateStr);
     }
     return { monthLabel: b.label, netWorth };
   });

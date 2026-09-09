@@ -7,6 +7,7 @@ import { format, startOfMonth } from "date-fns";
 import { db } from "@/db";
 import { budgets } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
+import { ownedCategoryId } from "@/lib/category";
 import { getTodayInTaipei } from "@/lib/date";
 import { fail } from "@/lib/action-result";
 
@@ -27,13 +28,20 @@ export async function createBudget(formData: FormData) {
     categoryId: categoryIdRaw && categoryIdRaw !== "overall" ? categoryIdRaw : undefined,
     limitAmount: formData.get("limitAmount"),
   });
+  const categoryId = await ownedCategoryId(userId, parsed.categoryId);
+  const month = format(startOfMonth(getTodayInTaipei()), "yyyy-MM-dd");
 
-  await db.insert(budgets).values({
-    userId,
-    categoryId: parsed.categoryId,
-    month: format(startOfMonth(getTodayInTaipei()), "yyyy-MM-dd"),
-    limitAmount: parsed.limitAmount.toString(),
-  });
+  // Upsert rather than insert — setting a budget for a category that
+  // already has one this month means "change it to this", not "add a
+  // second one" (which is what used to happen, then double-counted in
+  // every total). Matches budgets_user_category_month_key in schema.ts.
+  await db
+    .insert(budgets)
+    .values({ userId, categoryId, month, limitAmount: parsed.limitAmount.toString() })
+    .onConflictDoUpdate({
+      target: [budgets.userId, budgets.categoryId, budgets.month],
+      set: { limitAmount: parsed.limitAmount.toString() },
+    });
 
   revalidateBudgetPaths();
 }
