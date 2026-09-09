@@ -3,22 +3,10 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
-// Same 10 scenes, one aspect ratio — this app (unlike a desktop-capable
-// site) is always rendered in a max-w-md mobile-first shell, so there's no
-// separate wide/desktop variant to prepare the way a full desktop site
-// would need.
-const SCENE_FILES = [
-  "01-daily.webp",
-  "02-weekly-budget.webp",
-  "03-shopping.webp",
-  "04-travel-fund.webp",
-  "05-shared-ledger.webp",
-  "06-monthly-bill.webp",
-  "07-coffee.webp",
-  "08-rainy-night.webp",
-  "09-category-budget.webp",
-  "10-savings-goal.webp",
-];
+// Single branded scene (small-bear-on-desk + wordmark) — replaced the
+// earlier random-pick-of-10 rotation 2026-09-09, so every cold load shows
+// the same art instead of a different scene each time.
+const SPLASH_FILE = "welcome.webp";
 
 const HOLD_MS = 1450;
 const EXIT_MS = 600;
@@ -67,14 +55,7 @@ function claimSplashTurn(): boolean {
 // remount a shared layout on client-side navigation, so it only plays on
 // an actual cold load (refresh, PWA launch, first visit), never when
 // tapping between tabs.
-export function BearSplashScreen({
-  // Preview-only override so a review page can cycle through scenes
-  // instead of getting whatever the RNG picks — production usage should
-  // never pass this.
-  forceFile,
-}: {
-  forceFile?: string;
-} = {}) {
+export function BearSplashScreen() {
   const pathname = usePathname();
   const isAuthPage = pathname?.startsWith("/sign-in") || pathname?.startsWith("/sign-up");
   // /sign-in and /sign-up are their own full page load (root layout mounts
@@ -92,16 +73,11 @@ export function BearSplashScreen({
   // hydration caught up. Moved to the effect below instead, where it can
   // only ever change things after the first paint has already matched.
   const shouldRender = !isAuthPage;
-  const [file] = useState(
-    () => forceFile ?? SCENE_FILES[Math.floor(Math.random() * SCENE_FILES.length)],
-  );
   const [phase, setPhase] = useState<Phase>("enter");
 
   useEffect(() => {
     if (!shouldRender) return;
-    // `forceFile` (preview/testing only) always bypasses the session gate,
-    // since a caller passing it explicitly wants to see it play regardless.
-    if (forceFile === undefined && !claimSplashTurn()) {
+    if (!claimSplashTurn()) {
       // Already played once in this tab — skip straight to hidden instead
       // of replaying the full ~2s ceremony. The first frame (rendered
       // above, before this effect runs) briefly shows the same splash art
@@ -146,7 +122,7 @@ export function BearSplashScreen({
           sizing machinery, and this needs to paint the instant the layout
           mounts, before any data fetching. */}
       <img
-        src={`/images/bears/splash/${file}`}
+        src={`/images/bears/splash/${SPLASH_FILE}`}
         alt=""
         className={`h-full w-full object-cover transition-transform duration-[1400ms] ease-out motion-reduce:transition-none ${
           phase === "enter" ? "scale-105" : "scale-100"
