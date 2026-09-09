@@ -8,12 +8,12 @@ import { SlidingIndicator } from "@/components/motion/sliding-indicator";
 import type { HeatmapDay, WeekdayPoint } from "@/lib/stats/trend-queries";
 import { cn } from "@/lib/utils";
 
-type PaymentRow = { name: string; icon: string | null; amount: number; color: string };
+type AccountRow = { name: string; icon: string | null; amount: number; color: string };
 
 const tabs = [
   { key: "heatmap", label: "熱力圖" },
   { key: "weekday", label: "週間模式" },
-  { key: "payment", label: "付款方式" },
+  { key: "account", label: "帳戶" },
 ] as const;
 
 // Replaces 3 separately stacked full-width Cards with one Card + in-page
@@ -24,11 +24,11 @@ const tabs = [
 export function SecondaryChartsTabs({
   heatmapDays,
   weekdayPattern,
-  paymentRows,
+  accountRows,
 }: {
   heatmapDays: HeatmapDay[];
   weekdayPattern: WeekdayPoint[];
-  paymentRows: PaymentRow[];
+  accountRows: AccountRow[];
 }) {
   const [active, setActive] = useState<(typeof tabs)[number]["key"]>("heatmap");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -73,7 +73,7 @@ export function SecondaryChartsTabs({
       </div>
       {active === "heatmap" && <DailySpendHeatmap days={heatmapDays} />}
       {active === "weekday" && <WeekdayPatternChart data={weekdayPattern} />}
-      {active === "payment" && <CategoryBreakdown rows={paymentRows} />}
+      {active === "account" && <CategoryBreakdown rows={accountRows} />}
     </div>
   );
 }

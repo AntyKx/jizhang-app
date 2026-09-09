@@ -1,8 +1,7 @@
 import { endOfMonth, format, startOfMonth, subMonths } from "date-fns";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/db";
-import { categories, transactions } from "@/db/schema";
-import { paymentMethodColor, paymentMethodLabel } from "@/lib/payment-methods";
+import { accounts, categories, transactions } from "@/db/schema";
 import { getCategoryColor, OTHER_COLOR } from "@/components/stats/chart-colors";
 import type { StatsRange } from "@/lib/stats/range";
 
@@ -119,8 +118,8 @@ export async function getCategoryDrilldowns(
   return result;
 }
 
-export type PaymentSlice = {
-  method: string;
+export type AccountSlice = {
+  accountId: string;
   name: string;
   icon: null;
   color: string;
@@ -128,14 +127,26 @@ export type PaymentSlice = {
   pct: number;
 };
 
-export async function getPaymentMethodBreakdown(userId: string, range: StatsRange): Promise<PaymentSlice[]> {
+// "Where did this period's spending come from" — grouped by the account the
+// money actually left. This replaced a 付款方式 breakdown, which drew on a
+// field that mostly just restated the account anyway and disagreed with it
+// in ~19% of rows (see the 2026-09-09 payment-method rework); the account
+// is the reliable version of the same question.
+//
+// Archived accounts are deliberately included: the spending genuinely
+// happened out of them, and dropping it would make the slices stop summing
+// to the period's real expense total.
+export async function getAccountBreakdown(userId: string, range: StatsRange): Promise<AccountSlice[]> {
   const rows = await db
     .select({
-      paymentMethod: transactions.paymentMethod,
+      accountId: transactions.accountId,
+      accountName: accounts.name,
+      accountColor: accounts.color,
       amount: transactions.amount,
       exchangeRate: transactions.exchangeRate,
     })
     .from(transactions)
+    .innerJoin(accounts, eq(transactions.accountId, accounts.id))
     .where(
       and(
         eq(transactions.userId, userId),
@@ -145,23 +156,25 @@ export async function getPaymentMethodBreakdown(userId: string, range: StatsRang
       ),
     );
 
-  const byMethod = new Map<string, number>();
+  const byAccount = new Map<string, { name: string; color: string; amount: number }>();
   for (const r of rows) {
     const amount = Number(r.amount) * Number(r.exchangeRate);
-    byMethod.set(r.paymentMethod, (byMethod.get(r.paymentMethod) ?? 0) + amount);
+    const existing = byAccount.get(r.accountId);
+    if (existing) existing.amount += amount;
+    else byAccount.set(r.accountId, { name: r.accountName, color: r.accountColor ?? OTHER_COLOR, amount });
   }
-  const total = [...byMethod.values()].reduce((sum, v) => sum + v, 0);
-  return [...byMethod.entries()]
-    .map(([method, amount]) => ({
-      method,
-      name: paymentMethodLabel(method),
-      // No icon: payment methods render as Lucide glyphs in transaction rows
-      // (see PaymentMethodIcon), and this breakdown row already carries a
-      // colored bar — an emoji here would be the odd one out.
+  const total = [...byAccount.values()].reduce((sum, a) => sum + a.amount, 0);
+  return [...byAccount.entries()]
+    .map(([accountId, a]) => ({
+      accountId,
+      name: a.name,
+      // No icon: an account's identity renders as a Lucide type glyph
+      // elsewhere (AccountTypeIcon), and this row already carries a colored
+      // bar — a category-style icon here would be the odd one out.
       icon: null,
-      color: paymentMethodColor(method),
-      amount,
-      pct: total > 0 ? (amount / total) * 100 : 0,
+      color: a.color,
+      amount: a.amount,
+      pct: total > 0 ? (a.amount / total) * 100 : 0,
     }))
     .sort((a, b) => b.amount - a.amount);
 }

@@ -1,7 +1,7 @@
 import { requireUserId } from "@/lib/auth";
 import { resolveStatsRange } from "@/lib/stats/range";
 import { getIncomeExpenseTrend } from "@/lib/stats/overview-queries";
-import { getCategoryBreakdown, getCategoryDrilldowns, getPaymentMethodBreakdown } from "@/lib/stats/category-queries";
+import { getAccountBreakdown, getCategoryBreakdown, getCategoryDrilldowns } from "@/lib/stats/category-queries";
 import { getDailyHeatmap, getWeekdayPattern } from "@/lib/stats/trend-queries";
 import { IncomeExpenseTrendChart } from "@/components/stats/income-expense-trend-chart";
 import { CategoryBreakdownPanel } from "@/components/stats/category-breakdown-panel";
@@ -19,10 +19,10 @@ export default async function StatsDailyPage({
   const params = await searchParams;
   const range = resolveStatsRange(params);
 
-  const [trend, categoryRows, paymentRows, heatmapDays, weekdayPattern, drilldowns] = await Promise.all([
+  const [trend, categoryRows, accountRows, heatmapDays, weekdayPattern, drilldowns] = await Promise.all([
     getIncomeExpenseTrend(userId, range),
     getCategoryBreakdown(userId, range, "expense"),
-    getPaymentMethodBreakdown(userId, range),
+    getAccountBreakdown(userId, range),
     getDailyHeatmap(userId, range.end),
     getWeekdayPattern(userId, range),
     getCategoryDrilldowns(userId, range),
@@ -47,7 +47,7 @@ export default async function StatsDailyPage({
         <SecondaryChartsTabs
           heatmapDays={heatmapDays}
           weekdayPattern={weekdayPattern}
-          paymentRows={paymentRows.map((r) => ({ name: r.name, icon: r.icon, amount: r.amount, color: r.color }))}
+          accountRows={accountRows.map((r) => ({ name: r.name, icon: r.icon, amount: r.amount, color: r.color }))}
         />
       </StaggerList>
     </>
