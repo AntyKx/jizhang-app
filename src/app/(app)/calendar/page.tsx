@@ -289,7 +289,13 @@ export default async function CalendarPage({
       // <main>'s own py-6 + body's safe-area-inset-top padding — without
       // reproducing it here, the header would render flush against the
       // true top edge, back under the status bar/notch on a real phone.
-      style={{ paddingTop: "calc(1.5rem + env(safe-area-inset-top))" }}
+      // paddingBottom reserves the same room MainNav's fixed bottom bar
+      // needs, so the transaction list's last rows scroll into view above
+      // it instead of under it.
+      style={{
+        paddingTop: "calc(1.5rem + env(safe-area-inset-top))",
+        paddingBottom: "calc(6rem + env(safe-area-inset-bottom))",
+      }}
     >
       <CalendarScrollPane header={header} dateRow={dateRow} list={list} />
     </div>

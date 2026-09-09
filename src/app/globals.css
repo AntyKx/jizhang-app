@@ -157,6 +157,9 @@
       radial-gradient(ellipse 70% 50% at 100% -10%, color-mix(in oklch, var(--primary) 14%, transparent), transparent 60%),
       radial-gradient(ellipse 60% 45% at -10% 100%, color-mix(in oklch, var(--accent) 14%, transparent), transparent 60%);
     background-attachment: fixed;
+    /* Paired with html's overscroll-behavior-y below — some WebKit
+       versions only honor it when it's set on both html and body. */
+    overscroll-behavior-y: none;
   }
   html {
     @apply font-sans;
@@ -171,6 +174,17 @@
        (e.g. calendar's touch-none) since touch-action isn't inherited —
        each element's own computed value is what's used. */
     touch-action: manipulation;
+    /* Kills iOS Safari's rubber-band bounce on the main document scroll.
+       Without this, scrolling a normal page (e.g. /record's transaction
+       list) to its edge and then tapping a nav tab mid-bounce can catch
+       WebKit's fixed-positioning mid-glitch — the visual and layout
+       viewports briefly disagree during momentum/overscroll, so a page
+       whose root is position:fixed (e.g. /calendar) can render torn, with
+       the previous page's scrolled content showing through underneath it
+       for a frame. Contained scroll boxes (e.g. calendar's own detail
+       list) keep their own overscroll-contain regardless — this only
+       stops the *document's* own bounce. */
+    overscroll-behavior-y: none;
     /* Long-press text-selection/copy popup and iOS's "Copy/Share" callout
        read as a webpage, not an app — off everywhere except actual text
        inputs, which still need normal select/edit behavior. */
