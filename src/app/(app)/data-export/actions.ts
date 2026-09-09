@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
   accounts,
+  aiUsageEvents,
   budgets,
   categories,
   recurringRules,
@@ -33,6 +34,11 @@ export async function deleteAllUserData() {
     db.delete(savingsGoals).where(eq(savingsGoals.userId, userId)),
     db.delete(accounts).where(eq(accounts.userId, userId)),
     db.delete(categories).where(eq(categories.userId, userId)),
+    // AI usage history counts as this user's data too — /privacy promises
+    // deletion covers everything, and leaving these behind would also
+    // outlive the Clerk account itself when this runs as part of
+    // delete-account (see account-settings.tsx).
+    db.delete(aiUsageEvents).where(eq(aiUsageEvents.userId, userId)),
     db.delete(userSettings).where(eq(userSettings.userId, userId)),
   ]);
 
@@ -107,12 +113,20 @@ export async function restoreBackup(backupJson: string) {
 
   if (parsed.settings) {
     const { partnerName, baseCurrency, monthStartDay } = parsed.settings;
+    // Only carried over when the account it points at is actually part of
+    // this same backup — a dangling id would fail the FK and abort the
+    // whole restore over a preference that just falls back to "自動".
+    const restoredAccountIds = new Set(parsed.accounts.map((a) => a.id));
+    const defaultAccountId =
+      parsed.settings.defaultAccountId && restoredAccountIds.has(parsed.settings.defaultAccountId)
+        ? parsed.settings.defaultAccountId
+        : null;
     await db
       .insert(userSettings)
-      .values({ userId, partnerName, baseCurrency, monthStartDay })
+      .values({ userId, partnerName, baseCurrency, monthStartDay, defaultAccountId })
       .onConflictDoUpdate({
         target: userSettings.userId,
-        set: { partnerName, baseCurrency, monthStartDay },
+        set: { partnerName, baseCurrency, monthStartDay, defaultAccountId },
       });
   }
 

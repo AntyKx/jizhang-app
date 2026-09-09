@@ -59,6 +59,7 @@ export async function GET() {
         icon: accounts.icon,
         isArchived: accounts.isArchived,
         excludeFromNetWorth: accounts.excludeFromNetWorth,
+        statementDay: accounts.statementDay,
         sortOrder: accounts.sortOrder,
       })
       .from(accounts)
@@ -143,6 +144,7 @@ export async function GET() {
         partnerName: userSettings.partnerName,
         baseCurrency: userSettings.baseCurrency,
         monthStartDay: userSettings.monthStartDay,
+        defaultAccountId: userSettings.defaultAccountId,
       })
       .from(userSettings)
       .where(eq(userSettings.userId, userId)),

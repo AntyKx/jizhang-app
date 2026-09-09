@@ -34,6 +34,9 @@ export const backupSchema = z.object({
       icon: z.string().nullable(),
       isArchived: z.boolean(),
       excludeFromNetWorth: z.boolean(),
+      // Optional so a backup downloaded before this field existed still
+      // restores — same rule for every field added from here on.
+      statementDay: z.number().int().nullable().optional(),
       sortOrder: z.number().int(),
     }),
   ),
@@ -112,6 +115,7 @@ export const backupSchema = z.object({
       partnerName: z.string().nullable(),
       baseCurrency: z.string(),
       monthStartDay: z.number().int(),
+      defaultAccountId: z.string().uuid().nullable().optional(),
     })
     .nullable(),
 });
