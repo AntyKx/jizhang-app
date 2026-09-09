@@ -67,7 +67,7 @@ export async function TodayTransactionsSection({
   if (todayTransactions.length === 0) {
     return (
       <Reveal className="flex flex-col items-center gap-3 py-8 text-center">
-        <BearIllustration name="record" size={96} />
+        <BearIllustration name="record" size={64} />
         <span className="text-sm text-muted-foreground">今天還沒有記帳，來記第一筆吧！</span>
       </Reveal>
     );

@@ -1,22 +1,29 @@
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-const BEARS = {
-  record: "/images/bears/bear-record.webp",
-  saving: "/images/bears/bear-saving.webp",
-  spending: "/images/bears/bear-spending.webp",
-  reports: "/images/bears/bear-reports.webp",
-  "goal-achieved": "/images/bears/bear-goal-achieved.webp",
-  "over-budget": "/images/bears/bear-over-budget.webp",
-  empty: "/images/bears/bear-empty.webp",
-  search: "/images/bears/bear-search.webp",
-  "ai-analysis": "/images/bears/bear-ai-analysis.webp",
-  welcome: "/images/bears/bear-welcome.webp",
-  "multi-account": "/images/bears/bear-multi-account.webp",
-  "account-management": "/images/bears/bear-account-management.webp",
-} as const;
+export type BearName =
+  | "record"
+  | "saving"
+  | "spending"
+  | "reports"
+  | "goal-achieved"
+  | "over-budget"
+  | "empty"
+  | "search"
+  | "ai-analysis"
+  | "welcome"
+  | "multi-account"
+  | "account-management";
 
-export type BearName = keyof typeof BEARS;
+// Every scene-specific photographic bear (see git history) has been
+// replaced by flat round bear-mark icons — most names still share one
+// generic mark since only a few scenes have their own art so far; add an
+// entry here as more come in.
+const BEARS: Partial<Record<BearName, string>> = {
+  record: "/icons/bear-record.png",
+  empty: "/icons/bear-empty.png",
+  "ai-analysis": "/icons/bear-ai-analysis.png",
+};
+const DEFAULT_BEAR = "/icons/bear-mark-v2.png";
 
 export function BearIllustration({
   name,
@@ -30,12 +37,12 @@ export function BearIllustration({
   className?: string;
 }) {
   return (
-    <Image
-      src={BEARS[name]}
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={BEARS[name] ?? DEFAULT_BEAR}
       alt={alt}
-      width={size}
-      height={size}
-      className={cn("rounded-2xl", className)}
+      className={cn("object-contain", className)}
+      style={{ width: size, height: size }}
     />
   );
 }

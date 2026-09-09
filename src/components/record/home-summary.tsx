@@ -4,7 +4,6 @@ import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { getNowInTaipei } from "@/lib/date";
 import { Progress } from "@/components/ui/progress";
-import { BearLogoMark } from "@/components/bear-logo-mark";
 import { cn } from "@/lib/utils";
 
 function getGreeting(hour: number): string {
@@ -62,8 +61,9 @@ export function HomeSummary({
             </span>
             <span className="text-xs text-muted-foreground">{dateLabel}</span>
           </div>
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-card shadow-sm shadow-foreground/10">
-            <BearLogoMark className="size-[30px]" />
+          <span className="flex size-12 shrink-0 items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icons/bear-mark-v2.png" alt="" className="size-full object-contain" />
           </span>
         </div>
 
