@@ -18,10 +18,10 @@ import { createTransaction, deleteTransaction, deleteUnlinkedSharedExpense } fro
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
-import { paymentMethods, type PaymentMethod } from "@/lib/payment-methods";
+import { type PaymentMethod } from "@/lib/payment-methods";
 import { accountTypeToPaymentMethod, type AccountType } from "@/lib/account-type";
+import { PaymentMethodField } from "@/components/record/payment-method-field";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
-import { PaymentMethodIcon } from "@/components/transactions/payment-method-icon";
 import { SharedExpenseToggle } from "@/components/record/shared-expense-toggle";
 import { todayInTaipeiString } from "@/lib/date";
 import { cn } from "@/lib/utils";
@@ -261,26 +261,11 @@ export function TextQuickAdd({
           {/* A partner-paid share never touches any of my accounts (see
               createTransaction) — 付款方式/帳戶 would be misleading. */}
           {!(isSharedExpense && !paidByMe) && (
-            <div className="flex flex-col gap-2">
-              <Label>付款方式</Label>
-              <div className="flex flex-wrap gap-2">
-                {paymentMethods.map((p) => (
-                  <button
-                    key={p.value}
-                    type="button"
-                    onClick={() => setDraft({ ...draft, paymentMethod: p.value })}
-                    className={
-                      draft.paymentMethod === p.value
-                        ? "flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-3 py-1.5 text-sm text-primary"
-                        : "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
-                    }
-                  >
-                    <PaymentMethodIcon method={p.value} />
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <PaymentMethodField
+              accountType={accounts.find((a) => a.id === accountId)?.type}
+              value={draft.paymentMethod}
+              onChange={(paymentMethod) => setDraft({ ...draft, paymentMethod })}
+            />
           )}
 
           {accounts.length > 1 && !(isSharedExpense && !paidByMe) && (

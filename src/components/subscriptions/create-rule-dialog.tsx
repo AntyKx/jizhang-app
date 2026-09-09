@@ -23,9 +23,9 @@ import { createRecurringRule } from "@/app/(app)/subscriptions/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
-import { PaymentMethodIcon } from "@/components/transactions/payment-method-icon";
+import { PaymentMethodField } from "@/components/record/payment-method-field";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
-import { paymentMethods, type PaymentMethod } from "@/lib/payment-methods";
+import { type PaymentMethod } from "@/lib/payment-methods";
 import { accountTypeToPaymentMethod, type AccountType } from "@/lib/account-type";
 import { cn } from "@/lib/utils";
 
@@ -150,25 +150,11 @@ export function CreateRuleDialog({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label>付款方式</Label>
-            <div className="flex flex-wrap gap-2">
-              {paymentMethods.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => setPaymentMethod(p.value)}
-                  className={cn(
-                    "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm transition-colors",
-                    paymentMethod === p.value
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-muted",
-                  )}
-                >
-                  <PaymentMethodIcon method={p.value} />
-                  {p.label}
-                </button>
-              ))}
-            </div>
+            <PaymentMethodField
+              accountType={accounts.find((a) => a.id === accountId)?.type}
+              value={paymentMethod}
+              onChange={setPaymentMethod}
+            />
             <input type="hidden" name="paymentMethod" value={paymentMethod} />
           </div>
 

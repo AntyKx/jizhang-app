@@ -24,10 +24,10 @@ import { deleteTransaction, updateTransaction } from "@/app/(app)/transactions/a
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { SharedExpenseToggle } from "@/components/record/shared-expense-toggle";
-import { paymentMethods, type PaymentMethod } from "@/lib/payment-methods";
+import { type PaymentMethod } from "@/lib/payment-methods";
 import { accountTypeToPaymentMethod, type AccountType } from "@/lib/account-type";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
-import { PaymentMethodIcon } from "@/components/transactions/payment-method-icon";
+import { PaymentMethodField } from "@/components/record/payment-method-field";
 import { cn } from "@/lib/utils";
 
 type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
@@ -195,26 +195,11 @@ export function EditTransactionDialog({
               updateTransaction, which deletes the underlying transaction
               entirely in that case) — 付款方式/帳戶 would be misleading. */}
           {!(type === "expense" && isSharedExpense && !paidByMe) && (
-            <div className="flex flex-col gap-2">
-              <Label>付款方式</Label>
-              <div className="flex flex-wrap gap-2">
-                {paymentMethods.map((p) => (
-                  <button
-                    key={p.value}
-                    type="button"
-                    onClick={() => setPaymentMethod(p.value)}
-                    className={
-                      paymentMethod === p.value
-                        ? "flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-3 py-1.5 text-sm text-primary"
-                        : "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
-                    }
-                  >
-                    <PaymentMethodIcon method={p.value} />
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <PaymentMethodField
+              accountType={accounts.find((a) => a.id === accountId)?.type}
+              value={paymentMethod}
+              onChange={setPaymentMethod}
+            />
           )}
 
           {accounts.length > 1 && !(type === "expense" && isSharedExpense && !paidByMe) && (
