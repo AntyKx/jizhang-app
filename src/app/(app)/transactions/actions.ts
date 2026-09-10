@@ -7,7 +7,6 @@ import { db } from "@/db";
 import { accounts, categories, sharedExpenses, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { ownedCategoryId } from "@/lib/category";
-import { todayInTaipeiString } from "@/lib/date";
 import { getExchangeRateToTwd } from "@/lib/fx";
 import { deriveSplitFields } from "@/lib/shared-expenses";
 import {
@@ -421,12 +420,18 @@ export async function duplicateTransaction(transactionId: string) {
   if (!existing) return fail("找不到指定的交易");
   if (existing.type === "transfer") return fail("轉帳紀錄不能複製");
 
-  const today = todayInTaipeiString();
+  // Duplicate means duplicate — the copy keeps the source transaction's own
+  // date (and the exchange rate for that date, not today's), not just
+  // whatever day happens to be "today" for the account making the copy.
+  // This button is reachable from the calendar's day-detail view for any
+  // past day, not only from the home page's today-list — pinning the date
+  // to today there silently relocated a backfilled entry onto today instead
+  // of the day being backfilled.
   const [account] = await db
     .select({ currency: accounts.currency })
     .from(accounts)
     .where(and(eq(accounts.id, existing.accountId), eq(accounts.userId, userId)));
-  const exchangeRate = account ? await tryExchangeRate(account.currency, today) : 1;
+  const exchangeRate = account ? await tryExchangeRate(account.currency, existing.occurredAt) : 1;
   if (isFail(exchangeRate)) return exchangeRate;
 
   const delta = existing.type === "expense" ? -Number(existing.amount) : Number(existing.amount);
@@ -444,7 +449,7 @@ export async function duplicateTransaction(transactionId: string) {
         paymentMethod: existing.paymentMethod,
         note: existing.note,
         merchant: existing.merchant,
-        occurredAt: today,
+        occurredAt: existing.occurredAt,
       })
       .returning({ id: transactions.id }),
     db

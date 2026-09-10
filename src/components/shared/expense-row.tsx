@@ -72,7 +72,7 @@ export function SharedExpenseRow({ item, categories }: { item: FlatSplitItem; ca
         disabled={item.isSettled || isLinked}
         onTap={item.isSettled || isLinked ? undefined : () => setEditing(true)}
       >
-        <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <div className="flex items-center justify-between gap-4 px-4 py-3">
           <div className="flex min-w-0 flex-col gap-0.5">
             {/* Item name gets its own line — sharing a row with the category
                 badge meant a long name (no spaces to break on in Chinese)
@@ -82,12 +82,24 @@ export function SharedExpenseRow({ item, categories }: { item: FlatSplitItem; ca
                 badges + secondary text together below where there's no
                 similar long/unbreakable string to fight them for space. */}
             <span className="truncate text-sm font-medium">{item.itemName}</span>
-            <div className="flex items-center gap-1.5">
+            <div className="flex min-w-0 items-center gap-1.5">
               {item.categoryName && <Badge variant="outline">{item.categoryName}</Badge>}
               {isLinked && <Badge variant="outline">來自交易</Badge>}
-              <span className="truncate text-xs text-muted-foreground">
-                {item.iOwe ? "你欠對方" : "對方欠你"}・{item.occurredAt}
+              {/* Who owes whom is folded into this string instead of the
+                  generic "你欠對方" it used to say — in the flat 已結清 list
+                  (rendered ungrouped, mixing every counterparty together,
+                  unlike the per-person unsettled cards) that was the only
+                  place a settled row's counterparty ever showed up at all.
+                  Split into two spans so the date gets a shrink-0 slot: the
+                  combined string used to share one truncating span with two
+                  shrink-0 badges, and since Tailwind's truncate doesn't set
+                  min-width:0, that span couldn't actually shrink — the row
+                  just overflowed past the app-wide overflow-x:hidden and
+                  silently clipped the date instead of showing an ellipsis. */}
+              <span className="min-w-0 truncate text-xs text-muted-foreground">
+                {item.iOwe ? `你欠 ${item.name}` : `${item.name} 欠你`}
               </span>
+              <span className="shrink-0 text-xs text-muted-foreground">・{item.occurredAt}</span>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
