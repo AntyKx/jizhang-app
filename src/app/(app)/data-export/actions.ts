@@ -1,6 +1,7 @@
 "use server";
 
 import { eq } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -45,8 +46,9 @@ export async function deleteAllUserData() {
   revalidatePath("/", "layout");
 }
 
-// Replace-style restore: wipes the user's existing content, then loads the
-// backup. `userSettings` is intentionally never deleted — only the
+// Replace-style restore, applied as a single all-or-nothing batch: either
+// the backup fully lands or the account is untouched. `userSettings` is
+// intentionally never deleted — only the
 // content-safe fields (baseCurrency/monthStartDay) are ever touched, via a
 // scoped upsert, so a restore can never grant/revoke a purchase or
 // subscription. Every inserted row gets the *current* session's
@@ -64,7 +66,19 @@ export async function restoreBackup(backupJson: string) {
     return fail("備份檔案格式錯誤，無法還原");
   }
 
-  await db.batch([
+  // Wipe and reload in ONE batch, so a restore is all-or-nothing. Splitting
+  // them (an atomic wipe followed by sequential inserts) meant a failure
+  // partway through the insert phase left the account holding a half-loaded
+  // ledger with its original data already gone — the worst possible outcome
+  // for the one operation people reach for when something has already gone
+  // wrong. Ordering inside the array is preserved by Neon, so deletes run
+  // children-before-parents and inserts run parents-before-children.
+  //
+  // The array is built dynamically (empty tables are skipped, since
+  // .values([]) is invalid) and cast at the call, because db.batch()'s
+  // signature wants a fixed-length tuple purely to type the *results* —
+  // which this caller ignores. The 7 deletes guarantee it's never empty.
+  const ops: BatchItem<"pg">[] = [
     db.delete(sharedExpenses).where(eq(sharedExpenses.userId, userId)),
     db.delete(transactions).where(eq(transactions.userId, userId)),
     db.delete(recurringRules).where(eq(recurringRules.userId, userId)),
@@ -72,34 +86,28 @@ export async function restoreBackup(backupJson: string) {
     db.delete(savingsGoals).where(eq(savingsGoals.userId, userId)),
     db.delete(accounts).where(eq(accounts.userId, userId)),
     db.delete(categories).where(eq(categories.userId, userId)),
-  ]);
+  ];
 
-  // Sequential, FK-ordered (parents before children) rather than one
-  // atomic batch — neon-http's db.batch() needs a fixed-length array
-  // literal for correct TS tuple inference, which doesn't work for a
-  // variable number of conditionally-included inserts. Known limitation:
-  // if a later insert fails, earlier ones in this phase have already
-  // committed (the prior wipe above is still atomic).
   if (parsed.categories.length > 0) {
-    await db.insert(categories).values(parsed.categories.map((c) => ({ ...c, userId })));
+    ops.push(db.insert(categories).values(parsed.categories.map((c) => ({ ...c, userId }))));
   }
   if (parsed.accounts.length > 0) {
-    await db.insert(accounts).values(parsed.accounts.map((a) => ({ ...a, userId })));
+    ops.push(db.insert(accounts).values(parsed.accounts.map((a) => ({ ...a, userId }))));
   }
   if (parsed.recurringRules.length > 0) {
-    await db.insert(recurringRules).values(parsed.recurringRules.map((r) => ({ ...r, userId })));
+    ops.push(db.insert(recurringRules).values(parsed.recurringRules.map((r) => ({ ...r, userId }))));
   }
   if (parsed.transactions.length > 0) {
-    await db.insert(transactions).values(parsed.transactions.map((t) => ({ ...t, userId })));
+    ops.push(db.insert(transactions).values(parsed.transactions.map((t) => ({ ...t, userId }))));
   }
   if (parsed.budgets.length > 0) {
-    await db.insert(budgets).values(parsed.budgets.map((b) => ({ ...b, userId })));
+    ops.push(db.insert(budgets).values(parsed.budgets.map((b) => ({ ...b, userId }))));
   }
   if (parsed.savingsGoals.length > 0) {
-    await db.insert(savingsGoals).values(parsed.savingsGoals.map((g) => ({ ...g, userId })));
+    ops.push(db.insert(savingsGoals).values(parsed.savingsGoals.map((g) => ({ ...g, userId }))));
   }
   if (parsed.sharedExpenses.length > 0) {
-    await db.insert(sharedExpenses).values(parsed.sharedExpenses.map((s) => ({ ...s, userId })));
+    ops.push(db.insert(sharedExpenses).values(parsed.sharedExpenses.map((s) => ({ ...s, userId }))));
   }
 
   if (parsed.settings) {
@@ -112,13 +120,25 @@ export async function restoreBackup(backupJson: string) {
       parsed.settings.defaultAccountId && restoredAccountIds.has(parsed.settings.defaultAccountId)
         ? parsed.settings.defaultAccountId
         : null;
-    await db
-      .insert(userSettings)
-      .values({ userId, baseCurrency, monthStartDay, defaultAccountId })
-      .onConflictDoUpdate({
-        target: userSettings.userId,
-        set: { baseCurrency, monthStartDay, defaultAccountId },
-      });
+    ops.push(
+      db
+        .insert(userSettings)
+        .values({ userId, baseCurrency, monthStartDay, defaultAccountId })
+        .onConflictDoUpdate({
+          target: userSettings.userId,
+          set: { baseCurrency, monthStartDay, defaultAccountId },
+        }),
+    );
+  }
+
+  try {
+    await db.batch(ops as [BatchItem<"pg">, ...BatchItem<"pg">[]]);
+  } catch (err) {
+    // Nothing was applied — the whole batch rolled back — so the account is
+    // exactly as it was before the attempt, which is what makes it safe to
+    // just tell the user to try again.
+    console.error("[restoreBackup] failed:", err);
+    return fail("還原失敗，資料維持原狀，請確認備份檔案後再試一次");
   }
 
   revalidatePath("/", "layout");
