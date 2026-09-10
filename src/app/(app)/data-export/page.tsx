@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { accounts, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { hasCoreAccess } from "@/lib/entitlements";
-import { listSnapshots, RETENTION_DAYS } from "@/lib/backup-snapshots";
+import { listSnapshots, retentionCutoff, retentionDaysFor, PAID_RETENTION_DAYS } from "@/lib/backup-snapshots";
 import { getTodayInTaipei } from "@/lib/date";
 import { buttonVariants } from "@/components/ui/button";
 import { BackLink } from "@/components/back-link";
@@ -18,21 +18,28 @@ import { cn } from "@/lib/utils";
 export default async function DataExportPage() {
   const userId = await requireUserId();
 
-  // Formatted CSV/Excel/monthly-report export and restore-from-backup are
-  // core-unlock features. Downloading a raw backup and deleting all data
-  // stay free for everyone regardless of plan — both are data-subject
-  // rights, not paid conveniences (see /api/export/backup/route.ts and
-  // deleteAllUserData()'s comments).
+  // Formatted CSV/Excel/monthly-report export is a core-unlock feature, and
+  // so is how far back the cloud snapshots reach. Everything to do with
+  // getting your own data back — downloading a raw backup, restoring from a
+  // file, restoring a recent snapshot, deleting everything — stays free for
+  // everyone regardless of plan; those are data-subject rights, not paid
+  // conveniences (see /api/export/backup/route.ts and deleteAllUserData()'s
+  // comments). What the unlock sells is reach, not recovery.
   const unlocked = await hasCoreAccess(userId);
 
-  const [txRows, accountRows, snapshots] = await Promise.all([
+  const [txRows, accountRows, allSnapshots] = await Promise.all([
     db.select({ occurredAt: transactions.occurredAt }).from(transactions).where(eq(transactions.userId, userId)),
     db.select({ id: accounts.id }).from(accounts).where(eq(accounts.userId, userId)),
-    // Listing is cheap and read-only, so it runs for everyone — the gate is
-    // on restoring, matching how the rest of this page treats reading your
-    // own data as free and destructive operations as core-unlock.
-    unlocked ? listSnapshots(userId) : Promise.resolve([]),
+    listSnapshots(userId),
   ]);
+
+  // Filtered to the plan's window so the list matches what restore will
+  // actually accept — a snapshot that survived past the window (pruning
+  // runs nightly, so one can) would otherwise show a restore button that
+  // then refuses.
+  const today = getTodayInTaipei();
+  const cutoff = retentionCutoff(today, unlocked);
+  const snapshots = allSnapshots.filter((s) => s.day >= cutoff);
 
   const transactionCount = txRows.length;
   const firstDate = txRows.reduce<string | null>(
@@ -85,7 +92,7 @@ export default async function DataExportPage() {
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-muted-foreground">備份與還原</h2>
         <p className="text-sm text-muted-foreground">
-          你的資料已經即時同步在雲端，不會因為手機遺失或重灌而不見。這裡讓你把完整資料（帳戶、交易、預算、目標、訂閱、分帳本）下載成一份檔案帶著走。
+          把完整資料（帳戶、交易、預算、目標、訂閱、分帳本）下載成一份檔案。
         </p>
         <a
           href="/api/export/backup"
@@ -95,45 +102,27 @@ export default async function DataExportPage() {
           下載備份檔案
         </a>
 
-        {unlocked ? (
-          <RestoreBackupDialog />
-        ) : (
-          <Link
-            href="/upgrade?from=data-export"
-            className="flex items-center gap-2.5 rounded-lg border border-dashed p-3 text-sm text-muted-foreground hover:bg-muted"
-          >
-            <Lock className="size-4 shrink-0" strokeWidth={1.75} />
-            用備份檔案還原是核心解鎖功能，點此了解如何解鎖
-          </Link>
-        )}
+        <RestoreBackupDialog />
       </section>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-muted-foreground">雲端自動備份</h2>
         <p className="text-sm text-muted-foreground">
-          除了你自己下載的備份檔，系統每天也會自動幫你保存一份快照。誤刪資料或想回到某一天的狀態時，可以直接從這裡還原，不需要事先下載過任何東西。
+          系統每天自動保存一份快照，誤刪資料或想回到某一天時可以直接還原。
         </p>
-        {unlocked ? (
-          <CloudSnapshotList
-            snapshots={snapshots}
-            today={format(getTodayInTaipei(), "yyyy-MM-dd")}
-            retentionDays={RETENTION_DAYS}
-          />
-        ) : (
-          <Link
-            href="/upgrade?from=data-export"
-            className="flex items-center gap-2.5 rounded-lg border border-dashed p-3 text-sm text-muted-foreground hover:bg-muted"
-          >
-            <Lock className="size-4 shrink-0" strokeWidth={1.75} />
-            還原到指定日期是核心解鎖功能，點此了解如何解鎖
-          </Link>
-        )}
+        <CloudSnapshotList
+          snapshots={snapshots}
+          today={format(today, "yyyy-MM-dd")}
+          retentionDays={retentionDaysFor(unlocked)}
+          paidRetentionDays={PAID_RETENTION_DAYS}
+          unlocked={unlocked}
+        />
       </section>
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold text-muted-foreground">雲端同步狀態</h2>
         <p className="text-sm text-muted-foreground">
-          你的每一筆記帳都會即時寫入雲端資料庫，不需要手動同步。換手機或重新安裝後，只要用同一個帳號登入，資料就會直接還原。
+          每筆記帳即時寫入雲端，換手機或重灌後登入同一帳號即可還原。
         </p>
         <div className="flex flex-col divide-y">
           <div className="flex justify-between py-2 text-sm">
@@ -156,7 +145,7 @@ export default async function DataExportPage() {
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-destructive">危險區域</h2>
         <p className="text-sm text-muted-foreground">
-          刪除後所有帳戶、交易、預算、目標、訂閱與分帳本紀錄都會永久移除，無法復原。建議刪除前先匯出一份備份。
+          帳戶、交易、預算、目標、訂閱與分帳本紀錄將永久刪除，無法復原，建議先匯出備份。
         </p>
         <DeleteAllDataDialog />
       </section>

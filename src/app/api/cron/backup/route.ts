@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 import { db } from "@/db";
 import { accounts } from "@/db/schema";
+import { hasCoreAccess } from "@/lib/entitlements";
 import { buildBackup } from "@/lib/backup";
-import { pruneSnapshots, writeSnapshot, RETENTION_DAYS } from "@/lib/backup-snapshots";
+import { pruneSnapshots, retentionCutoff, writeSnapshot } from "@/lib/backup-snapshots";
 import { getTodayInTaipei } from "@/lib/date";
 
 // A full pass builds one JSON per user; generous ceiling so a slow run
@@ -24,7 +25,6 @@ export async function GET(req: Request) {
 
   const today = getTodayInTaipei();
   const day = format(today, "yyyy-MM-dd");
-  const cutoffDay = format(subDays(today, RETENTION_DAYS), "yyyy-MM-dd");
 
   // Every real user has at least one account (getDefaultAccountId creates
   // one on first use), so this covers everyone with data worth snapshotting
@@ -44,7 +44,11 @@ export async function GET(req: Request) {
       const backup = await buildBackup(userId);
       await writeSnapshot(userId, day, JSON.stringify(backup));
       saved += 1;
-      pruned += await pruneSnapshots(userId, cutoffDay);
+      // Snapshots are taken for everyone; only how long they're kept
+      // depends on the plan. Pruning reads the entitlement per user so a
+      // plan change takes effect on the next nightly pass without needing
+      // any migration of what's already stored.
+      pruned += await pruneSnapshots(userId, retentionCutoff(today, await hasCoreAccess(userId)));
     } catch (err) {
       console.error(`[cron/backup] failed for ${userId}:`, err);
       failed.push(userId);

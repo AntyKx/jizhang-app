@@ -5,7 +5,7 @@ export function TopMerchantsList({ rows }: { rows: MerchantRow[] }) {
   if (rows.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
-        這段期間的支出還沒有填商家或備註，所以排不出榜。記帳時順手填一下商家，這裡就會告訴你錢實際流去哪幾家。
+        還沒有填商家或備註，記帳時填一下商家就能看出錢花去哪。
       </p>
     );
   }

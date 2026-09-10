@@ -46,7 +46,7 @@ export function FixedVsVariableCard({ data }: { data: FixedVsVariable }) {
 
       {data.fixed === 0 && (
         <p className="rounded-xl bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
-          目前沒有任何由「訂閱／定期收支」自動記錄的支出，所以全部算成變動支出。把房租、保險、訂閱設成定期項目後，這裡就能看出每月的固定開銷基本盤。
+          還沒有「訂閱／定期收支」紀錄，暫時全算變動支出。把房租、保險等設成定期項目就能看出固定開銷。
         </p>
       )}
     </div>

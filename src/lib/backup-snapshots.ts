@@ -1,10 +1,26 @@
 import { del, get, list, put } from "@vercel/blob";
+import { format, subDays } from "date-fns";
 
-// How far back snapshots are kept. Shared by the cron job that prunes and
-// the UI that explains the window, so the promise shown to the user can't
-// drift from what's actually retained. This is also the seam where
-// free/paid retention tiers would later plug in.
-export const RETENTION_DAYS = 30;
+// How far back snapshots are kept, by plan. Restoring is free for everyone
+// — what the core unlock buys is a longer window to reach back into, not
+// the ability to recover at all. Shared by the cron job that prunes, the
+// UI that explains the window, and the restore action that enforces it, so
+// the promise shown to the user can't drift from what's actually retained.
+export const FREE_RETENTION_DAYS = 7;
+export const PAID_RETENTION_DAYS = 30;
+
+export function retentionDaysFor(unlocked: boolean): number {
+  return unlocked ? PAID_RETENTION_DAYS : FREE_RETENTION_DAYS;
+}
+
+// The oldest day still inside a plan's window, as a yyyy-MM-dd string.
+// Restore checks against this rather than trusting that pruning has already
+// run — a snapshot can outlive the window between nightly passes, or after
+// a plan changes, and it shouldn't become reachable just because the
+// cleanup hasn't caught up yet.
+export function retentionCutoff(today: Date, unlocked: boolean): string {
+  return format(subDays(today, retentionDaysFor(unlocked)), "yyyy-MM-dd");
+}
 
 // Dated, deterministic path: re-running on the same day overwrites that
 // day's snapshot rather than piling up duplicates, and the date is

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CloudDownload } from "lucide-react";
@@ -13,11 +14,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { CollapsibleProgressList } from "@/components/stats/collapsible-progress-list";
 import { restoreFromSnapshot } from "@/app/(app)/data-export/actions";
 import { isFail } from "@/lib/action-result";
 import type { Snapshot } from "@/lib/backup-snapshots";
 
 const CONFIRM_PHRASE = "取代還原";
+const VISIBLE_COUNT = 3;
 
 function relativeLabel(day: string, today: string): string | null {
   if (day === today) return "今天";
@@ -33,10 +36,14 @@ export function CloudSnapshotList({
   snapshots,
   today,
   retentionDays,
+  paidRetentionDays,
+  unlocked,
 }: {
   snapshots: Snapshot[];
   today: string;
   retentionDays: number;
+  paidRetentionDays: number;
+  unlocked: boolean;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Snapshot | null>(null);
@@ -61,43 +68,54 @@ export function CloudSnapshotList({
   if (snapshots.length === 0) {
     return (
       <p className="rounded-xl bg-muted/60 px-3 py-2.5 text-sm text-muted-foreground">
-        還沒有雲端備份。系統每天凌晨會自動幫你備份一次，明天起這裡就會出現可還原的時間點。
+        還沒有雲端備份，系統每天凌晨自動備份一次。
       </p>
     );
   }
 
+  const items = snapshots.map((s) => {
+    const rel = relativeLabel(s.day, today);
+    return {
+      key: s.day,
+      node: (
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex min-w-0 flex-col">
+            <span className="text-sm font-medium tabular-nums">{s.day}</span>
+            <span className="text-xs text-muted-foreground">
+              {rel ? `${rel}・` : ""}
+              {(s.size / 1024).toFixed(0)} KB
+            </span>
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={() => {
+              setSelected(s);
+              setConfirmText("");
+            }}
+          >
+            還原
+          </Button>
+        </div>
+      ),
+    };
+  });
+
   return (
     <>
-      <div className="flex flex-col divide-y">
-        {snapshots.map((s) => {
-          const rel = relativeLabel(s.day, today);
-          return (
-            <div key={s.day} className="flex items-center justify-between gap-2 py-2.5">
-              <span className="flex min-w-0 flex-col">
-                <span className="text-sm font-medium tabular-nums">{s.day}</span>
-                <span className="text-xs text-muted-foreground">
-                  {rel ? `${rel}・` : ""}
-                  {(s.size / 1024).toFixed(0)} KB
-                </span>
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-                onClick={() => {
-                  setSelected(s);
-                  setConfirmText("");
-                }}
-              >
-                還原
-              </Button>
-            </div>
-          );
-        })}
-      </div>
+      <CollapsibleProgressList items={items} visibleCount={VISIBLE_COUNT} gapClassName="gap-2" />
 
       <p className="text-xs text-muted-foreground">
         每天凌晨自動備份，保留最近 {retentionDays} 天。
+        {!unlocked && (
+          <>
+            {" "}
+            <Link href="/upgrade?from=data-export" className="text-primary underline underline-offset-2">
+              解鎖後可回到 {paidRetentionDays} 天前
+            </Link>
+          </>
+        )}
       </p>
 
       <Dialog

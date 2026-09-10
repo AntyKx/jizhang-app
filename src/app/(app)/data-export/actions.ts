@@ -16,9 +16,15 @@ import {
   userSettings,
 } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
-import { requireCoreAccess } from "@/lib/entitlements";
+import { hasCoreAccess } from "@/lib/entitlements";
 import { backupSchema, type Backup } from "@/lib/backup-schema";
-import { listSnapshots, readSnapshot } from "@/lib/backup-snapshots";
+import {
+  FREE_RETENTION_DAYS,
+  PAID_RETENTION_DAYS,
+  readSnapshot,
+  retentionCutoff,
+} from "@/lib/backup-snapshots";
+import { getTodayInTaipei } from "@/lib/date";
 import { fail } from "@/lib/action-result";
 
 // The neon-http driver has no interactive `db.transaction`, but does support
@@ -135,10 +141,12 @@ async function applyBackup(userId: string, parsed: Backup) {
   revalidatePath("/", "layout");
 }
 
-// Restore from a file the user uploaded themselves.
+// Restore from a file the user uploaded themselves. Free for everyone —
+// recovering your own data was never what the core unlock is for (see the
+// same reasoning on /api/export/backup); what it buys is how far back the
+// cloud snapshots below reach.
 export async function restoreBackup(backupJson: string) {
   const userId = await requireUserId();
-  await requireCoreAccess(userId, "restore-backup");
 
   let parsed;
   try {
@@ -155,9 +163,21 @@ export async function restoreBackup(backupJson: string) {
 // pointed at another account's snapshot.
 export async function restoreFromSnapshot(day: string) {
   const userId = await requireUserId();
-  await requireCoreAccess(userId, "restore-backup");
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return fail("備份日期格式錯誤");
+
+  // Enforced here rather than relying on pruning having already run: a
+  // snapshot can outlive the window between nightly passes, or after a
+  // downgrade, and it must not become reachable just because cleanup
+  // hasn't caught up.
+  const unlocked = await hasCoreAccess(userId);
+  if (day < retentionCutoff(getTodayInTaipei(), unlocked)) {
+    return fail(
+      unlocked
+        ? `只能還原最近 ${PAID_RETENTION_DAYS} 天內的雲端備份`
+        : `免費版只能還原最近 ${FREE_RETENTION_DAYS} 天內的雲端備份，解鎖後可回到 ${PAID_RETENTION_DAYS} 天前`,
+    );
+  }
 
   let contents: string | null;
   try {
@@ -180,11 +200,4 @@ export async function restoreFromSnapshot(day: string) {
   }
 
   return applyBackup(userId, parsed);
-}
-
-// Powers the point-in-time list in the UI.
-export async function getMySnapshots() {
-  const userId = await requireUserId();
-  await requireCoreAccess(userId, "restore-backup");
-  return listSnapshots(userId);
 }
