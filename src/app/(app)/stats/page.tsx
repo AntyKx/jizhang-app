@@ -4,13 +4,15 @@ import { transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { detectSpendingAnomalies } from "@/lib/analytics";
 import { resolveStatsRange } from "@/lib/stats/range";
-import { getPreviousPeriodTotals } from "@/lib/stats/overview-queries";
+import { getCumulativeSpending, getPreviousPeriodTotals } from "@/lib/stats/overview-queries";
 import { getCategoryBreakdown } from "@/lib/stats/category-queries";
 import { MonthlySummaryCard } from "@/components/stats/monthly-summary-card";
 import { CollapsibleProgressList } from "@/components/stats/collapsible-progress-list";
 import { StatsTabNav } from "@/components/stats/stats-tab-nav";
 import { StatsRangeSwitcher } from "@/components/stats/stats-range-switcher";
 import { CategoryOverviewList } from "@/components/stats/category-overview-list";
+import { CumulativeSpendChart } from "@/components/stats/cumulative-spend-chart";
+import { SavingsRateCard } from "@/components/stats/savings-rate-card";
 import { StaggerList } from "@/components/motion/stagger-list";
 import { CountUpNumber } from "@/components/motion/count-up-number";
 import { BearIllustration } from "@/components/bear-illustration";
@@ -25,7 +27,7 @@ export default async function StatsPage({
   const params = await searchParams;
   const range = resolveStatsRange(params);
 
-  const [rangeTransactions, anomalies, prevTotals, expenseCategories] = await Promise.all([
+  const [rangeTransactions, anomalies, prevTotals, expenseCategories, cumulative] = await Promise.all([
     db
       .select({ type: transactions.type, amount: transactions.amount, exchangeRate: transactions.exchangeRate })
       .from(transactions)
@@ -39,6 +41,7 @@ export default async function StatsPage({
     detectSpendingAnomalies(userId, range.end),
     getPreviousPeriodTotals(userId, range),
     getCategoryBreakdown(userId, range, "expense"),
+    getCumulativeSpending(userId, range),
   ]);
 
   const income = rangeTransactions
@@ -50,6 +53,9 @@ export default async function StatsPage({
   const balance = income - expense;
 
   const expensePctChange = prevTotals.expense > 0 ? ((expense - prevTotals.expense) / prevTotals.expense) * 100 : null;
+  const savingsRate = income > 0 ? ((income - expense) / income) * 100 : null;
+  const prevSavingsRate =
+    prevTotals.income > 0 ? ((prevTotals.income - prevTotals.expense) / prevTotals.income) * 100 : null;
 
   return (
     <>
@@ -89,6 +95,11 @@ export default async function StatsPage({
           </div>
         </div>
 
+        {/* Sits directly under the income/expense row it's derived from —
+            the same three numbers expressed as the one rate that actually
+            says whether the period went well. */}
+        <SavingsRateCard income={income} expense={expense} rate={savingsRate} previousRate={prevSavingsRate} />
+
         <section className="flex flex-col gap-2">
           <h2 className="text-sm font-semibold text-muted-foreground">支出與上期比較</h2>
           {expensePctChange === null ? (
@@ -104,6 +115,15 @@ export default async function StatsPage({
               {Math.abs(Math.round(expensePctChange))}%
             </p>
           )}
+        </section>
+
+        {/* Moved up from the old 進階分析 tab — "am I burning through this
+            month too fast" is a this-month question, and with the budget
+            pace line it's the one chart here you'd actually act on
+            mid-period rather than review afterwards. */}
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold text-muted-foreground">支出步調</h2>
+          <CumulativeSpendChart data={cumulative} />
         </section>
 
         <section className="flex flex-col gap-2">
