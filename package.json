@@ -19,6 +19,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@gsap/react": "^2.1.2",
     "@neondatabase/serverless": "^1.1.0",
+    "@vercel/blob": "^2.8.0",
     "ai": "^7.0.35",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

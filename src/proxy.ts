@@ -7,6 +7,10 @@ const isPublicRoute = createRouteMatcher([
   "/terms",
   "/privacy",
   "/api/webhooks/stripe",
+  // Called by Vercel Cron, which has no Clerk session — "public" to this
+  // middleware only. The route itself is not open: it requires a Bearer
+  // CRON_SECRET and refuses outright when that env var is missing.
+  "/api/cron(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
