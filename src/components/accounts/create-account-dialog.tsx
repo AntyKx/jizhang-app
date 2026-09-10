@@ -23,7 +23,7 @@ import { createAccount } from "@/app/(app)/accounts/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { accountTypeLabels, type AccountType } from "@/lib/account-type";
-import { supportedCurrencies } from "@/lib/currency";
+import { currencyAllowsDecimal, supportedCurrencies } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
 const statementDayItems = Object.fromEntries(
@@ -33,6 +33,7 @@ const statementDayItems = Object.fromEntries(
 export function CreateAccountDialog({ defaultCurrency = "TWD" }: { defaultCurrency?: string }) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<AccountType>("bank");
+  const [currency, setCurrency] = useState(defaultCurrency);
   const [initialBalance, setInitialBalance] = useState("");
   const [excludeFromNetWorth, setExcludeFromNetWorth] = useState(false);
   const [statementDay, setStatementDay] = useState<string | undefined>(undefined);
@@ -65,6 +66,7 @@ export function CreateAccountDialog({ defaultCurrency = "TWD" }: { defaultCurren
             setInitialBalance("");
             setExcludeFromNetWorth(false);
             setType("bank");
+            setCurrency(defaultCurrency);
             setStatementDay(undefined);
           }}
           className="flex flex-col gap-4"
@@ -116,7 +118,7 @@ export function CreateAccountDialog({ defaultCurrency = "TWD" }: { defaultCurren
           )}
           <div className="flex flex-col gap-2">
             <Label htmlFor="currency">幣別</Label>
-            <Select name="currency" defaultValue={defaultCurrency} items={supportedCurrencies}>
+            <Select name="currency" defaultValue={defaultCurrency} items={supportedCurrencies} onValueChange={(v) => v && setCurrency(v)}>
               <SelectTrigger id="currency">
                 <SelectValue />
               </SelectTrigger>
@@ -131,7 +133,7 @@ export function CreateAccountDialog({ defaultCurrency = "TWD" }: { defaultCurren
           </div>
           <div className="flex flex-col gap-2">
             <Label>期初餘額</Label>
-            <AmountKeypadField value={initialBalance} onChange={setInitialBalance} />
+            <AmountKeypadField value={initialBalance} onChange={setInitialBalance} allowDecimal={currencyAllowsDecimal(currency)} />
           </div>
 
           <button

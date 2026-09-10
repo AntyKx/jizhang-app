@@ -12,9 +12,10 @@ import {
 import { and, eq, gte, lte } from "drizzle-orm";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { db } from "@/db";
-import { accounts, categories, sharedExpenses, transactions, userSettings } from "@/db/schema";
+import { accounts, categories, sharedExpenses, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { listAccounts } from "@/lib/account";
+import { deriveSplitFields, getFrequentSplitNames } from "@/lib/shared-expenses";
 import { PaymentMethodIcon } from "@/components/transactions/payment-method-icon";
 import { CategoryIcon } from "@/components/category-icon";
 import { TodayTransactionRow } from "@/components/record/today-transaction-row";
@@ -48,7 +49,7 @@ export default async function CalendarPage({
   const todayKey = format(today, "yyyy-MM-dd");
   const selectedDay = params.day ?? (monthKey === format(today, "yyyy-MM") ? todayKey : null);
 
-  const [monthTransactionRows, userCategories, userAccounts, settingsRows] = await Promise.all([
+  const [monthTransactionRows, userCategories, userAccounts, frequentSplitNames] = await Promise.all([
     db
       .select({
         id: transactions.id,
@@ -66,8 +67,7 @@ export default async function CalendarPage({
         paymentMethod: transactions.paymentMethod,
         accountId: transactions.accountId,
         accountName: accounts.name,
-        sharedExpenseId: sharedExpenses.id,
-        sharedExpensePaidByMe: sharedExpenses.paidByMe,
+        sharedExpenseParticipants: sharedExpenses.participants,
       })
       .from(transactions)
       .leftJoin(categories, eq(transactions.categoryId, categories.id))
@@ -86,18 +86,13 @@ export default async function CalendarPage({
       .where(eq(categories.userId, userId))
       .orderBy(categories.sortOrder),
     listAccounts(userId),
-    db
-      .select({ partnerName: userSettings.partnerName })
-      .from(userSettings)
-      .where(eq(userSettings.userId, userId)),
+    getFrequentSplitNames(userId),
   ]);
 
-  const partnerName = settingsRows[0]?.partnerName || "另一半";
-  const monthTransactions = monthTransactionRows.map((t) => ({
-    ...t,
-    isSharedExpense: t.sharedExpenseId !== null,
-    paidByMe: t.sharedExpensePaidByMe ?? true,
-  }));
+  const monthTransactions = monthTransactionRows.map((t) => {
+    const { sharedExpenseParticipants, ...rest } = t;
+    return { ...rest, ...deriveSplitFields(sharedExpenseParticipants) };
+  });
 
   const byDay = new Map<string, { income: number; expense: number }>();
   for (const t of monthTransactions) {
@@ -246,7 +241,7 @@ export default async function CalendarPage({
                 categories={userCategories}
                 accounts={userAccounts.filter((a) => !a.excludeFromNetWorth)}
                 showAccount={userAccounts.length > 1}
-                partnerName={partnerName}
+                frequentSplitNames={frequentSplitNames}
               />
             ))}
           </StaggerList>

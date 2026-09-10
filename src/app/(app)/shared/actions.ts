@@ -4,7 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/db";
-import { sharedExpenses, transactions, userSettings } from "@/db/schema";
+import { sharedExpenses, transactions, type SplitParticipant } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { requireCoreAccess } from "@/lib/entitlements";
 import { getDefaultAccountId } from "@/lib/account";
@@ -17,185 +17,193 @@ function revalidateSharedPaths() {
   revalidatePath("/shared");
 }
 
-type SettleableExpense = {
-  amount: string;
-  paidByMe: boolean;
-  categoryId: string | null;
-  name: string;
-  linkedTransactionId: string | null;
-};
-
-// Settling records the other half's reimbursement as a real personal
-// transaction — a settled "I paid" expense means the partner paid me back
-// (income), a settled "partner paid" expense means I paid my share back to
-// them (expense). Without this, personal stats would keep showing the full
-// original amount forever, even after the money actually changed hands.
-async function createSettlementTransaction(userId: string, expense: SettleableExpense) {
-  const half = Number(expense.amount) / 2;
-
+// Settling records the other side's reimbursement as a real personal
+// transaction — a settled "they owe me" participant means they paid me back
+// (income), a settled "I owe them" participant means I paid my share to them
+// (expense). Without this, personal stats would keep showing the split as
+// outstanding forever, even after the money actually changed hands.
+async function createSettlementTransaction(
+  userId: string,
+  input: { amount: string; iOwe: boolean; categoryId: string | null; label: string; linkedTransactionId: string | null },
+) {
   let accountId: string | undefined;
-  if (expense.linkedTransactionId) {
+  if (input.linkedTransactionId) {
     const [linked] = await db
       .select({ accountId: transactions.accountId })
       .from(transactions)
-      .where(and(eq(transactions.id, expense.linkedTransactionId), eq(transactions.userId, userId)));
+      .where(and(eq(transactions.id, input.linkedTransactionId), eq(transactions.userId, userId)));
     accountId = linked?.accountId;
   }
   if (!accountId) accountId = await getDefaultAccountId(userId);
 
-  // Returned so the caller can stamp it onto settlementTransactionId —
-  // unsettleSharedExpense needs it to know exactly which transaction to
-  // delete when reverting a mistaken settlement.
   return createTransaction({
-    categoryId: expense.categoryId ?? undefined,
-    type: expense.paidByMe ? "income" : "expense",
-    amount: half,
+    categoryId: input.categoryId ?? undefined,
+    type: input.iOwe ? "expense" : "income",
+    amount: Number(input.amount),
     accountId,
-    note: `分帳結算：${expense.name}`,
+    note: `分帳結算：${input.label}`,
     occurredAt: todayInTaipeiString(),
   });
 }
 
-const sharedExpenseInputSchema = z.object({
-  name: z.string().min(1).max(50),
+const participantInputSchema = z.object({
+  name: z.string().min(1).max(30),
   amount: z.coerce.number().positive(),
-  paidByMe: z.boolean(),
-  categoryId: z.string().uuid().optional(),
-  occurredAt: z.string().min(1),
+  iOwe: z.boolean(),
 });
 
-async function insertParsedSharedExpense(userId: string, parsed: z.infer<typeof sharedExpenseInputSchema>) {
+const splitExpenseInputSchema = z.object({
+  name: z.string().min(1).max(50),
+  categoryId: z.string().uuid().optional(),
+  occurredAt: z.string().min(1),
+  participants: z.array(participantInputSchema).min(1).max(20),
+});
+
+function toParticipantRows(input: z.infer<typeof participantInputSchema>[]): SplitParticipant[] {
+  return input.map((p) => ({
+    name: p.name.trim(),
+    amount: p.amount.toString(),
+    iOwe: p.iOwe,
+    isSettled: false,
+    settledAt: null,
+    settlementTransactionId: null,
+    settlementBatchId: null,
+  }));
+}
+
+// Standalone split (no linked personal transaction) — used by the /shared
+// page's manual "新增分帳支出" dialog and its AI quick-add. A transaction-
+// entry-flow split (the common "I paid, N friends owe me" case) is created
+// directly in transactions/actions.ts's createTransaction instead, since it
+// also has to insert the real transaction + balance update atomically.
+export async function createSplitExpense(input: {
+  name: string;
+  categoryId?: string;
+  occurredAt: string;
+  participants: { name: string; amount: number; iOwe: boolean }[];
+}) {
+  const userId = await requireUserId();
+  await requireCoreAccess(userId, "shared");
+  const parsed = splitExpenseInputSchema.parse(input);
+
   await db.insert(sharedExpenses).values({
     userId,
-    paidByMe: parsed.paidByMe,
     categoryId: parsed.categoryId,
     name: parsed.name,
-    amount: parsed.amount.toString(),
     occurredAt: parsed.occurredAt,
+    participants: toParticipantRows(parsed.participants),
   });
 
   revalidateSharedPaths();
 }
 
-export async function createSharedExpense(formData: FormData) {
-  const userId = await requireUserId();
-  await requireCoreAccess(userId, "shared");
-  const categoryIdRaw = formData.get("categoryId");
-  const parsed = sharedExpenseInputSchema.parse({
-    name: formData.get("name"),
-    amount: formData.get("amount"),
-    paidByMe: formData.get("paidByMe") === "true",
-    categoryId: categoryIdRaw ? String(categoryIdRaw) : undefined,
-    occurredAt: formData.get("occurredAt"),
-  });
-
-  await insertParsedSharedExpense(userId, parsed);
-}
-
-// Used by the AI quick-add flow, which already has a parsed draft object
-// rather than a <form>'s FormData.
-export async function createSharedExpenseFromDraft(input: {
-  name: string;
-  amount: number;
-  paidByMe: boolean;
-  categoryId?: string;
-  occurredAt: string;
-}) {
-  const userId = await requireUserId();
-  await requireCoreAccess(userId, "shared");
-  const parsed = sharedExpenseInputSchema.parse(input);
-  await insertParsedSharedExpense(userId, parsed);
-}
-
-const updateSharedExpenseSchema = sharedExpenseInputSchema.extend({
+const updateSplitExpenseSchema = splitExpenseInputSchema.extend({
   id: z.string().uuid(),
 });
 
-// Only unsettled expenses can be edited — a settled one already has a
-// reimbursement transaction recorded against its original amount/payer, and
-// changing those numbers afterward would silently desync the two.
-export async function updateSharedExpense(input: {
+// Only a split with no settled participants can be edited — a settled
+// participant already has a reimbursement transaction recorded against its
+// original amount, and changing the numbers afterward would silently desync
+// the two (same rule as the old single-counterparty version).
+export async function updateSplitExpense(input: {
   id: string;
   name: string;
-  amount: number;
-  paidByMe: boolean;
   categoryId?: string;
   occurredAt: string;
+  participants: { name: string; amount: number; iOwe: boolean }[];
 }) {
   const userId = await requireUserId();
   await requireCoreAccess(userId, "shared");
-  const parsed = updateSharedExpenseSchema.parse(input);
+  const parsed = updateSplitExpenseSchema.parse(input);
 
   const [existing] = await db
-    .select({ isSettled: sharedExpenses.isSettled })
+    .select({ participants: sharedExpenses.participants })
     .from(sharedExpenses)
     .where(and(eq(sharedExpenses.id, parsed.id), eq(sharedExpenses.userId, userId)));
   if (!existing) return fail("找不到指定的分帳支出");
-  if (existing.isSettled) return fail("已結清的項目無法編輯");
+  if (existing.participants.some((p) => p.isSettled)) return fail("已有對象結清的項目無法編輯");
 
   await db
     .update(sharedExpenses)
     .set({
       name: parsed.name,
-      amount: parsed.amount.toString(),
-      paidByMe: parsed.paidByMe,
       categoryId: parsed.categoryId ?? null,
       occurredAt: parsed.occurredAt,
+      participants: toParticipantRows(parsed.participants),
     })
     .where(and(eq(sharedExpenses.id, parsed.id), eq(sharedExpenses.userId, userId)));
 
   revalidateSharedPaths();
 }
 
-export async function settleSharedExpense(expenseId: string) {
+export async function settleParticipant(sharedExpenseId: string, participantIndex: number) {
   const userId = await requireUserId();
   await requireCoreAccess(userId, "shared");
 
-  const [expense] = await db
+  const [row] = await db
     .select()
     .from(sharedExpenses)
-    .where(and(eq(sharedExpenses.id, expenseId), eq(sharedExpenses.userId, userId)));
-  if (!expense || expense.isSettled) return;
+    .where(and(eq(sharedExpenses.id, sharedExpenseId), eq(sharedExpenses.userId, userId)));
+  if (!row) return fail("找不到指定的分帳項目");
+  const participant = row.participants[participantIndex];
+  if (!participant || participant.isSettled) return;
 
   // Record the reimbursement first — if it fails (e.g. an FX lookup fails
-  // for a foreign-currency account), the expense stays unsettled instead of
-  // silently losing the money it was supposed to represent.
-  const settlement = await createSettlementTransaction(userId, expense);
+  // for a foreign-currency account), the participant stays unsettled instead
+  // of silently losing the money it was supposed to represent.
+  const settlement = await createSettlementTransaction(userId, {
+    amount: participant.amount,
+    iOwe: participant.iOwe,
+    categoryId: row.categoryId,
+    label: `${row.name}（${participant.name}）`,
+    linkedTransactionId: row.linkedTransactionId,
+  });
   if (isFail(settlement)) return settlement;
 
-  // settlementTransactionId is what lets unsettleSharedExpense find and
-  // remove exactly this reimbursement later, if this settle turns out to be
-  // a mistake.
+  const nextParticipants = [...row.participants];
+  nextParticipants[participantIndex] = {
+    ...participant,
+    isSettled: true,
+    settledAt: new Date().toISOString(),
+    settlementTransactionId: settlement.id,
+  };
+
   await db
     .update(sharedExpenses)
-    .set({ isSettled: true, settledAt: new Date(), settlementTransactionId: settlement.id })
-    .where(and(eq(sharedExpenses.id, expenseId), eq(sharedExpenses.userId, userId)));
+    .set({ participants: nextParticipants })
+    .where(and(eq(sharedExpenses.id, sharedExpenseId), eq(sharedExpenses.userId, userId)));
 
   revalidateSharedPaths();
 }
 
-// Bulk settle nets everything into a single reimbursement transaction
-// instead of one per expense — individual settle (above) still records one
-// transaction per item, since there's exactly one thing being settled.
-// Accepts an optional date range so a specific stretch (e.g. "just July")
-// can be settled without touching older unsettled items outside it.
-export async function settleAllSharedExpenses(range?: { from?: string; to?: string }) {
+// Bulk-settles every unsettled participant across every split event that
+// matches `name`, netted into a single reimbursement transaction instead of
+// one per item — mirrors the old settleAllSharedExpenses, just scoped to one
+// counterparty's name (the /shared page's per-person "全部結清" button)
+// instead of the whole book, since there's no longer a single fixed partner
+// to settle everything against at once.
+export async function settleAllForName(name: string, range?: { from?: string; to?: string }) {
   const userId = await requireUserId();
   await requireCoreAccess(userId, "shared");
 
-  const conditions = [eq(sharedExpenses.userId, userId), eq(sharedExpenses.isSettled, false)];
+  const conditions = [eq(sharedExpenses.userId, userId)];
   if (range?.from) conditions.push(gte(sharedExpenses.occurredAt, range.from));
   if (range?.to) conditions.push(lte(sharedExpenses.occurredAt, range.to));
 
-  const unsettled = await db
+  const rows = await db
     .select()
     .from(sharedExpenses)
     .where(and(...conditions));
-  if (unsettled.length === 0) return;
 
-  // Same ordering fix as settleSharedExpense: record the net reimbursement
-  // first, only mark everything settled once that succeeds.
-  const net = computeNetBalance(unsettled);
+  const targets = rows
+    .flatMap((row) =>
+      row.participants
+        .map((p, participantIndex) => ({ row, p, participantIndex }))
+        .filter(({ p }) => p.name === name && !p.isSettled),
+    );
+  if (targets.length === 0) return;
+
+  const net = computeNetBalance(targets.map((t) => t.p));
   let settlementTransactionId: string | null = null;
   if (Math.abs(net) >= 1) {
     const accountId = await getDefaultAccountId(userId);
@@ -203,99 +211,108 @@ export async function settleAllSharedExpenses(range?: { from?: string; to?: stri
       type: net > 0 ? "income" : "expense",
       amount: Math.abs(net),
       accountId,
-      note: `分帳一鍵結清（共 ${unsettled.length} 筆）`,
+      note: `分帳一鍵結清（${name}，共 ${targets.length} 筆）`,
       occurredAt: todayInTaipeiString(),
     });
     if (isFail(settlement)) return settlement;
     settlementTransactionId = settlement.id;
   }
 
-  // All items settled in this call share one settlementBatchId (and, when
-  // there was a nonzero net, the same single settlementTransactionId) —
-  // unsettleSharedExpense uses that to revert the whole batch together,
-  // since there's no way to split that one net transaction back out per
-  // item.
   const settlementBatchId = crypto.randomUUID();
+  const settledAt = new Date().toISOString();
 
-  await db
-    .update(sharedExpenses)
-    .set({ isSettled: true, settledAt: new Date(), settlementTransactionId, settlementBatchId })
-    .where(and(...conditions));
+  // Group targets back by their source row so each row is updated once with
+  // all of its affected participants, instead of racing multiple updates
+  // against the same row.
+  const byRow = new Map<string, { row: (typeof targets)[number]["row"]; indices: Set<number> }>();
+  for (const t of targets) {
+    const entry = byRow.get(t.row.id) ?? { row: t.row, indices: new Set<number>() };
+    entry.indices.add(t.participantIndex);
+    byRow.set(t.row.id, entry);
+  }
+
+  for (const { row, indices } of byRow.values()) {
+    const nextParticipants = row.participants.map((p, i) =>
+      indices.has(i) ? { ...p, isSettled: true, settledAt, settlementTransactionId, settlementBatchId } : p,
+    );
+    await db
+      .update(sharedExpenses)
+      .set({ participants: nextParticipants })
+      .where(and(eq(sharedExpenses.id, row.id), eq(sharedExpenses.userId, userId)));
+  }
 
   revalidateSharedPaths();
 }
 
 // Reverts a mistaken settle — removes the reimbursement transaction it
-// produced (reversing its balance effect) and puts the shared-expense row(s)
-// back to unsettled. A batch-settled item shares its settlementBatchId with
-// every other item settled in the same settleAllSharedExpenses call, all
-// funded by one net transaction that can't be split back out per item, so
+// produced (reversing its balance effect) and puts the participant back to
+// unsettled. A batch-settled participant shares its settlementBatchId with
+// every other participant settled in the same settleAllForName call, all
+// funded by one net transaction that can't be split back out per person, so
 // reverting any one of them reverts the whole batch together.
-export async function unsettleSharedExpense(expenseId: string) {
+export async function unsettleParticipant(sharedExpenseId: string, participantIndex: number) {
   const userId = await requireUserId();
   await requireCoreAccess(userId, "shared");
 
-  const [expense] = await db
+  const [row] = await db
     .select()
     .from(sharedExpenses)
-    .where(and(eq(sharedExpenses.id, expenseId), eq(sharedExpenses.userId, userId)));
-  if (!expense || !expense.isSettled) return;
+    .where(and(eq(sharedExpenses.id, sharedExpenseId), eq(sharedExpenses.userId, userId)));
+  if (!row) return;
+  const participant = row.participants[participantIndex];
+  if (!participant || !participant.isSettled) return;
 
-  // Remove the reimbursement first — if it throws, the item stays settled
-  // instead of silently pretending the money never moved. A perfectly
-  // net-zero batch never had a settlement transaction to begin with (see
-  // settleAllSharedExpenses), hence the null check. Uses the unguarded
-  // deleteSettlementTransaction rather than the public deleteTransaction,
-  // since this *is* the sanctioned way to remove one.
-  if (expense.settlementTransactionId) {
-    await deleteSettlementTransaction(expense.settlementTransactionId);
+  if (participant.settlementTransactionId) {
+    await deleteSettlementTransaction(participant.settlementTransactionId);
   }
 
-  const batchCondition = expense.settlementBatchId
-    ? and(eq(sharedExpenses.settlementBatchId, expense.settlementBatchId), eq(sharedExpenses.userId, userId))
-    : and(eq(sharedExpenses.id, expenseId), eq(sharedExpenses.userId, userId));
+  const batchId = participant.settlementBatchId;
 
-  await db
-    .update(sharedExpenses)
-    .set({ isSettled: false, settledAt: null, settlementTransactionId: null, settlementBatchId: null })
-    .where(batchCondition);
+  // If this was part of a batch, every row's matching participants need the
+  // same revert — refetch everything for this user so a batch spanning
+  // multiple rows is reverted together, not just this one row.
+  const allRows = batchId
+    ? await db.select().from(sharedExpenses).where(eq(sharedExpenses.userId, userId))
+    : [row];
+
+  for (const r of allRows) {
+    let changed = false;
+    const nextParticipants = r.participants.map((p) => {
+      const matches = batchId ? p.settlementBatchId === batchId : r.id === row.id && p === participant;
+      if (!matches) return p;
+      changed = true;
+      return { ...p, isSettled: false, settledAt: null, settlementTransactionId: null, settlementBatchId: null };
+    });
+    if (changed) {
+      await db
+        .update(sharedExpenses)
+        .set({ participants: nextParticipants })
+        .where(and(eq(sharedExpenses.id, r.id), eq(sharedExpenses.userId, userId)));
+    }
+  }
 
   revalidateSharedPaths();
 }
 
-// Deleting a settled expense would erase the audit trail while the real
-// reimbursement transaction it produced (see settleSharedExpense) stays
-// behind unexplained — same rationale as the edit block above.
-export async function deleteSharedExpense(expenseId: string) {
+// Deleting a split with any settled participant would erase the audit trail
+// while the real reimbursement transaction(s) it produced stay behind
+// unexplained — same rationale as the edit block above. Only for standalone
+// (unlinked) splits; a linked one is removed by deleting its transaction
+// (see transactions/actions.ts), which cascades to this row.
+export async function deleteSplitExpense(sharedExpenseId: string) {
   const userId = await requireUserId();
   await requireCoreAccess(userId, "shared");
 
   const [existing] = await db
-    .select({ isSettled: sharedExpenses.isSettled })
+    .select({ participants: sharedExpenses.participants })
     .from(sharedExpenses)
-    .where(and(eq(sharedExpenses.id, expenseId), eq(sharedExpenses.userId, userId)));
+    .where(and(eq(sharedExpenses.id, sharedExpenseId), eq(sharedExpenses.userId, userId)));
   if (!existing) return;
-  if (existing.isSettled) return fail("已結清的項目無法刪除");
+  if (existing.participants.some((p) => p.isSettled)) return fail("已有對象結清的項目無法刪除");
 
   await db
     .delete(sharedExpenses)
-    .where(and(eq(sharedExpenses.id, expenseId), eq(sharedExpenses.userId, userId)));
-
-  revalidateSharedPaths();
-}
-
-export async function updatePartnerName(name: string) {
-  const userId = await requireUserId();
-  await requireCoreAccess(userId, "shared");
-  const trimmed = name.trim().slice(0, 30);
-
-  await db
-    .insert(userSettings)
-    .values({ userId, partnerName: trimmed || null })
-    .onConflictDoUpdate({
-      target: userSettings.userId,
-      set: { partnerName: trimmed || null },
-    });
+    .where(and(eq(sharedExpenses.id, sharedExpenseId), eq(sharedExpenses.userId, userId)));
 
   revalidateSharedPaths();
 }

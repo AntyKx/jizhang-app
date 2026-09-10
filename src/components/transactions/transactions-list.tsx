@@ -184,7 +184,7 @@ export function TransactionsList({
   accounts,
   accountsById,
   initialCursor,
-  partnerName,
+  frequentSplitNames,
   filter,
 }: {
   items: ListItem[];
@@ -192,7 +192,7 @@ export function TransactionsList({
   accounts: Account[];
   accountsById: Record<string, AccountInfo>;
   initialCursor: TransactionsCursor | null;
-  partnerName: string;
+  frequentSplitNames: string[];
   // Category/date-range narrowing carried over into "load more" so paging
   // stays inside the same filtered set the server already applied to
   // `items` — see /transactions's page.tsx.
@@ -289,7 +289,8 @@ export function TransactionsList({
         note: selected.note,
         occurredAt: selected.occurredAt,
         isSharedExpense: selected.isSharedExpense,
-        paidByMe: selected.paidByMe,
+        splitParticipants: selected.splitParticipants,
+        splitLocked: selected.splitLocked,
       }
     : null;
 
@@ -345,7 +346,7 @@ export function TransactionsList({
         transaction={editableTransaction}
         categories={categories}
         accounts={accounts}
-        partnerName={partnerName}
+        frequentSplitNames={frequentSplitNames}
         open={selected !== null}
         onOpenChange={(open) => !open && setSelected(null)}
         onSaved={() => router.refresh()}

@@ -20,3 +20,16 @@ export type CurrencyCode = keyof typeof supportedCurrencies;
 export function isSupportedCurrency(value: string): value is CurrencyCode {
   return value in supportedCurrencies;
 }
+
+// TWD and JPY are the two currencies actually in use here where a decimal
+// amount is never meaningful in daily spending — every other supported
+// currency (USD, EUR, etc.) keeps its decimal point, since a fractional
+// amount there is a real one (e.g. $12.50), not just visual clutter on the
+// keypad. Undefined/unrecognized currency defaults to allowing it, the
+// safer direction (never silently blocks a legitimate amount).
+const NO_DECIMAL_CURRENCIES = new Set(["TWD", "JPY"]);
+
+export function currencyAllowsDecimal(currency: string | undefined): boolean {
+  if (!currency) return true;
+  return !NO_DECIMAL_CURRENCIES.has(currency);
+}

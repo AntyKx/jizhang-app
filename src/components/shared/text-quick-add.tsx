@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { createSharedExpenseFromDraft } from "@/app/(app)/shared/actions";
+import { createSplitExpense } from "@/app/(app)/shared/actions";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
 import { todayInTaipeiString } from "@/lib/date";
@@ -17,20 +17,21 @@ type Category = { id: string; name: string; icon: string | null; color: string |
 type Draft = {
   amount: number;
   categoryName: string | null;
-  paidByMe: boolean;
+  counterpartyName: string;
+  iOwe: boolean;
   name: string;
   occurredAt: string;
 };
 
 export function SharedTextQuickAdd({
   categories,
-  partnerName,
+  frequentSplitNames,
   initialText,
   onDone,
   onCancel,
 }: {
   categories: Category[];
-  partnerName: string;
+  frequentSplitNames: string[];
   initialText?: string;
   onDone: () => void;
   onCancel: () => void;
@@ -78,7 +79,8 @@ export function SharedTextQuickAdd({
       setDraft({
         amount: 0,
         categoryName: null,
-        paidByMe: true,
+        counterpartyName: "",
+        iOwe: false,
         name: input,
         occurredAt: todayInTaipeiString(),
       });
@@ -95,14 +97,13 @@ export function SharedTextQuickAdd({
   }, []);
 
   function handleConfirm() {
-    if (!draft) return;
+    if (!draft || !draft.counterpartyName.trim()) return;
     startTransition(async () => {
-      await createSharedExpenseFromDraft({
+      await createSplitExpense({
         name: draft.name,
-        amount: draft.amount,
-        paidByMe: draft.paidByMe,
         categoryId: categoryId || undefined,
         occurredAt: draft.occurredAt,
+        participants: [{ name: draft.counterpartyName.trim(), amount: draft.amount, iOwe: draft.iOwe }],
       });
       toast.success(`已新增「${draft.name} NT$${draft.amount.toLocaleString("zh-TW")}」`);
       onDone();
@@ -120,12 +121,12 @@ export function SharedTextQuickAdd({
       </button>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="shared-quick-text">輸入一句話，例如「晚餐 1200 元，我付的」</Label>
+        <Label htmlFor="shared-quick-text">輸入一句話，例如「跟小美吃晚餐 1200 元，我付的」</Label>
         <Textarea
           id="shared-quick-text"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="晚餐 1200 元，我付的"
+          placeholder="跟小美吃晚餐 1200 元，我付的"
           rows={2}
           autoFocus
         />
@@ -138,7 +139,7 @@ export function SharedTextQuickAdd({
         <div className="flex flex-col gap-3 rounded-2xl border bg-card p-4">
           {parseFailed && (
             <p className="rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
-              ⚠️ AI 沒解析成功，原文已保留在項目名稱，請手動補金額
+              ⚠️ AI 沒解析成功，原文已保留在項目名稱，請手動補金額與分帳對象
             </p>
           )}
 
@@ -155,8 +156,33 @@ export function SharedTextQuickAdd({
                   setAmountText(text);
                   setDraft({ ...draft, amount: text === "" || text === "." ? 0 : Number(text) });
                 }}
+                allowDecimal={false}
               />
             </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label>分帳對象</Label>
+            <Input
+              value={draft.counterpartyName}
+              onChange={(e) => setDraft({ ...draft, counterpartyName: e.target.value })}
+              placeholder="姓名"
+              maxLength={30}
+            />
+            {frequentSplitNames.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {frequentSplitNames.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setDraft({ ...draft, counterpartyName: n })}
+                    className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
@@ -165,31 +191,27 @@ export function SharedTextQuickAdd({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label>付款人</Label>
+            <Label>方向</Label>
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setDraft({ ...draft, paidByMe: true })}
+                onClick={() => setDraft({ ...draft, iOwe: false })}
                 className={cn(
                   "flex-1 rounded-full border px-3 py-1.5 text-sm transition-colors",
-                  draft.paidByMe
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted",
+                  !draft.iOwe ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted",
                 )}
               >
-                我付的
+                對方欠我
               </button>
               <button
                 type="button"
-                onClick={() => setDraft({ ...draft, paidByMe: false })}
+                onClick={() => setDraft({ ...draft, iOwe: true })}
                 className={cn(
                   "flex-1 rounded-full border px-3 py-1.5 text-sm transition-colors",
-                  !draft.paidByMe
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted",
+                  draft.iOwe ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted",
                 )}
               >
-                {partnerName}付的
+                我欠對方
               </button>
             </div>
           </div>
@@ -203,7 +225,10 @@ export function SharedTextQuickAdd({
             />
           </div>
 
-          <Button onClick={handleConfirm} disabled={pending || !draft.amount || draft.amount <= 0}>
+          <Button
+            onClick={handleConfirm}
+            disabled={pending || !draft.amount || draft.amount <= 0 || !draft.counterpartyName.trim()}
+          >
             {pending ? "儲存中…" : "確認新增"}
           </Button>
         </div>

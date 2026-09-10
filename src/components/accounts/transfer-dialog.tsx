@@ -24,6 +24,7 @@ import { createTransfer } from "@/app/(app)/transactions/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { type AccountType } from "@/lib/account-type";
+import { currencyAllowsDecimal } from "@/lib/currency";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { todayInTaipeiString } from "@/lib/date";
 
@@ -146,12 +147,12 @@ export function TransferDialog({ accounts }: { accounts: Account[] }) {
 
           <div className="flex flex-col gap-2">
             <Label>金額</Label>
-            <AmountKeypadField value={amount} onChange={setAmount} />
+            <AmountKeypadField value={amount} onChange={setAmount} allowDecimal={currencyAllowsDecimal(fromCurrency)} />
           </div>
 
           <div className="flex flex-col gap-2">
             <Label>手續費（選填）</Label>
-            <AmountKeypadField value={fee} onChange={setFee} />
+            <AmountKeypadField value={fee} onChange={setFee} allowDecimal={currencyAllowsDecimal(fromCurrency)} />
             <p className="text-xs text-muted-foreground">手續費只會從轉出帳戶扣除，轉入帳戶不受影響。</p>
           </div>
 

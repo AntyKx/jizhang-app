@@ -21,7 +21,7 @@ export function AccountDetailTabs({
   categories,
   accounts,
   accountsById,
-  partnerName,
+  frequentSplitNames,
 }: {
   monthLabel: string;
   currentBalance: string;
@@ -32,7 +32,7 @@ export function AccountDetailTabs({
   categories: Category[];
   accounts: Account[];
   accountsById: Record<string, AccountInfo>;
-  partnerName: string;
+  frequentSplitNames: string[];
 }) {
   const [active, setActive] = useState<(typeof tabs)[number]["key"]>("overview");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -101,7 +101,7 @@ export function AccountDetailTabs({
           accounts={accounts}
           accountsById={accountsById}
           initialCursor={null}
-          partnerName={partnerName}
+          frequentSplitNames={frequentSplitNames}
         />
       )}
     </div>

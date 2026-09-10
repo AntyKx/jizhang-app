@@ -157,39 +157,51 @@
       radial-gradient(ellipse 70% 50% at 100% -10%, color-mix(in oklch, var(--primary) 14%, transparent), transparent 60%),
       radial-gradient(ellipse 60% 45% at -10% 100%, color-mix(in oklch, var(--accent) 14%, transparent), transparent 60%);
     background-attachment: fixed;
-    /* Paired with html's overscroll-behavior-y below — some WebKit
-       versions only honor it when it's set on both html and body. */
-    overscroll-behavior-y: none;
+    /* Paired with html's overscroll-behavior below — some WebKit versions
+       only honor it when it's set on both html and body. Both axes now,
+       not just Y — see the html rule's comment for why X was the missing
+       half of the "can still drag the edge into view" bug. */
+    overscroll-behavior: none;
+    /* Unconditional guarantee against a left-right drag, independent of
+       whatever's causing it (a still-possible pinch-zoom, a future stray
+       wide element) — no legitimate layout in this app is ever meant to
+       exceed the viewport's width, so clipping it here is never wrong,
+       only ever a safety net. Paired on both html and body for the same
+       reason overscroll-behavior-y is above. */
+    overflow-x: hidden;
   }
   html {
     @apply font-sans;
+    overflow-x: hidden;
     /* App-like touch behavior, not a webpage's — kills double-tap-to-zoom,
-       pinch-zoom, and the ~300ms tap delay, while normal single-axis
-       panning/scrolling still works fine (unlike touch-action:none, which
-       would break every scrollable list). Listing pan-x/pan-y explicitly
-       (instead of the `manipulation` keyword) is what also drops
-       pinch-zoom — `manipulation` is *defined* to still permit it
-       alongside panning, only double-tap-zoom is excluded from that one;
-       plain user testing on a real phone confirmed pinch-zoom was still
-       live under it. Deliberately CSS-only, same as before: the earlier
-       attempt at this used the viewport meta's user-scalable=no, which
-       broke env(safe-area-inset-*) on notch/Dynamic-Island phones — this
-       doesn't touch the viewport at all, so that risk doesn't apply here.
-       Individual elements can still set a *more* restrictive touch-action
-       (e.g. calendar's touch-none) since touch-action isn't inherited —
-       each element's own computed value is what's used. */
-    touch-action: pan-x pan-y;
+       pinch-zoom, and the ~300ms tap delay, while normal vertical
+       scrolling still works fine everywhere (unlike touch-action:none,
+       which would break every scrollable list). No pan-x here (dropped
+       after real-device testing kept finding a horizontal drag still
+       possible, landing in WebKit's rubber-band bounce and reading as
+       "swiping reveals the edge/backdrop" even on pages with nothing to
+       actually scroll to sideways — overscroll-behavion:none on its own
+       didn't stop it, because pan-x means the browser still recognizes and
+       starts that gesture at all, bounce or not). touch-action is NOT
+       inherited in the normal CSS sense, but a descendant can only ever
+       *restrict further* than an ancestor, never widen back past it — so
+       once pan-x is gone here, NOTHING under it can regain native
+       horizontal panning via touch-action alone, including legitimate
+       cases (see daily-spend-heatmap.tsx, which switched to its own
+       pointer-driven scroll instead of relying on this). Individual
+       elements can still restrict further still (e.g. calendar's
+       touch-none) since that direction always works. */
+    touch-action: pan-y;
     /* Kills iOS Safari's rubber-band bounce on the main document scroll.
-       Without this, scrolling a normal page (e.g. /record's transaction
-       list) to its edge and then tapping a nav tab mid-bounce can catch
-       WebKit's fixed-positioning mid-glitch — the visual and layout
-       viewports briefly disagree during momentum/overscroll, so a page
-       whose root is position:fixed (e.g. /calendar) can render torn, with
-       the previous page's scrolled content showing through underneath it
-       for a frame. Contained scroll boxes (e.g. calendar's own detail
-       list) keep their own overscroll-contain regardless — this only
-       stops the *document's* own bounce. */
-    overscroll-behavior-y: none;
+       Scrolling a normal page like /record's transaction list to its edge
+       and tapping a nav tab mid-bounce could catch WebKit's
+       fixed-positioning mid-glitch, tearing a position:fixed page like
+       /calendar for a frame. Both axes set even though pan-x above no
+       longer permits horizontal panning at all — belt and suspenders, and
+       matches body's own rule below. Contained scroll boxes (e.g.
+       calendar's own detail list) keep their own overscroll-contain
+       regardless — this only stops the *document's* own bounce. */
+    overscroll-behavior: none;
     /* Long-press text-selection/copy popup and iOS's "Copy/Share" callout
        read as a webpage, not an app — off everywhere except actual text
        inputs, which still need normal select/edit behavior. */

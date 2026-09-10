@@ -10,6 +10,7 @@ import {
   pgEnum,
   index,
   unique,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 export const accountTypeEnum = pgEnum("account_type", [
@@ -65,9 +66,6 @@ export const userSettings = pgTable("user_settings", {
   // set null on delete so removing the account just falls back to
   // getDefaultAccountId's oldest-account behavior instead of erroring.
   defaultAccountId: uuid("default_account_id").references(() => accounts.id, { onDelete: "set null" }),
-  // Display name for the other half of a single-user "分帳本" — a nominal
-  // counterparty, not a real second account (see sharedExpenses).
-  partnerName: text("partner_name"),
   // One-time purchase that permanently unlocks multi-account, advanced
   // stats, data export, and the shared ledger (see entitlements.ts).
   hasPurchasedCore: boolean("has_purchased_core").notNull().default(false),
@@ -224,43 +222,52 @@ export const budgets = pgTable("budgets", {
     .nullsNotDistinct(),
 ]);
 
+// One counterparty's share of a split expense. Lives inside
+// sharedExpenses.participants (a jsonb array) rather than as its own row —
+// keeps "one real transaction can be split N ways" from exploding the
+// transactions↔sharedExpenses join into N joined rows (it stays a plain 1:1
+// leftJoin on linkedTransactionId, same as before this table supported more
+// than one counterparty per item). Settling one participant just rewrites
+// their element in place; the settlement transaction it produces still goes
+// into the real transactions table like any other reimbursement.
+export type SplitParticipant = {
+  name: string;
+  amount: string;
+  // true = I owe this person their `amount`; false = they owe me. Kept per
+  // participant (not on the row) so a single ad-hoc split can't accidentally
+  // mix directions, but the data model doesn't forbid it either.
+  iOwe: boolean;
+  isSettled: boolean;
+  settledAt: string | null;
+  // The reimbursement transaction settleParticipant/settleAllForName
+  // produced when this participant was marked settled — lets
+  // unsettleParticipant find and delete exactly that transaction (reversing
+  // its balance effect) when reverting a mistaken settlement.
+  settlementTransactionId: string | null;
+  // Shared by every participant settled together in one settleAllForName
+  // call — they all point at the same settlementTransactionId (one net
+  // transaction for the whole batch), so reverting any one of them has to
+  // revert the whole batch at once, not just that participant.
+  settlementBatchId: string | null;
+};
+
 export const sharedExpenses = pgTable("shared_expenses", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id").notNull(), // owner of this single-user "分帳本"
-  // No real second account — the counterparty is a nominal name
-  // (userSettings.partnerName), so "who paid" is just a boolean.
-  paidByMe: boolean("paid_by_me").notNull().default(true),
+  userId: text("user_id").notNull(),
   categoryId: uuid("category_id").references(() => categories.id, {
     onDelete: "set null",
   }),
   name: text("name").notNull(),
-  amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
   note: text("note"),
   occurredAt: date("occurred_at").notNull(),
-  isSettled: boolean("is_settled").notNull().default(false),
-  settledAt: timestamp("settled_at"),
-  // Set only when this row was auto-created from the "分帳" checkbox on a
+  // Set only when this row was auto-created from the "分帳" section on a
   // personal transaction. Cascades so deleting the source transaction
-  // removes the shared-ledger copy too, instead of leaving an orphaned row
+  // removes the split-ledger copy too, instead of leaving an orphaned row
   // behind.
   linkedTransactionId: uuid("linked_transaction_id").references(() => transactions.id, {
     onDelete: "cascade",
   }),
-  // The reimbursement transaction settleSharedExpense/settleAllSharedExpenses
-  // produced when this item was marked settled — lets unsettleSharedExpense
-  // find and delete exactly that transaction (reversing its balance effect)
-  // when reverting a mistaken settlement. "set null" (not cascade) so
-  // deleting the transaction some other way doesn't also silently delete
-  // this shared-expense row — see the settlement-transaction guard in
-  // transactions/actions.ts's deleteTransaction, which blocks that path.
-  settlementTransactionId: uuid("settlement_transaction_id").references(() => transactions.id, {
-    onDelete: "set null",
-  }),
-  // Shared by every item settled together in one settleAllSharedExpenses
-  // call — they all point at the same settlementTransactionId (one net
-  // transaction for the whole batch), so reverting any one of them has to
-  // revert the whole batch at once, not just that row.
-  settlementBatchId: uuid("settlement_batch_id"),
+  participants: jsonb("participants").notNull().$type<SplitParticipant[]>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("shared_expenses_user_idx").on(table.userId),

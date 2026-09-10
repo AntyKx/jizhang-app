@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createSharedExpense } from "@/app/(app)/shared/actions";
+import { createSplitExpense } from "@/app/(app)/shared/actions";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
 import { todayInTaipeiString } from "@/lib/date";
@@ -20,14 +20,14 @@ import { cn } from "@/lib/utils";
 type Category = { id: string; name: string; icon: string | null; color: string | null };
 
 export function AddSharedExpenseDialog({
-  partnerName,
   categories,
+  frequentSplitNames,
   defaultDate,
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
 }: {
-  partnerName: string;
   categories: Category[];
+  frequentSplitNames: string[];
   // Context default from wherever this dialog was opened — e.g. a specific
   // day selected on /calendar. Omitted everywhere else, falls back to today.
   defaultDate?: string;
@@ -43,11 +43,13 @@ export function AddSharedExpenseDialog({
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : uncontrolledOpen;
   const setOpen = controlledOnOpenChange ?? setUncontrolledOpen;
-  const [paidByMe, setPaidByMe] = useState(true);
+  const [iOwe, setIOwe] = useState(false);
+  const [name, setName] = useState("");
+  const [counterpartyName, setCounterpartyName] = useState("");
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [occurredAt, setOccurredAt] = useState(defaultDate ?? todayInTaipeiString());
-  const formRef = useRef<HTMLFormElement>(null);
+  const [pending, setPending] = useState(false);
 
   // Re-seed the date right when the dialog opens (render-phase state
   // adjustment, same pattern as EditTransactionDialog) rather than on every
@@ -61,6 +63,32 @@ export function AddSharedExpenseDialog({
     if (open) setOccurredAt(defaultDate ?? todayInTaipeiString());
   }
 
+  function reset() {
+    setIOwe(false);
+    setName("");
+    setCounterpartyName("");
+    setAmount("");
+    setCategoryId("");
+    setOccurredAt(defaultDate ?? todayInTaipeiString());
+  }
+
+  async function handleSubmit() {
+    if (!name.trim() || !counterpartyName.trim() || !amount || Number(amount) <= 0) return;
+    setPending(true);
+    try {
+      await createSplitExpense({
+        name: name.trim(),
+        categoryId: categoryId || undefined,
+        occurredAt,
+        participants: [{ name: counterpartyName.trim(), amount: Number(amount), iOwe }],
+      });
+      setOpen(false);
+      reset();
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {!isControlled && <DialogTrigger render={<Button />}>新增分帳支出</DialogTrigger>}
@@ -68,71 +96,75 @@ export function AddSharedExpenseDialog({
         <DialogHeader>
           <DialogTitle>新增分帳支出</DialogTitle>
         </DialogHeader>
-        <form
-          ref={formRef}
-          action={async (formData) => {
-            await createSharedExpense(formData);
-            setOpen(false);
-            setPaidByMe(true);
-            formRef.current?.reset();
-            setAmount("");
-            setCategoryId("");
-            setOccurredAt(defaultDate ?? todayInTaipeiString());
-          }}
-          className="flex flex-col gap-4"
-        >
-          <input type="hidden" name="paidByMe" value={paidByMe ? "true" : "false"} />
-
+        <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="shared-name">項目</Label>
-            <Input id="shared-name" name="name" placeholder="例：晚餐" required />
+            <Input id="shared-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：晚餐" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
               <Label>金額</Label>
-              <AmountKeypadField value={amount} onChange={setAmount} />
-              <input type="hidden" name="amount" value={amount} />
+              <AmountKeypadField value={amount} onChange={setAmount} allowDecimal={false} />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="shared-occurredAt">日期</Label>
               <Input
                 id="shared-occurredAt"
-                name="occurredAt"
                 type="date"
                 value={occurredAt}
                 onChange={(e) => setOccurredAt(e.target.value)}
-                required
               />
             </div>
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label>付款人</Label>
+            <Label htmlFor="shared-counterparty">分帳對象</Label>
+            <Input
+              id="shared-counterparty"
+              value={counterpartyName}
+              onChange={(e) => setCounterpartyName(e.target.value)}
+              placeholder="姓名"
+              maxLength={30}
+            />
+            {frequentSplitNames.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {frequentSplitNames.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setCounterpartyName(n)}
+                    className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label>方向</Label>
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setPaidByMe(true)}
+                onClick={() => setIOwe(false)}
                 className={cn(
                   "flex-1 rounded-full border px-3 py-1.5 text-sm transition-colors",
-                  paidByMe
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted",
+                  !iOwe ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted",
                 )}
               >
-                我付的
+                對方欠我
               </button>
               <button
                 type="button"
-                onClick={() => setPaidByMe(false)}
+                onClick={() => setIOwe(true)}
                 className={cn(
                   "flex-1 rounded-full border px-3 py-1.5 text-sm transition-colors",
-                  !paidByMe
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted",
+                  iOwe ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted",
                 )}
               >
-                {partnerName}付的
+                我欠對方
               </button>
             </div>
           </div>
@@ -140,13 +172,15 @@ export function AddSharedExpenseDialog({
           <div className="flex flex-col gap-2">
             <Label>分類（選填）</Label>
             <CategoryPickerSheet categories={categories} value={categoryId} onChange={setCategoryId} placeholder="不指定" />
-            <input type="hidden" name="categoryId" value={categoryId} />
           </div>
 
-          <Button type="submit" disabled={!amount || Number(amount) <= 0}>
-            新增
+          <Button
+            onClick={handleSubmit}
+            disabled={pending || !name.trim() || !counterpartyName.trim() || !amount || Number(amount) <= 0}
+          >
+            {pending ? "新增中…" : "新增"}
           </Button>
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
   );

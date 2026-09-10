@@ -1,49 +1,30 @@
-"use client";
-
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { settleAllSharedExpenses } from "@/app/(app)/shared/actions";
-import { isFail } from "@/lib/action-result";
-
+// Purely display now — settling used to be a single "一鍵結清" button here
+// because there was exactly one fixed partner to settle against. With N
+// different named counterparties, settling is inherently per-person (see
+// PersonGroupCard's own settle button), so this card just shows the
+// overall picture.
 export function BalanceCard({
-  partnerName,
   netBalance,
+  owedToMe,
+  iOweTotal,
   hasUnsettled,
   dateFrom,
   dateTo,
 }: {
-  partnerName: string;
   netBalance: number;
+  owedToMe: number;
+  iOweTotal: number;
   hasUnsettled: boolean;
   dateFrom?: string;
   dateTo?: string;
 }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-
-  function handleSettleAll() {
-    startTransition(async () => {
-      const result = await settleAllSharedExpenses({ from: dateFrom, to: dateTo });
-      if (isFail(result)) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success("已標記結清");
-      router.refresh();
-    });
-  }
-
   const rounded = Math.round(netBalance);
-  let headline: string;
-  if (Math.abs(rounded) < 1) {
-    headline = "目前已結清 🎉";
-  } else if (rounded > 0) {
-    headline = `${partnerName} 還需給你 NT$${rounded.toLocaleString("zh-TW")}`;
-  } else {
-    headline = `你還需給 ${partnerName} NT$${Math.abs(rounded).toLocaleString("zh-TW")}`;
-  }
+  const headline =
+    Math.abs(rounded) < 1
+      ? "目前已結清 🎉"
+      : rounded > 0
+        ? `別人共欠你 NT$${rounded.toLocaleString("zh-TW")}`
+        : `你共欠別人 NT$${Math.abs(rounded).toLocaleString("zh-TW")}`;
 
   const rangeLabel = dateFrom || dateTo ? `${dateFrom ?? "…"} ~ ${dateTo ?? "…"}` : "全部時間";
 
@@ -52,9 +33,14 @@ export function BalanceCard({
       <span className="text-sm text-muted-foreground">結算狀態・{rangeLabel}</span>
       <span className="text-xl font-semibold tabular-nums">{headline}</span>
       {hasUnsettled && (
-        <Button variant="secondary" disabled={pending} onClick={handleSettleAll} className="self-start">
-          {pending ? "處理中…" : dateFrom || dateTo ? "一鍵標記此區間已結清" : "一鍵標記已結清"}
-        </Button>
+        <div className="flex gap-4 text-sm">
+          <span className="text-muted-foreground">
+            別人欠你 <span className="font-semibold text-foreground tabular-nums">${owedToMe.toLocaleString("zh-TW")}</span>
+          </span>
+          <span className="text-muted-foreground">
+            你欠別人 <span className="font-semibold text-foreground tabular-nums">${iOweTotal.toLocaleString("zh-TW")}</span>
+          </span>
+        </div>
       )}
     </div>
   );

@@ -1,12 +1,13 @@
+import type { SplitParticipant } from "@/db/schema";
+
 /**
- * Net balance across all unsettled shared expenses, from "my" point of view.
- * Positive = the partner owes me; negative = I owe the partner.
+ * Net balance across a set of unsettled split participants, from "my" point
+ * of view. Positive = others owe me net; negative = I owe others net.
  */
-export function computeNetBalance(unsettledExpenses: { paidByMe: boolean; amount: string }[]): number {
+export function computeNetBalance(participants: Pick<SplitParticipant, "iOwe" | "amount">[]): number {
   let net = 0;
-  for (const expense of unsettledExpenses) {
-    const half = Number(expense.amount) / 2;
-    net += expense.paidByMe ? half : -half;
+  for (const p of participants) {
+    net += p.iOwe ? -Number(p.amount) : Number(p.amount);
   }
   return net;
 }

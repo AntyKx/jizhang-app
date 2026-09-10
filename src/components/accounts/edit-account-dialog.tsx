@@ -17,6 +17,7 @@ import { updateAccount } from "@/app/(app)/accounts/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { accountTypeLabels, type AccountType } from "@/lib/account-type";
+import { currencyAllowsDecimal } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
 type Account = {
@@ -141,7 +142,7 @@ export function EditAccountDialog({
 
           <div className="flex flex-col gap-2">
             <Label>期初餘額</Label>
-            <AmountKeypadField value={initialBalance} onChange={setInitialBalance} />
+            <AmountKeypadField value={initialBalance} onChange={setInitialBalance} allowDecimal={currencyAllowsDecimal(account?.currency)} />
             <p className="text-xs text-muted-foreground">
               修改這裡不會動到已經記錄的交易，只會依調整的差額更新目前餘額。
             </p>

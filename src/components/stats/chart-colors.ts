@@ -9,12 +9,6 @@ export const INCOME_COLOR = "#059669";
 export const EXPENSE_COLOR = "var(--destructive)";
 export const SLOT_1_COLOR = "#2a78d6";
 
-// Fixed identity pair for "you" vs "partner" in the shared-ledger trend chart
-// — deliberately not INCOME_COLOR/EXPENSE_COLOR, which already carry a
-// distinct income/expense meaning elsewhere in the app.
-export const ME_COLOR = SLOT_1_COLOR;
-export const PARTNER_COLOR = "#eb6834";
-
 // Sequential ramp for magnitude (heatmap) — same warm hue as --primary
 // (oklch hue ~38-40) instead of the cold blue this used to be, which read
 // as a generic dashboard color completely off the app's warm-cream/coral

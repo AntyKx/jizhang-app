@@ -2,13 +2,14 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { eq, and, or, lt, ne, desc, inArray, isNull, sql } from "drizzle-orm";
+import { eq, and, or, lt, ne, desc, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, categories, sharedExpenses, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { ownedCategoryId } from "@/lib/category";
 import { todayInTaipeiString } from "@/lib/date";
 import { getExchangeRateToTwd } from "@/lib/fx";
+import { deriveSplitFields } from "@/lib/shared-expenses";
 import {
   TRANSACTIONS_PAGE_SIZE,
   type ListItemRow,
@@ -40,6 +41,11 @@ function revalidateTransactionPaths() {
   revalidatePath("/accounts");
 }
 
+const splitParticipantInputSchema = z.object({
+  name: z.string().min(1).max(30),
+  amount: z.coerce.number().positive(),
+});
+
 const createTransactionSchema = z.object({
   categoryId: z.string().uuid().optional(),
   type: z.enum(["income", "expense"]),
@@ -51,8 +57,7 @@ const createTransactionSchema = z.object({
   note: z.string().max(200).optional(),
   merchant: z.string().max(100).optional(),
   occurredAt: z.string().min(1),
-  isSharedExpense: z.boolean().optional(),
-  paidByMe: z.boolean().optional(),
+  splitParticipants: z.array(splitParticipantInputSchema).max(20).optional(),
 });
 
 export async function createTransaction(input: {
@@ -64,38 +69,18 @@ export async function createTransaction(input: {
   note?: string;
   merchant?: string;
   occurredAt: string;
-  isSharedExpense?: boolean;
-  // Who paid the shared portion — only meaningful alongside isSharedExpense.
-  // Defaults to true (the account owner) so every other caller that never
-  // passes it keeps the old always-paidByMe behavior.
-  paidByMe?: boolean;
+  // People who owe me their share of this expense — I paid the full
+  // `amount` myself, so the transaction is always recorded in full; this
+  // just also creates a linked split-ledger entry for the shares I'm owed.
+  // The reverse ("someone else paid, I owe them") never touches any of my
+  // accounts, so it doesn't belong here — see shared/actions.ts's
+  // createSplitExpense for that standalone case instead.
+  splitParticipants?: { name: string; amount: number }[];
 }) {
   const userId = await requireUserId();
   const parsed = createTransactionSchema.parse(input);
   const { accountId } = parsed;
   const categoryId = await ownedCategoryId(userId, parsed.categoryId);
-
-  // Partner paid the whole thing — no money actually left any of my own
-  // accounts, so this doesn't belong in my personal transaction ledger at
-  // all (same as a plain "新增分帳支出" entry from /shared). Only my share
-  // becomes a real transaction later, at settlement (see
-  // shared/actions.ts's settleSharedExpense) — recording the full amount
-  // here too would double-count it.
-  if (parsed.isSharedExpense && parsed.type === "expense" && parsed.paidByMe === false) {
-    const [created] = await db
-      .insert(sharedExpenses)
-      .values({
-        userId,
-        paidByMe: false,
-        categoryId,
-        name: parsed.merchant || parsed.note || "分帳支出",
-        amount: parsed.amount.toString(),
-        occurredAt: parsed.occurredAt,
-      })
-      .returning({ id: sharedExpenses.id });
-    revalidateTransactionPaths();
-    return { id: created.id };
-  }
 
   const [ownedAccount] = await db
     .select({ id: accounts.id, currency: accounts.currency })
@@ -132,24 +117,30 @@ export async function createTransaction(input: {
     .set({ currentBalance: sql`${accounts.currentBalance} + ${delta}` })
     .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)));
 
-  // "分帳" checkbox reaching here always means I paid (the paidByMe===false
-  // case returned early above without ever creating this transaction).
-  // Linked so deleting this transaction cascades to remove the shared-ledger
+  // Linked so deleting this transaction cascades to remove the split-ledger
   // copy (see schema.ts). Everything below runs as a single atomic batch so
-  // the transaction, balance update, and shared-ledger copy can never
+  // the transaction, balance update, and split-ledger copy can never
   // partially fail.
-  if (parsed.isSharedExpense && parsed.type === "expense") {
+  const hasSplit = parsed.type === "expense" && parsed.splitParticipants && parsed.splitParticipants.length > 0;
+  if (hasSplit) {
     await db.batch([
       insertTransaction,
       updateAccountBalance,
       db.insert(sharedExpenses).values({
         userId,
-        paidByMe: true,
         categoryId,
         name: parsed.merchant || parsed.note || "分帳支出",
-        amount: parsed.amount.toString(),
         occurredAt: parsed.occurredAt,
         linkedTransactionId: transactionId,
+        participants: parsed.splitParticipants!.map((p) => ({
+          name: p.name,
+          amount: p.amount.toString(),
+          iOwe: false,
+          isSettled: false,
+          settledAt: null,
+          settlementTransactionId: null,
+          settlementBatchId: null,
+        })),
       }),
     ]);
   } else {
@@ -253,8 +244,7 @@ const updateTransactionSchema = z.object({
   note: z.string().max(200).nullable(),
   merchant: z.string().max(100).nullable(),
   occurredAt: z.string().min(1),
-  isSharedExpense: z.boolean().optional(),
-  paidByMe: z.boolean().optional(),
+  splitParticipants: z.array(splitParticipantInputSchema).max(20).optional(),
 });
 
 export async function updateTransaction(input: {
@@ -267,8 +257,7 @@ export async function updateTransaction(input: {
   note: string | null;
   merchant: string | null;
   occurredAt: string;
-  isSharedExpense?: boolean;
-  paidByMe?: boolean;
+  splitParticipants?: { name: string; amount: number }[];
 }) {
   const userId = await requireUserId();
   const parsed = updateTransactionSchema.parse(input);
@@ -296,15 +285,15 @@ export async function updateTransaction(input: {
   const exchangeRate = await tryExchangeRate(ownedAccount.currency, parsed.occurredAt);
   if (isFail(exchangeRate)) return exchangeRate;
 
-  // A settled shared-ledger entry already has a reimbursement transaction
+  // A settled split-ledger entry already has a reimbursement transaction
   // recorded against the original amount/category — letting the source
   // transaction change out from under it would silently desync the two
-  // (see the matching guard in shared/actions.ts's updateSharedExpense).
+  // (see the matching guard in shared/actions.ts's updateSplitExpense).
   const [linkedShared] = await db
-    .select({ id: sharedExpenses.id, isSettled: sharedExpenses.isSettled })
+    .select({ id: sharedExpenses.id, participants: sharedExpenses.participants })
     .from(sharedExpenses)
     .where(and(eq(sharedExpenses.linkedTransactionId, parsed.id), eq(sharedExpenses.userId, userId)));
-  if (linkedShared?.isSettled) {
+  if (linkedShared?.participants.some((p) => p.isSettled)) {
     return fail("這筆交易已建立分帳結算紀錄，請先到分帳頁面處理再編輯");
   }
 
@@ -334,40 +323,15 @@ export async function updateTransaction(input: {
     .set({ currentBalance: sql`${accounts.currentBalance} + ${newDelta}` })
     .where(and(eq(accounts.id, parsed.accountId), eq(accounts.userId, userId)));
 
-  // "分帳" checkbox, same semantics as createTransaction's — only
-  // meaningful for an expense.
-  const wantsShared = parsed.type === "expense" && !!parsed.isSharedExpense;
+  const wantsSplit = parsed.type === "expense" && !!parsed.splitParticipants?.length;
 
   // Everything runs as one atomic batch so the transaction edit, the balance
-  // adjustments on both accounts, and the shared-ledger sync can never
+  // adjustments on both accounts, and the split-ledger sync can never
   // partially apply.
-  if (wantsShared && parsed.paidByMe === false) {
-    // Switched to "partner paid" — same reasoning as createTransaction's:
-    // no money actually left any of my accounts, so this transaction
-    // shouldn't exist in my personal ledger at all. Delete it (reversing
-    // its balance effect on the account it used to sit in; cascades to
-    // remove any existing linked shared-ledger row) and record only an
-    // unlinked shared-ledger entry instead, same as a plain "新增分帳支出"
-    // from /shared. My share only becomes a real transaction later, at
-    // settlement.
-    await db.batch([
-      db.delete(transactions).where(and(eq(transactions.id, parsed.id), eq(transactions.userId, userId))),
-      updateOldAccountBalance,
-      db.insert(sharedExpenses).values({
-        userId,
-        paidByMe: false,
-        categoryId,
-        name: parsed.merchant || parsed.note || "分帳支出",
-        amount: parsed.amount.toString(),
-        occurredAt: parsed.occurredAt,
-      }),
-    ]);
-  } else if (linkedShared && wantsShared) {
-    // Keep the shared-ledger copy in sync with the transaction it was
-    // created from — otherwise the shared balance silently drifts from
-    // what the personal transaction actually says. paidByMe included here
-    // too, so switching who paid on an already-shared transaction actually
-    // sticks instead of only ever taking effect on first creation.
+  if (linkedShared && wantsSplit) {
+    // Keep the split-ledger copy in sync with the transaction it was created
+    // from — otherwise the split balance silently drifts from what the
+    // personal transaction actually says.
     await db.batch([
       updateTx,
       updateOldAccountBalance,
@@ -376,24 +340,31 @@ export async function updateTransaction(input: {
         .update(sharedExpenses)
         .set({
           name: parsed.merchant || parsed.note || "分帳支出",
-          amount: parsed.amount.toString(),
           categoryId,
           occurredAt: parsed.occurredAt,
-          paidByMe: parsed.paidByMe ?? true,
+          participants: parsed.splitParticipants!.map((p) => ({
+            name: p.name,
+            amount: p.amount.toString(),
+            iOwe: false,
+            isSettled: false,
+            settledAt: null,
+            settlementTransactionId: null,
+            settlementBatchId: null,
+          })),
         })
         .where(eq(sharedExpenses.id, linkedShared.id)),
     ]);
   } else if (linkedShared) {
-    // No longer wanted as a shared cost (type changed away from expense, or
-    // the user unchecked the toggle) — drop the shared-ledger copy.
+    // No longer wanted as a split (type changed away from expense, or the
+    // user unchecked the toggle) — drop the split-ledger copy.
     await db.batch([
       updateTx,
       updateOldAccountBalance,
       updateNewAccountBalance,
       db.delete(sharedExpenses).where(eq(sharedExpenses.id, linkedShared.id)),
     ]);
-  } else if (wantsShared) {
-    // Wasn't shared before, now toggled on — create the shared-ledger copy,
+  } else if (wantsSplit) {
+    // Was not split before, now toggled on — create the split-ledger copy,
     // same shape as the one createTransaction inserts.
     await db.batch([
       updateTx,
@@ -401,12 +372,19 @@ export async function updateTransaction(input: {
       updateNewAccountBalance,
       db.insert(sharedExpenses).values({
         userId,
-        paidByMe: parsed.paidByMe ?? true,
         categoryId,
         name: parsed.merchant || parsed.note || "分帳支出",
-        amount: parsed.amount.toString(),
         occurredAt: parsed.occurredAt,
         linkedTransactionId: parsed.id,
+        participants: parsed.splitParticipants!.map((p) => ({
+          name: p.name,
+          amount: p.amount.toString(),
+          iOwe: false,
+          isSettled: false,
+          settledAt: null,
+          settlementTransactionId: null,
+          settlementBatchId: null,
+        })),
       }),
     ]);
   } else {
@@ -480,26 +458,6 @@ export async function duplicateTransaction(transactionId: string) {
   return { id: insertedRows[0].id };
 }
 
-// Undo for the "partner paid" branch of createTransaction/updateTransaction
-// above, which creates a bare sharedExpenses row instead of a transaction —
-// deleteTransaction can't reach it since there's no transaction id. The
-// isNull(linkedTransactionId) guard keeps this from ever touching a real
-// linked shared-expense row (those go through deleteSharedExpense instead,
-// which also blocks deleting a settled one).
-export async function deleteUnlinkedSharedExpense(sharedExpenseId: string) {
-  const userId = await requireUserId();
-  await db
-    .delete(sharedExpenses)
-    .where(
-      and(
-        eq(sharedExpenses.id, sharedExpenseId),
-        eq(sharedExpenses.userId, userId),
-        isNull(sharedExpenses.linkedTransactionId),
-      ),
-    );
-  revalidateTransactionPaths();
-}
-
 // Shared by deleteTransaction and shared/actions.ts's unsettleSharedExpense
 // — both need to delete a transaction row and reverse its balance effect
 // exactly the same way, just gated by different guards (or none, for the
@@ -558,28 +516,33 @@ export async function deleteTransaction(transactionId: string) {
 
   if (!tx) return;
 
-  // Deleting cascades (see schema.ts) to remove any linked shared-ledger
-  // copy — fine for an unsettled one, but a settled one already has a real
-  // reimbursement transaction recorded against it, and losing that record
-  // silently would leave the reimbursement looking unexplained.
+  // Deleting cascades (see schema.ts) to remove any linked split-ledger
+  // copy — fine when nobody's settled yet, but a settled participant already
+  // has a real reimbursement transaction recorded against it, and losing
+  // that record silently would leave the reimbursement looking unexplained.
   const [linkedShared] = await db
-    .select({ isSettled: sharedExpenses.isSettled })
+    .select({ participants: sharedExpenses.participants })
     .from(sharedExpenses)
     .where(and(eq(sharedExpenses.linkedTransactionId, transactionId), eq(sharedExpenses.userId, userId)));
-  if (linkedShared?.isSettled) {
+  if (linkedShared?.participants.some((p) => p.isSettled)) {
     return fail("這筆交易已建立分帳結算紀錄，請先到分帳頁面處理再刪除");
   }
 
   // This transaction might instead *be* a settlement reimbursement (see
-  // shared/actions.ts's settleSharedExpense) — deleting it out from under
-  // its shared-expense row would leave that row stuck showing "已結清" with
-  // no reimbursement to back it up. Revert the settlement from /shared
-  // instead, which removes this transaction the same way but also resets
-  // the shared-expense row.
+  // shared/actions.ts's settleParticipant) — deleting it out from under its
+  // split-ledger participant would leave that participant stuck showing "已
+  // 結清" with no reimbursement to back it up. Revert the settlement from
+  // /shared instead, which removes this transaction the same way but also
+  // resets the participant.
   const [settledFrom] = await db
     .select({ id: sharedExpenses.id })
     .from(sharedExpenses)
-    .where(and(eq(sharedExpenses.settlementTransactionId, transactionId), eq(sharedExpenses.userId, userId)));
+    .where(
+      and(
+        eq(sharedExpenses.userId, userId),
+        sql`${sharedExpenses.participants} @> ${JSON.stringify([{ settlementTransactionId: transactionId }])}::jsonb`,
+      ),
+    );
   if (settledFrom) {
     return fail("這是分帳結算交易，請到分帳頁面用「回復結清」處理");
   }
@@ -643,8 +606,7 @@ export async function loadMoreTransactions(cursor: TransactionsCursor, filter?: 
         categoryColor: categories.color,
         paymentMethod: transactions.paymentMethod,
         accountId: transactions.accountId,
-        sharedExpenseId: sharedExpenses.id,
-        sharedExpensePaidByMe: sharedExpenses.paidByMe,
+        sharedExpenseParticipants: sharedExpenses.participants,
       })
       .from(transactions)
       .leftJoin(categories, eq(transactions.categoryId, categories.id))
@@ -689,13 +651,15 @@ export async function loadMoreTransactions(cursor: TransactionsCursor, filter?: 
   ]);
 
   const merged: ListItemRow[] = [
-    ...regularRows.map((t) => ({
-      ...t,
-      kind: "transaction" as const,
-      type: t.type as "income" | "expense",
-      isSharedExpense: t.sharedExpenseId !== null,
-      paidByMe: t.sharedExpensePaidByMe ?? true,
-    })),
+    ...regularRows.map((t) => {
+      const { sharedExpenseParticipants, ...rest } = t;
+      return {
+        ...rest,
+        kind: "transaction" as const,
+        type: t.type as "income" | "expense",
+        ...deriveSplitFields(sharedExpenseParticipants),
+      };
+    }),
     ...transferRows.map((t) => ({ ...t, kind: "transfer" as const })),
   ].sort((a, b) => {
     if (a.occurredAt !== b.occurredAt) return a.occurredAt < b.occurredAt ? 1 : -1;

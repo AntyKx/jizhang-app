@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 // Each section below is its own Suspense island rather than one big
 // Promise.all blocking the whole page — see docs/changelog for the
 // discussion. QuickAddSection is the one exception: its data
-// (categories/accounts/partnerName) is already resolved by
+// (categories/accounts/frequentSplitNames) is already resolved by
 // (app)/layout.tsx before this page starts rendering (getQuickAddContext
 // is wrapped in React's cache(), so this call is a free re-read, not a
 // second DB round trip), so it renders synchronously instead of behind its
@@ -50,7 +50,7 @@ export default async function RecordPage() {
         <QuickAddSection
           categories={quickAddContext.categories}
           accounts={quickAddContext.accounts}
-          partnerName={quickAddContext.partnerName}
+          frequentSplitNames={quickAddContext.frequentSplitNames}
           sharedLocked={!unlocked}
         />
       </Reveal>
@@ -71,7 +71,7 @@ export default async function RecordPage() {
             userId={userId}
             categories={quickAddContext.categories}
             accounts={quickAddContext.accounts}
-            partnerName={quickAddContext.partnerName}
+            frequentSplitNames={quickAddContext.frequentSplitNames}
           />
         </Reveal>
       </Suspense>

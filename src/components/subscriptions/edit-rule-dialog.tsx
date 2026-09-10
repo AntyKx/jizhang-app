@@ -27,6 +27,7 @@ import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { PaymentMethodField } from "@/components/record/payment-method-field";
 import { type PaymentMethod } from "@/lib/payment-methods";
 import { accountTypeToPaymentMethod, type AccountType } from "@/lib/account-type";
+import { currencyAllowsDecimal } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
 type Rule = {
@@ -43,7 +44,7 @@ type Rule = {
   isSubscription: boolean;
 };
 type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
-type Account = { id: string; name: string; type: AccountType };
+type Account = { id: string; name: string; type: AccountType; currency: string };
 
 export function EditRuleDialog({
   rule,
@@ -134,7 +135,11 @@ export function EditRuleDialog({
             </div>
             <div className="flex flex-col gap-2">
               <Label>金額</Label>
-              <AmountKeypadField value={amount} onChange={setAmount} />
+              <AmountKeypadField
+                value={amount}
+                onChange={setAmount}
+                allowDecimal={currencyAllowsDecimal(accounts.find((a) => a.id === accountId)?.currency)}
+              />
               <input type="hidden" name="amount" value={amount} />
             </div>
           </div>

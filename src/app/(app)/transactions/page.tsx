@@ -1,8 +1,9 @@
 import { and, desc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { categories, sharedExpenses, transactions, userSettings } from "@/db/schema";
+import { categories, sharedExpenses, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { listAccounts, listArchivedAccounts } from "@/lib/account";
+import { deriveSplitFields, getFrequentSplitNames } from "@/lib/shared-expenses";
 import { TransactionsList } from "@/components/transactions/transactions-list";
 import { TransactionsFilterHeader } from "@/components/transactions/transactions-filter-header";
 import { BackLink } from "@/components/back-link";
@@ -25,7 +26,7 @@ export default async function TransactionsPage({
     : undefined;
   const filterConditions = transactionsFilterConditions(filter);
 
-  const [regularRows, transferRows, userCategories, userAccounts, archivedAccounts, settingsRows] = await Promise.all([
+  const [regularRows, transferRows, userCategories, userAccounts, archivedAccounts, frequentSplitNames] = await Promise.all([
     db
       .select({
         id: transactions.id,
@@ -41,8 +42,7 @@ export default async function TransactionsPage({
         categoryColor: categories.color,
         paymentMethod: transactions.paymentMethod,
         accountId: transactions.accountId,
-        sharedExpenseId: sharedExpenses.id,
-        sharedExpensePaidByMe: sharedExpenses.paidByMe,
+        sharedExpenseParticipants: sharedExpenses.participants,
       })
       .from(transactions)
       .leftJoin(categories, eq(transactions.categoryId, categories.id))
@@ -89,29 +89,27 @@ export default async function TransactionsPage({
       .orderBy(categories.sortOrder),
     listAccounts(userId),
     listArchivedAccounts(userId),
-    db
-      .select({ partnerName: userSettings.partnerName })
-      .from(userSettings)
-      .where(eq(userSettings.userId, userId)),
+    getFrequentSplitNames(userId),
   ]);
 
   const accountsById = Object.fromEntries(
     [...userAccounts, ...archivedAccounts].map((a) => [a.id, { name: a.name, type: a.type }]),
   );
-  const partnerName = settingsRows[0]?.partnerName || "另一半";
 
   // The query already excludes/includes "transfer" rows by type; narrow here
   // since drizzle can't reflect a runtime `where` filter in its inferred
   // column type. Merge the two shapes by occurredAt/createdAt so the list
   // reads as one continuous timeline instead of two separate feeds.
   const merged: ListItemRow[] = [
-    ...regularRows.map((t) => ({
-      ...t,
-      kind: "transaction" as const,
-      type: t.type as "income" | "expense",
-      isSharedExpense: t.sharedExpenseId !== null,
-      paidByMe: t.sharedExpensePaidByMe ?? true,
-    })),
+    ...regularRows.map((t) => {
+      const { sharedExpenseParticipants, ...rest } = t;
+      return {
+        ...rest,
+        kind: "transaction" as const,
+        type: t.type as "income" | "expense",
+        ...deriveSplitFields(sharedExpenseParticipants),
+      };
+    }),
     ...transferRows.map((t) => ({ ...t, kind: "transfer" as const })),
   ].sort((a, b) => {
     if (a.occurredAt !== b.occurredAt) return a.occurredAt < b.occurredAt ? 1 : -1;
@@ -155,10 +153,10 @@ export default async function TransactionsPage({
         categories={userCategories}
         accounts={userAccounts
           .filter((a) => !a.excludeFromNetWorth)
-          .map((a) => ({ id: a.id, name: a.name, type: a.type }))}
+          .map((a) => ({ id: a.id, name: a.name, type: a.type, currency: a.currency }))}
         accountsById={accountsById}
         initialCursor={initialCursor}
-        partnerName={partnerName}
+        frequentSplitNames={frequentSplitNames}
         filter={filter}
       />
     </div>

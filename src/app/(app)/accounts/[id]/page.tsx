@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import { and, desc, eq, ne, or, gte, lte } from "drizzle-orm";
 import { ChevronLeft } from "lucide-react";
 import { db } from "@/db";
-import { accounts, categories, sharedExpenses, transactions, userSettings } from "@/db/schema";
+import { accounts, categories, sharedExpenses, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { listAccounts, listArchivedAccounts } from "@/lib/account";
+import { deriveSplitFields, getFrequentSplitNames } from "@/lib/shared-expenses";
 import { resolveStatsRange } from "@/lib/stats/range";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { AccountMonthNav } from "@/components/accounts/account-month-nav";
@@ -33,7 +34,7 @@ export default async function AccountDetailPage({
     .where(and(eq(accounts.id, id), eq(accounts.userId, userId)));
   if (!account) notFound();
 
-  const [regularRows, transferRows, userCategories, userAccounts, archivedAccounts, settingsRows] =
+  const [regularRows, transferRows, userCategories, userAccounts, archivedAccounts, frequentSplitNames] =
     await Promise.all([
       db
         .select({
@@ -50,8 +51,7 @@ export default async function AccountDetailPage({
           categoryColor: categories.color,
           paymentMethod: transactions.paymentMethod,
           accountId: transactions.accountId,
-          sharedExpenseId: sharedExpenses.id,
-          sharedExpensePaidByMe: sharedExpenses.paidByMe,
+          sharedExpenseParticipants: sharedExpenses.participants,
         })
         .from(transactions)
         .leftJoin(categories, eq(transactions.categoryId, categories.id))
@@ -95,13 +95,12 @@ export default async function AccountDetailPage({
         .orderBy(categories.sortOrder),
       listAccounts(userId),
       listArchivedAccounts(userId),
-      db.select({ partnerName: userSettings.partnerName }).from(userSettings).where(eq(userSettings.userId, userId)),
+      getFrequentSplitNames(userId),
     ]);
 
   const accountsById = Object.fromEntries(
     [...userAccounts, ...archivedAccounts].map((a) => [a.id, { name: a.name, type: a.type }]),
   );
-  const partnerName = settingsRows[0]?.partnerName || "另一半";
 
   const monthIncome = regularRows
     .filter((t) => t.type === "income")
@@ -111,13 +110,15 @@ export default async function AccountDetailPage({
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
   const listItems: ListItemRow[] = [
-    ...regularRows.map((t) => ({
-      ...t,
-      kind: "transaction" as const,
-      type: t.type as "income" | "expense",
-      isSharedExpense: t.sharedExpenseId !== null,
-      paidByMe: t.sharedExpensePaidByMe ?? true,
-    })),
+    ...regularRows.map((t) => {
+      const { sharedExpenseParticipants, ...rest } = t;
+      return {
+        ...rest,
+        kind: "transaction" as const,
+        type: t.type as "income" | "expense",
+        ...deriveSplitFields(sharedExpenseParticipants),
+      };
+    }),
     ...transferRows.map((t) => ({ ...t, kind: "transfer" as const })),
   ].sort((a, b) => {
     if (a.occurredAt !== b.occurredAt) return a.occurredAt < b.occurredAt ? 1 : -1;
@@ -151,9 +152,9 @@ export default async function AccountDetailPage({
         categories={userCategories}
         accounts={userAccounts
           .filter((a) => !a.excludeFromNetWorth)
-          .map((a) => ({ id: a.id, name: a.name, type: a.type }))}
+          .map((a) => ({ id: a.id, name: a.name, type: a.type, currency: a.currency }))}
         accountsById={accountsById}
-        partnerName={partnerName}
+        frequentSplitNames={frequentSplitNames}
       />
     </div>
   );

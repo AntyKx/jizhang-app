@@ -66,7 +66,7 @@ export function CreateBudgetDialog({ categories }: { categories: Category[] }) {
           </div>
           <div className="flex flex-col gap-2">
             <Label>預算上限</Label>
-            <AmountKeypadField value={limitAmount} onChange={setLimitAmount} />
+            <AmountKeypadField value={limitAmount} onChange={setLimitAmount} allowDecimal={false} />
             <input type="hidden" name="limitAmount" value={limitAmount} />
           </div>
           <Button type="submit" disabled={!limitAmount || Number(limitAmount) <= 0}>

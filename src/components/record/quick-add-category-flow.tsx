@@ -9,10 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BottomSheet, BottomSheetContent, BottomSheetTitle } from "@/components/ui/bottom-sheet";
-import { createTransaction, deleteTransaction, deleteUnlinkedSharedExpense } from "@/app/(app)/transactions/actions";
+import { createTransaction, deleteTransaction } from "@/app/(app)/transactions/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
-import { SharedExpenseToggle } from "@/components/record/shared-expense-toggle";
+import { currencyAllowsDecimal } from "@/lib/currency";
+import { SplitExpenseField, computeSplitOverflow, type SplitParticipantDraft } from "@/components/record/split-expense-field";
 import { CategoryIconBadge } from "@/components/category-icon";
 import { categoryDisplayName } from "@/lib/category-display-name";
 import { StaggerList } from "@/components/motion/stagger-list";
@@ -49,7 +50,7 @@ const CATEGORY_PREVIEW_COUNT = 9;
 export function QuickAddCategoryFlow({
   categories,
   accounts,
-  partnerName,
+  frequentSplitNames,
   defaultAccountId,
   defaultDate,
   onDone,
@@ -58,7 +59,7 @@ export function QuickAddCategoryFlow({
 }: {
   categories: QuickAddCategory[];
   accounts: QuickAddAccount[];
-  partnerName: string;
+  frequentSplitNames: string[];
   // Context defaults from wherever this flow was opened — e.g. the global
   // FAB on an account's detail page (defaultAccountId) or a specific day
   // selected on /calendar (defaultDate). Omitted everywhere else, falling
@@ -69,7 +70,7 @@ export function QuickAddCategoryFlow({
   // Adds a third "分帳" segment next to 支出/收入 — used only on the home
   // page, where it replaces the standalone 分帳記帳 button. It reuses the
   // expense category list (a shared expense is always an expense) and just
-  // pre-checks the existing SharedExpenseToggle below, rather than being a
+  // pre-checks the existing SplitExpenseField below, rather than being a
   // separate entry flow.
   enableSharedTab?: boolean;
   sharedLocked?: boolean;
@@ -88,7 +89,7 @@ export function QuickAddCategoryFlow({
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [isSharedExpense, setIsSharedExpense] = useState(false);
-  const [paidByMe, setPaidByMe] = useState(true);
+  const [splitParticipants, setSplitParticipants] = useState<SplitParticipantDraft[]>([]);
   const initialAccountId = accounts.find((a) => a.id === defaultAccountId)?.id ?? accounts[0]?.id ?? "";
   const [accountId, setAccountId] = useState(initialAccountId);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
@@ -110,7 +111,7 @@ export function QuickAddCategoryFlow({
     setAmount("");
     setNote("");
     setIsSharedExpense(false);
-    setPaidByMe(true);
+    setSplitParticipants([]);
     const currentAccount = accounts.find((a) => a.id === accountId);
     setPaymentMethod(accountTypeToPaymentMethod[currentAccount?.type ?? "cash"]);
     setOccurredAt(defaultDate ?? todayInTaipeiString());
@@ -149,10 +150,6 @@ export function QuickAddCategoryFlow({
   function handleSave() {
     if (!selected || !amount || Number(amount) <= 0) return;
     const savedAmount = amount;
-    // Partner-paid shared expenses don't create a real transaction (see
-    // createTransaction) — captured up front so the undo action below still
-    // knows which delete function to call after state resets on close.
-    const isPartnerPaidShare = selected.type === "expense" && isSharedExpense && !paidByMe;
     startTransition(async () => {
       const created = await createTransaction({
         categoryId: selected.id,
@@ -162,8 +159,10 @@ export function QuickAddCategoryFlow({
         accountId,
         note: note || undefined,
         occurredAt,
-        isSharedExpense: selected.type === "expense" ? isSharedExpense : undefined,
-        paidByMe: selected.type === "expense" ? paidByMe : undefined,
+        splitParticipants:
+          selected.type === "expense" && isSharedExpense
+            ? splitParticipants.map((p) => ({ name: p.name, amount: Number(p.amount) }))
+            : undefined,
       });
       if (isFail(created)) {
         toast.error(created.error);
@@ -173,8 +172,7 @@ export function QuickAddCategoryFlow({
         action: {
           label: "復原",
           onClick: async () => {
-            if (isPartnerPaidShare) await deleteUnlinkedSharedExpense(created.id);
-            else await deleteTransaction(created.id);
+            await deleteTransaction(created.id);
             router.refresh();
           },
         },
@@ -319,12 +317,15 @@ export function QuickAddCategoryFlow({
 
               <div className="flex flex-col gap-2">
                 <Label className="sr-only">金額</Label>
-                <AmountKeypadField value={amount} onChange={setAmount} autoOpen />
+                <AmountKeypadField
+                  value={amount}
+                  onChange={setAmount}
+                  autoOpen
+                  allowDecimal={currencyAllowsDecimal(accounts.find((a) => a.id === accountId)?.currency)}
+                />
               </div>
 
-              {/* A partner-paid share never touches any of my accounts (see
-                  createTransaction) — 帳戶/付款方式 would be misleading. */}
-              {accounts.length > 1 && !(isSharedExpense && !paidByMe) && (
+              {accounts.length > 1 && (
                 <div className="flex flex-col gap-2">
                   <Label>帳戶</Label>
                   <div className="flex flex-wrap gap-2">
@@ -334,10 +335,10 @@ export function QuickAddCategoryFlow({
                         type="button"
                         onClick={() => selectAccount(a)}
                         className={cn(
-                          "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm transition-colors",
+                          "flex items-center gap-1 rounded-full px-3 py-1.5 text-sm transition-colors",
                           accountId === a.id
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "text-muted-foreground hover:bg-muted",
+                            ? "bg-primary/10 text-primary"
+                            : "bg-muted/60 text-muted-foreground hover:bg-muted",
                         )}
                       >
                         <AccountTypeIcon type={a.type} className="size-3.5" />
@@ -348,21 +349,20 @@ export function QuickAddCategoryFlow({
                 </div>
               )}
 
-              {!(isSharedExpense && !paidByMe) && (
-                <PaymentMethodField
-                  accountType={accounts.find((a) => a.id === accountId)?.type}
-                  value={paymentMethod}
-                  onChange={setPaymentMethod}
-                />
-              )}
+              <PaymentMethodField
+                accountType={accounts.find((a) => a.id === accountId)?.type}
+                value={paymentMethod}
+                onChange={setPaymentMethod}
+              />
 
               {selected.type === "expense" && (
-                <SharedExpenseToggle
-                  checked={isSharedExpense}
-                  onChange={setIsSharedExpense}
-                  paidByMe={paidByMe}
-                  onPaidByMeChange={setPaidByMe}
-                  partnerName={partnerName}
+                <SplitExpenseField
+                  enabled={isSharedExpense}
+                  onEnabledChange={setIsSharedExpense}
+                  participants={splitParticipants}
+                  onParticipantsChange={setSplitParticipants}
+                  totalAmount={amount}
+                  suggestions={frequentSplitNames}
                 />
               )}
 
@@ -392,7 +392,12 @@ export function QuickAddCategoryFlow({
                 </Button>
                 <Button
                   className="flex-1"
-                  disabled={pending || !amount || Number(amount) <= 0}
+                  disabled={
+                    pending ||
+                    !amount ||
+                    Number(amount) <= 0 ||
+                    (isSharedExpense && computeSplitOverflow(amount, splitParticipants) > 0)
+                  }
                   onClick={handleSave}
                 >
                   {pending ? "儲存中…" : "完成"}

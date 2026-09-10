@@ -20,7 +20,7 @@ import { formatTimeInTaipei } from "@/lib/date";
 import { type AccountType } from "@/lib/account-type";
 
 type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
-type Account = { id: string; name: string; type: AccountType };
+type Account = { id: string; name: string; type: AccountType; currency: string };
 
 export type TodayTransaction = {
   id: string;
@@ -39,7 +39,8 @@ export type TodayTransaction = {
   occurredAt: string;
   createdAt: Date;
   isSharedExpense: boolean;
-  paidByMe: boolean;
+  splitParticipants: { name: string; amount: string }[];
+  splitLocked: boolean;
 };
 
 export function TodayTransactionRow({
@@ -47,13 +48,13 @@ export function TodayTransactionRow({
   categories,
   accounts,
   showAccount,
-  partnerName,
+  frequentSplitNames,
 }: {
   transaction: TodayTransaction;
   categories: Category[];
   accounts: Account[];
   showAccount: boolean;
-  partnerName: string;
+  frequentSplitNames: string[];
 }) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
@@ -98,7 +99,8 @@ export function TodayTransactionRow({
     note: t.note,
     occurredAt: t.occurredAt,
     isSharedExpense: t.isSharedExpense,
-    paidByMe: t.paidByMe,
+    splitParticipants: t.splitParticipants,
+    splitLocked: t.splitLocked,
   };
 
   // The title falls back to merchant -> note -> category, so a note never
@@ -170,7 +172,7 @@ export function TodayTransactionRow({
         transaction={editableTransaction}
         categories={categories}
         accounts={accounts}
-        partnerName={partnerName}
+        frequentSplitNames={frequentSplitNames}
         open={editOpen}
         onOpenChange={setEditOpen}
         onSaved={() => router.refresh()}

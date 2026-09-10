@@ -15,21 +15,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createTransaction, deleteTransaction, deleteUnlinkedSharedExpense } from "@/app/(app)/transactions/actions";
+import { createTransaction, deleteTransaction } from "@/app/(app)/transactions/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
 import { type PaymentMethod } from "@/lib/payment-methods";
 import { accountTypeToPaymentMethod, type AccountType } from "@/lib/account-type";
+import { currencyAllowsDecimal } from "@/lib/currency";
 import { PaymentMethodField } from "@/components/record/payment-method-field";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
-import { SharedExpenseToggle } from "@/components/record/shared-expense-toggle";
+import { SplitExpenseField, computeSplitOverflow, type SplitParticipantDraft } from "@/components/record/split-expense-field";
 import { compressImageToBase64 } from "@/lib/compress-image";
 import { todayInTaipeiString } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
-type Account = { id: string; name: string; type: AccountType };
+type Account = { id: string; name: string; type: AccountType; currency: string };
 
 type Draft = {
   amount: number;
@@ -47,7 +48,7 @@ export function ReceiptScanQuickAdd({
   accounts,
   defaultAccountId,
   defaultDate,
-  partnerName,
+  frequentSplitNames,
   onDone,
   onCancel,
 }: {
@@ -57,7 +58,7 @@ export function ReceiptScanQuickAdd({
   // Only used if OCR fails to read a date off the receipt — a real receipt
   // photo's printed date always takes priority over page context.
   defaultDate?: string;
-  partnerName?: string;
+  frequentSplitNames: string[];
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -71,7 +72,7 @@ export function ReceiptScanQuickAdd({
   const [parsing, setParsing] = useState(false);
   const [parseFailed, setParseFailed] = useState(false);
   const [isSharedExpense, setIsSharedExpense] = useState(false);
-  const [paidByMe, setPaidByMe] = useState(true);
+  const [splitParticipants, setSplitParticipants] = useState<SplitParticipantDraft[]>([]);
   const [pending, setPending] = useState(false);
 
   // Revoke the object URL when it's replaced or the component unmounts, so
@@ -138,10 +139,6 @@ export function ReceiptScanQuickAdd({
 
   function handleConfirm() {
     if (!draft) return;
-    // Partner-paid shared expenses don't create a real transaction (see
-    // createTransaction) — captured up front so the undo action below still
-    // knows which delete function to call.
-    const isPartnerPaidShare = draft.type === "expense" && isSharedExpense && !paidByMe;
     setPending(true);
     (async () => {
       try {
@@ -154,8 +151,10 @@ export function ReceiptScanQuickAdd({
           merchant: draft.merchant ?? undefined,
           note: draft.note ?? undefined,
           occurredAt: draft.occurredAt,
-          isSharedExpense: draft.type === "expense" ? isSharedExpense : undefined,
-          paidByMe: draft.type === "expense" ? paidByMe : undefined,
+          splitParticipants:
+            draft.type === "expense" && isSharedExpense
+              ? splitParticipants.map((p) => ({ name: p.name, amount: Number(p.amount) }))
+              : undefined,
         });
         if (isFail(created)) {
           toast.error(created.error);
@@ -165,8 +164,7 @@ export function ReceiptScanQuickAdd({
           action: {
             label: "復原",
             onClick: async () => {
-              if (isPartnerPaidShare) await deleteUnlinkedSharedExpense(created.id);
-              else await deleteTransaction(created.id);
+              await deleteTransaction(created.id);
               router.refresh();
             },
           },
@@ -280,6 +278,7 @@ export function ReceiptScanQuickAdd({
                   setAmountText(text);
                   setDraft({ ...draft, amount: text === "" || text === "." ? 0 : Number(text) });
                 }}
+                allowDecimal={currencyAllowsDecimal(accounts.find((a) => a.id === accountId)?.currency)}
               />
             </div>
           </div>
@@ -289,17 +288,13 @@ export function ReceiptScanQuickAdd({
             <CategoryPickerSheet categories={relevantCategories} value={categoryId} onChange={setCategoryId} />
           </div>
 
-          {/* A partner-paid share never touches any of my accounts (see
-              createTransaction) — 付款方式/帳戶 would be misleading. */}
-          {!(isSharedExpense && !paidByMe) && (
-            <PaymentMethodField
-              accountType={accounts.find((a) => a.id === accountId)?.type}
-              value={draft.paymentMethod}
-              onChange={(paymentMethod) => setDraft({ ...draft, paymentMethod })}
-            />
-          )}
+          <PaymentMethodField
+            accountType={accounts.find((a) => a.id === accountId)?.type}
+            value={draft.paymentMethod}
+            onChange={(paymentMethod) => setDraft({ ...draft, paymentMethod })}
+          />
 
-          {accounts.length > 1 && !(isSharedExpense && !paidByMe) && (
+          {accounts.length > 1 && (
             <div className="flex flex-col gap-2">
               <Label>帳戶</Label>
               <div className="flex flex-wrap gap-2">
@@ -312,10 +307,10 @@ export function ReceiptScanQuickAdd({
                       setDraft({ ...draft, paymentMethod: accountTypeToPaymentMethod[a.type] });
                     }}
                     className={cn(
-                      "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm transition-colors",
+                      "flex items-center gap-1 rounded-full px-3 py-1.5 text-sm transition-colors",
                       accountId === a.id
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-muted",
+                        ? "bg-primary/10 text-primary"
+                        : "bg-muted/60 text-muted-foreground hover:bg-muted",
                     )}
                   >
                     <AccountTypeIcon type={a.type} className="size-3.5" />
@@ -326,13 +321,14 @@ export function ReceiptScanQuickAdd({
             </div>
           )}
 
-          {draft.type === "expense" && partnerName && (
-            <SharedExpenseToggle
-              checked={isSharedExpense}
-              onChange={setIsSharedExpense}
-              paidByMe={paidByMe}
-              onPaidByMeChange={setPaidByMe}
-              partnerName={partnerName}
+          {draft.type === "expense" && (
+            <SplitExpenseField
+              enabled={isSharedExpense}
+              onEnabledChange={setIsSharedExpense}
+              participants={splitParticipants}
+              onParticipantsChange={setSplitParticipants}
+              totalAmount={amountText}
+              suggestions={frequentSplitNames}
             />
           )}
 
@@ -354,7 +350,15 @@ export function ReceiptScanQuickAdd({
             />
           </div>
 
-          <Button onClick={handleConfirm} disabled={pending || !draft.amount || draft.amount <= 0}>
+          <Button
+            onClick={handleConfirm}
+            disabled={
+              pending ||
+              !draft.amount ||
+              draft.amount <= 0 ||
+              (isSharedExpense && computeSplitOverflow(amountText, splitParticipants) > 0)
+            }
+          >
             {pending ? "儲存中…" : "確認記帳"}
           </Button>
         </div>

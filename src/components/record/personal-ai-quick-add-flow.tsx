@@ -19,7 +19,7 @@ export function PersonalAiQuickAddFlow({
   accounts,
   defaultAccountId,
   defaultDate,
-  partnerName,
+  frequentSplitNames,
   initialShowText = false,
   initialShowScan = false,
   onClose,
@@ -28,7 +28,7 @@ export function PersonalAiQuickAddFlow({
   accounts: QuickAddAccount[];
   defaultAccountId: string;
   defaultDate?: string;
-  partnerName: string;
+  frequentSplitNames: string[];
   initialShowText?: boolean;
   initialShowScan?: boolean;
   onClose?: () => void;
@@ -56,7 +56,7 @@ export function PersonalAiQuickAddFlow({
             accounts={accounts}
             defaultAccountId={defaultAccountId}
             defaultDate={defaultDate}
-            partnerName={partnerName}
+            frequentSplitNames={frequentSplitNames}
             initialText={quickText}
             onDone={() => {
               setShowText(false);
@@ -81,7 +81,7 @@ export function PersonalAiQuickAddFlow({
             accounts={accounts}
             defaultAccountId={defaultAccountId}
             defaultDate={defaultDate}
-            partnerName={partnerName}
+            frequentSplitNames={frequentSplitNames}
             onDone={() => {
               setShowReceiptScan(false);
               router.refresh();

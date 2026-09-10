@@ -39,7 +39,13 @@ function BottomSheetContent({
         <DrawerPrimitive.Popup
           data-slot="bottom-sheet-content"
           className={cn(
-            "flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-b-0 bg-card pt-3 shadow-lg outline-none",
+            // touch-pan-y: redundant with the document root now being
+            // pan-y-only (see globals.css), kept here as explicit
+            // self-documentation — this sheet only ever drags vertically
+            // (its own swipeDirection="down" dismiss, or a normal scroll of
+            // its content), so it should never regain horizontal panning
+            // even if the root's restriction ever changes again.
+            "touch-pan-y flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-b-0 bg-card pt-3 shadow-lg outline-none",
             "[transform:translateY(var(--drawer-swipe-movement-y))] transition-transform duration-300 ease-out data-swiping:transition-none",
             "data-ending-style:translate-y-full data-starting-style:translate-y-full",
             className
@@ -49,7 +55,14 @@ function BottomSheetContent({
           <div className="mx-auto mb-1 h-1.5 w-10 shrink-0 rounded-full bg-muted-foreground/30" />
           <div
             ref={containerRef}
-            className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+            // overflow-x-hidden set explicitly here (not just relying on
+            // the outer Popup's own overflow-hidden) — the Popup also
+            // carries a CSS transform for its swipe-drag positioning, and
+            // `overflow:hidden` + `transform` on the same element is a
+            // known WebKit combination that doesn't always clip reliably.
+            // This div has no transform of its own, so it clips correctly
+            // regardless of whatever's happening one level up.
+            className="flex min-h-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
           >
             {children}
           </div>

@@ -1,10 +1,41 @@
+"use client";
+
+import { useRef } from "react";
 import { format, getDay, parse } from "date-fns";
 import { SEQUENTIAL_HEATMAP_STEPS } from "@/components/stats/chart-colors";
 import type { HeatmapDay } from "@/lib/stats/trend-queries";
 
 const weekdayLabels = ["日", "一", "二", "三", "四", "五", "六"];
 
+// Scrolled by hand via pointer events rather than native touch-panning —
+// the document root dropped touch-action's pan-x (see globals.css: it was
+// letting a stray horizontal drag anywhere reach WebKit's rubber-band
+// bounce, reading as "swiping reveals the edge" even on pages with nothing
+// to scroll to). touch-action only gates the browser's own default-handled
+// gestures, not a scrollLeft assignment driven by JS, so this keeps working
+// without needing that permission back.
 export function DailySpendHeatmap({ days }: { days: HeatmapDay[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef<{ startX: number; startScrollLeft: number } | null>(null);
+
+  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    const el = scrollRef.current;
+    if (!el) return;
+    dragState.current = { startX: e.clientX, startScrollLeft: el.scrollLeft };
+    el.setPointerCapture(e.pointerId);
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const el = scrollRef.current;
+    if (!el || !dragState.current) return;
+    el.scrollLeft = dragState.current.startScrollLeft - (e.clientX - dragState.current.startX);
+  }
+
+  function endDrag(e: React.PointerEvent<HTMLDivElement>) {
+    dragState.current = null;
+    scrollRef.current?.releasePointerCapture(e.pointerId);
+  }
+
   if (days.length === 0 || days.every((d) => d.amount === 0)) {
     return <p className="text-muted-foreground text-sm">還沒有足夠的資料可以顯示熱力圖。</p>;
   }
@@ -30,7 +61,14 @@ export function DailySpendHeatmap({ days }: { days: HeatmapDay[] }) {
   });
 
   return (
-    <div className="flex flex-col gap-1 overflow-x-auto pb-2">
+    <div
+      ref={scrollRef}
+      className="flex flex-col gap-1 overflow-x-auto pb-2 touch-pan-y select-none"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+    >
       <div className="flex gap-[3px] pl-6">
         {monthLabels.map((label, i) => (
           <div key={i} className="text-muted-foreground w-[11px] shrink-0 text-[9px]">

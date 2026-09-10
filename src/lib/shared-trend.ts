@@ -6,14 +6,15 @@ import { getTodayInTaipei } from "@/lib/date";
 
 export type SharedMonthlyPoint = {
   monthLabel: string;
-  me: number;
-  partner: number;
+  owedToMe: number;
+  iOwe: number;
 };
 
-// Total joint spending per month (regardless of settled status) — a
-// lightweight trend view so the couple's ledger has some sense of history,
-// without a full separate stats section for what's meant to stay a simple,
-// single-user feature.
+// Total split spending per month (regardless of settled status) — a
+// lightweight trend view so the split ledger has some sense of history,
+// without a full separate stats section for what's meant to stay a simple
+// feature. Broken down by direction (別人欠你 vs 你欠別人) instead of "me vs
+// a fixed partner" now that a split event can name any counterparty.
 export async function getMonthlySharedExpenseTrend(
   userId: string,
   months = 6,
@@ -30,21 +31,22 @@ export async function getMonthlySharedExpenseTrend(
 
   const rows = await db
     .select({
-      amount: sharedExpenses.amount,
-      paidByMe: sharedExpenses.paidByMe,
+      participants: sharedExpenses.participants,
       occurredAt: sharedExpenses.occurredAt,
     })
     .from(sharedExpenses)
     .where(and(eq(sharedExpenses.userId, userId), gte(sharedExpenses.occurredAt, buckets[0].startStr)));
 
   return buckets.map((b) => {
-    let me = 0;
-    let partner = 0;
+    let owedToMe = 0;
+    let iOwe = 0;
     for (const r of rows) {
       if (r.occurredAt < b.startStr || r.occurredAt > b.endStr) continue;
-      if (r.paidByMe) me += Number(r.amount);
-      else partner += Number(r.amount);
+      for (const p of r.participants) {
+        if (p.iOwe) iOwe += Number(p.amount);
+        else owedToMe += Number(p.amount);
+      }
     }
-    return { monthLabel: b.label, me, partner };
+    return { monthLabel: b.label, owedToMe, iOwe };
   });
 }

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { categories, userSettings } from "@/db/schema";
 import { getDefaultAccountId, listAccounts } from "@/lib/account";
 import { seedDefaultCategories } from "@/lib/default-categories";
+import { getFrequentSplitNames } from "@/lib/shared-expenses";
 import type { AccountType } from "@/lib/account-type";
 
 export type QuickAddCategory = {
@@ -13,7 +14,7 @@ export type QuickAddCategory = {
   color: string | null;
   type: "income" | "expense";
 };
-export type QuickAddAccount = { id: string; name: string; type: AccountType };
+export type QuickAddAccount = { id: string; name: string; type: AccountType; currency: string };
 
 async function listCategories(userId: string) {
   return db
@@ -31,7 +32,7 @@ async function listCategories(userId: string) {
 
 // Shared by every surface that can trigger a quick-add flow (the /record
 // page and the global FAB rendered from the (app) layout on every page) so
-// both read categories/accounts/partnerName the same way, including the
+// both read categories/accounts/frequentSplitNames the same way, including the
 // "lazily create 我的帳本 for a brand-new user" fallback that used to live
 // only in record/page.tsx. Wrapped in React's `cache()` so the layout and a
 // page that both call this on the same request (e.g. /record) only hit the
@@ -39,15 +40,16 @@ async function listCategories(userId: string) {
 export const getQuickAddContext = cache(async (userId: string): Promise<{
   categories: QuickAddCategory[];
   accounts: QuickAddAccount[];
-  partnerName: string;
+  frequentSplitNames: string[];
 }> => {
-  const [initialCategories, accountRows, settingsRows] = await Promise.all([
+  const [initialCategories, accountRows, settingsRows, frequentSplitNames] = await Promise.all([
     listCategories(userId),
     listAccounts(userId),
     db
-      .select({ partnerName: userSettings.partnerName, defaultAccountId: userSettings.defaultAccountId })
+      .select({ defaultAccountId: userSettings.defaultAccountId })
       .from(userSettings)
       .where(eq(userSettings.userId, userId)),
+    getFrequentSplitNames(userId),
   ]);
 
   // A brand-new user has zero categories of their own — seed the starter
@@ -86,7 +88,7 @@ export const getQuickAddContext = cache(async (userId: string): Promise<{
 
   return {
     categories: userCategories,
-    accounts: userAccounts.map((a) => ({ id: a.id, name: a.name, type: a.type as AccountType })),
-    partnerName: settingsRows[0]?.partnerName || "另一半",
+    accounts: userAccounts.map((a) => ({ id: a.id, name: a.name, type: a.type as AccountType, currency: a.currency })),
+    frequentSplitNames,
   };
 });

@@ -33,12 +33,12 @@ const choices: { mode: Mode; label: string; desc: string; Icon: typeof SquarePen
 export function GlobalQuickAddFab({
   categories,
   accounts,
-  partnerName,
+  frequentSplitNames,
   sharedLocked,
 }: {
   categories: QuickAddCategory[];
   accounts: QuickAddAccount[];
-  partnerName: string;
+  frequentSplitNames: string[];
   sharedLocked: boolean;
 }) {
   const pathname = usePathname();
@@ -129,7 +129,7 @@ export function GlobalQuickAddFab({
           <QuickAddCategoryFlow
             categories={categories}
             accounts={accounts}
-            partnerName={partnerName}
+            frequentSplitNames={frequentSplitNames}
             defaultAccountId={contextAccountId}
             defaultDate={defaultDate}
             onDone={() => setMode(null)}
@@ -147,7 +147,7 @@ export function GlobalQuickAddFab({
             accounts={accounts}
             defaultAccountId={contextAccountId ?? accounts[0]?.id ?? ""}
             defaultDate={defaultDate}
-            partnerName={partnerName}
+            frequentSplitNames={frequentSplitNames}
             onClose={() => setMode(null)}
           />
         </BottomSheetContent>

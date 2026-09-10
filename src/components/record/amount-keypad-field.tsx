@@ -6,7 +6,11 @@ import { gsap } from "@/lib/gsap";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const KEYS = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "backspace"] as const;
+const KEYS_WITH_DECIMAL = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "backspace"] as const;
+// No "." key — 0 takes its place and spans both columns, backspace stays
+// last. Used for currencies where a fractional amount is never meaningful
+// (see lib/currency.ts's currencyAllowsDecimal).
+const KEYS_NO_DECIMAL = ["7", "8", "9", "4", "5", "6", "1", "2", "3", "0", "backspace"] as const;
 
 // Thousands-separate the integer part only, so a partial/trailing decimal
 // (e.g. "12." while still typing, or "1234.5") is never mangled — plain
@@ -38,12 +42,18 @@ export function AmountKeypadField({
   value,
   onChange,
   maxDecimals = 2,
+  allowDecimal = true,
   autoOpen = false,
   className,
 }: {
   value: string;
   onChange: (next: string) => void;
   maxDecimals?: number;
+  // Drops the "." key entirely for currencies where a fractional amount is
+  // never meaningful (see lib/currency.ts's currencyAllowsDecimal) — 0 takes
+  // its grid spot instead. Defaults to true (unchanged keypad) for call
+  // sites with no currency context of their own.
+  allowDecimal?: boolean;
   // Opens the panel as soon as this component mounts, instead of waiting
   // for a tap — for call sites where the field is the very first thing the
   // user needs to fill in (e.g. picking a category and jumping straight to
@@ -56,6 +66,7 @@ export function AmountKeypadField({
   className?: string;
 }) {
   const [open, setOpen] = useState(autoOpen);
+  const KEYS = allowDecimal ? KEYS_WITH_DECIMAL : KEYS_NO_DECIMAL;
 
   function press(key: (typeof KEYS)[number]) {
     if (key === "backspace") {
@@ -136,6 +147,10 @@ export function AmountKeypadField({
                 className={cn(
                   "flex h-14 items-center justify-center rounded-2xl bg-muted text-xl font-semibold shadow-sm transition-colors active:bg-secondary",
                   key === "backspace" && "text-muted-foreground",
+                  // 0 takes the "." key's old grid spot in no-decimal mode —
+                  // span it across both so it doesn't leave a lone empty
+                  // cell at the end of the grid.
+                  !allowDecimal && key === "0" && "col-span-2",
                 )}
                 aria-label={key === "backspace" ? "刪除" : key === "." ? "小數點" : `數字 ${key}`}
               >

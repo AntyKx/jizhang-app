@@ -97,22 +97,26 @@ export const backupSchema = z.object({
   sharedExpenses: z.array(
     z.object({
       id: z.string().uuid(),
-      paidByMe: z.boolean(),
       categoryId: z.string().uuid().nullable(),
       name: z.string(),
-      amount: z.string(),
       note: z.string().nullable(),
       occurredAt: z.string(),
-      isSettled: z.boolean(),
-      settledAt: z.string().nullable(),
       linkedTransactionId: z.string().uuid().nullable(),
-      settlementTransactionId: z.string().uuid().nullable(),
-      settlementBatchId: z.string().uuid().nullable(),
+      participants: z.array(
+        z.object({
+          name: z.string(),
+          amount: z.string(),
+          iOwe: z.boolean(),
+          isSettled: z.boolean(),
+          settledAt: z.string().nullable(),
+          settlementTransactionId: z.string().uuid().nullable(),
+          settlementBatchId: z.string().uuid().nullable(),
+        }),
+      ),
     }),
   ),
   settings: z
     .object({
-      partnerName: z.string().nullable(),
       baseCurrency: z.string(),
       monthStartDay: z.number().int(),
       defaultAccountId: z.string().uuid().nullable().optional(),

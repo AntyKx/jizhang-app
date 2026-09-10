@@ -3,6 +3,7 @@ import { and, desc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, categories, sharedExpenses, transactions } from "@/db/schema";
 import { getTodayInTaipei } from "@/lib/date";
+import { deriveSplitFields } from "@/lib/shared-expenses";
 import { TodayTransactionRow, type TodayTransaction } from "@/components/record/today-transaction-row";
 import { BearIllustration } from "@/components/bear-illustration";
 import { Reveal } from "@/components/motion/reveal";
@@ -17,12 +18,12 @@ export async function TodayTransactionsSection({
   userId,
   categories: categoryList,
   accounts: accountList,
-  partnerName,
+  frequentSplitNames,
 }: {
   userId: string;
   categories: QuickAddCategory[];
   accounts: QuickAddAccount[];
-  partnerName: string;
+  frequentSplitNames: string[];
 }) {
   const today = format(getTodayInTaipei(), "yyyy-MM-dd");
 
@@ -43,8 +44,7 @@ export async function TodayTransactionsSection({
       accountName: accounts.name,
       occurredAt: transactions.occurredAt,
       createdAt: transactions.createdAt,
-      sharedExpenseId: sharedExpenses.id,
-      sharedExpensePaidByMe: sharedExpenses.paidByMe,
+      sharedExpenseParticipants: sharedExpenses.participants,
     })
     .from(transactions)
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
@@ -57,12 +57,14 @@ export async function TodayTransactionsSection({
 
   // The query already excludes "transfer" rows — narrow the type here for
   // the same reason as dueRules above.
-  const todayTransactions: TodayTransaction[] = rows.map((t) => ({
-    ...t,
-    type: t.type as "income" | "expense",
-    isSharedExpense: t.sharedExpenseId !== null,
-    paidByMe: t.sharedExpensePaidByMe ?? true,
-  }));
+  const todayTransactions: TodayTransaction[] = rows.map((t) => {
+    const { sharedExpenseParticipants, ...rest } = t;
+    return {
+      ...rest,
+      type: t.type as "income" | "expense",
+      ...deriveSplitFields(sharedExpenseParticipants),
+    };
+  });
 
   if (todayTransactions.length === 0) {
     return (
@@ -84,7 +86,7 @@ export async function TodayTransactionsSection({
             categories={categoryList}
             accounts={accountList}
             showAccount={accountList.length > 1}
-            partnerName={partnerName}
+            frequentSplitNames={frequentSplitNames}
           />
         ))}
       </StaggerList>

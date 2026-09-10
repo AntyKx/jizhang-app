@@ -125,23 +125,17 @@ export async function GET() {
     db
       .select({
         id: sharedExpenses.id,
-        paidByMe: sharedExpenses.paidByMe,
         categoryId: sharedExpenses.categoryId,
         name: sharedExpenses.name,
-        amount: sharedExpenses.amount,
         note: sharedExpenses.note,
         occurredAt: sharedExpenses.occurredAt,
-        isSettled: sharedExpenses.isSettled,
-        settledAt: sharedExpenses.settledAt,
         linkedTransactionId: sharedExpenses.linkedTransactionId,
-        settlementTransactionId: sharedExpenses.settlementTransactionId,
-        settlementBatchId: sharedExpenses.settlementBatchId,
+        participants: sharedExpenses.participants,
       })
       .from(sharedExpenses)
       .where(eq(sharedExpenses.userId, userId)),
     db
       .select({
-        partnerName: userSettings.partnerName,
         baseCurrency: userSettings.baseCurrency,
         monthStartDay: userSettings.monthStartDay,
         defaultAccountId: userSettings.defaultAccountId,

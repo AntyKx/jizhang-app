@@ -7,6 +7,7 @@ import InstallPrompt from "@/components/install-prompt";
 import VersionBadge from "@/components/version-badge";
 import ServiceWorkerCleanup from "@/components/service-worker-cleanup";
 import { BearSplashScreen } from "@/components/bear-splash-screen";
+import { GestureLock } from "@/components/gesture-lock";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -60,6 +61,7 @@ export default function RootLayout({
         <body className="min-h-full flex flex-col bg-background pt-[env(safe-area-inset-top)] text-foreground">
           <ServiceWorkerCleanup />
           <UpdateChecker />
+          <GestureLock />
           {children}
           <InstallPrompt />
           <VersionBadge />

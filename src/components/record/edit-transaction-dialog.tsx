@@ -23,15 +23,16 @@ import { CategoryPickerSheet } from "@/components/categories/category-picker-she
 import { deleteTransaction, updateTransaction } from "@/app/(app)/transactions/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
-import { SharedExpenseToggle } from "@/components/record/shared-expense-toggle";
+import { SplitExpenseField, computeSplitOverflow, type SplitParticipantDraft } from "@/components/record/split-expense-field";
 import { type PaymentMethod } from "@/lib/payment-methods";
 import { accountTypeToPaymentMethod, type AccountType } from "@/lib/account-type";
+import { currencyAllowsDecimal } from "@/lib/currency";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { PaymentMethodField } from "@/components/record/payment-method-field";
 import { cn } from "@/lib/utils";
 
 type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
-type Account = { id: string; name: string; type: AccountType };
+type Account = { id: string; name: string; type: AccountType; currency: string };
 
 export type EditableTransaction = {
   id: string;
@@ -44,14 +45,19 @@ export type EditableTransaction = {
   note: string | null;
   occurredAt: string;
   isSharedExpense: boolean;
-  paidByMe: boolean;
+  splitParticipants: { name: string; amount: string }[];
+  // Any participant already settled — the split section is locked (view
+  // only, same rule as shared/actions.ts's updateSplitExpense) since
+  // changing amounts now would desync from the reimbursement already
+  // recorded against them.
+  splitLocked: boolean;
 };
 
 export function EditTransactionDialog({
   transaction,
   categories,
   accounts,
-  partnerName,
+  frequentSplitNames,
   open,
   onOpenChange,
   onSaved,
@@ -59,7 +65,7 @@ export function EditTransactionDialog({
   transaction: EditableTransaction | null;
   categories: Category[];
   accounts: Account[];
-  partnerName: string;
+  frequentSplitNames: string[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
@@ -72,7 +78,8 @@ export function EditTransactionDialog({
   const [note, setNote] = useState("");
   const [occurredAt, setOccurredAt] = useState("");
   const [isSharedExpense, setIsSharedExpense] = useState(false);
-  const [paidByMe, setPaidByMe] = useState(true);
+  const [splitParticipants, setSplitParticipants] = useState<SplitParticipantDraft[]>([]);
+  const [splitLocked, setSplitLocked] = useState(false);
   const [pending, startTransition] = useTransition();
 
   // Re-seed the form from `transaction` right when the dialog opens, rather
@@ -92,7 +99,8 @@ export function EditTransactionDialog({
       setNote(transaction.note ?? "");
       setOccurredAt(transaction.occurredAt);
       setIsSharedExpense(transaction.isSharedExpense);
-      setPaidByMe(transaction.paidByMe);
+      setSplitParticipants(transaction.splitParticipants);
+      setSplitLocked(transaction.splitLocked);
     }
   }
 
@@ -119,8 +127,10 @@ export function EditTransactionDialog({
         merchant: transaction.merchant,
         note: note || null,
         occurredAt,
-        isSharedExpense: type === "expense" ? isSharedExpense : undefined,
-        paidByMe: type === "expense" ? paidByMe : undefined,
+        splitParticipants:
+          type === "expense" && isSharedExpense
+            ? splitParticipants.map((p) => ({ name: p.name, amount: Number(p.amount) }))
+            : undefined,
       });
       if (isFail(result)) {
         toast.error(result.error);
@@ -182,7 +192,11 @@ export function EditTransactionDialog({
             </div>
             <div className="flex flex-col gap-2">
               <Label>金額</Label>
-              <AmountKeypadField value={amount} onChange={setAmount} />
+              <AmountKeypadField
+                value={amount}
+                onChange={setAmount}
+                allowDecimal={currencyAllowsDecimal(accounts.find((a) => a.id === accountId)?.currency)}
+              />
             </div>
           </div>
 
@@ -191,18 +205,13 @@ export function EditTransactionDialog({
             <CategoryPickerSheet categories={relevantCategories} value={categoryId} onChange={setCategoryId} />
           </div>
 
-          {/* A partner-paid share never touches any of my accounts (see
-              updateTransaction, which deletes the underlying transaction
-              entirely in that case) — 付款方式/帳戶 would be misleading. */}
-          {!(type === "expense" && isSharedExpense && !paidByMe) && (
-            <PaymentMethodField
-              accountType={accounts.find((a) => a.id === accountId)?.type}
-              value={paymentMethod}
-              onChange={setPaymentMethod}
-            />
-          )}
+          <PaymentMethodField
+            accountType={accounts.find((a) => a.id === accountId)?.type}
+            value={paymentMethod}
+            onChange={setPaymentMethod}
+          />
 
-          {accounts.length > 1 && !(type === "expense" && isSharedExpense && !paidByMe) && (
+          {accounts.length > 1 && (
             <div className="flex flex-col gap-2">
               <Label>帳戶</Label>
               <div className="flex flex-wrap gap-2">
@@ -212,10 +221,10 @@ export function EditTransactionDialog({
                     type="button"
                     onClick={() => selectAccount(a)}
                     className={cn(
-                      "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm transition-colors",
+                      "flex items-center gap-1 rounded-full px-3 py-1.5 text-sm transition-colors",
                       accountId === a.id
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-muted",
+                        ? "bg-primary/10 text-primary"
+                        : "bg-muted/60 text-muted-foreground hover:bg-muted",
                     )}
                   >
                     <AccountTypeIcon type={a.type} className="size-3.5" />
@@ -226,13 +235,20 @@ export function EditTransactionDialog({
             </div>
           )}
 
-          {type === "expense" && (
-            <SharedExpenseToggle
-              checked={isSharedExpense}
-              onChange={setIsSharedExpense}
-              paidByMe={paidByMe}
-              onPaidByMeChange={setPaidByMe}
-              partnerName={partnerName}
+          {type === "expense" && splitLocked && (
+            <p className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
+              已有分帳對象標記結清，分帳內容無法再編輯
+            </p>
+          )}
+
+          {type === "expense" && !splitLocked && (
+            <SplitExpenseField
+              enabled={isSharedExpense}
+              onEnabledChange={setIsSharedExpense}
+              participants={splitParticipants}
+              onParticipantsChange={setSplitParticipants}
+              totalAmount={amount}
+              suggestions={frequentSplitNames}
             />
           )}
 
@@ -259,7 +275,15 @@ export function EditTransactionDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             取消
           </Button>
-          <Button onClick={handleSave} disabled={pending || !amount || Number(amount) <= 0}>
+          <Button
+            onClick={handleSave}
+            disabled={
+              pending ||
+              !amount ||
+              Number(amount) <= 0 ||
+              (type === "expense" && isSharedExpense && computeSplitOverflow(amount, splitParticipants) > 0)
+            }
+          >
             {pending ? "儲存中…" : "儲存"}
           </Button>
         </DialogFooter>

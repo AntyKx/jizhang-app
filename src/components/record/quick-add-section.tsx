@@ -10,20 +10,20 @@ import type { QuickAddAccount, QuickAddCategory } from "@/lib/quick-add-context"
 // The AI bar + category grid — split out of the old monolithic RecordScreen
 // so it can render synchronously on /record instead of waiting behind the
 // same Suspense boundary as the summary/subscriptions/today's-list
-// sections. Its data (categories/accounts/partnerName) is already resolved
-// by (app)/layout.tsx before this page even starts rendering, so there's
-// nothing for it to wait on — this is the part of the home page a user
-// opens it to actually use, so it shouldn't be held hostage by a slower
-// Clerk API call or DB aggregation elsewhere on the page.
+// sections. Its data (categories/accounts/frequentSplitNames) is already
+// resolved by (app)/layout.tsx before this page even starts rendering, so
+// there's nothing for it to wait on — this is the part of the home page a
+// user opens it to actually use, so it shouldn't be held hostage by a
+// slower Clerk API call or DB aggregation elsewhere on the page.
 export function QuickAddSection({
   categories,
   accounts,
-  partnerName,
+  frequentSplitNames,
   sharedLocked,
 }: {
   categories: QuickAddCategory[];
   accounts: QuickAddAccount[];
-  partnerName: string;
+  frequentSplitNames: string[];
   sharedLocked: boolean;
 }) {
   const searchParams = useSearchParams();
@@ -34,7 +34,7 @@ export function QuickAddSection({
         categories={categories}
         accounts={accounts}
         defaultAccountId={accounts[0]?.id ?? ""}
-        partnerName={partnerName}
+        frequentSplitNames={frequentSplitNames}
         // Lazy-initialized from the URL so opening via the home screen's
         // long-press app shortcut (manifest.ts `action=quickadd`/`action=scan`)
         // jumps straight into the right sheet — closest a PWA can get to a
@@ -67,7 +67,7 @@ export function QuickAddSection({
         <QuickAddCategoryFlow
           categories={categories}
           accounts={accounts}
-          partnerName={partnerName}
+          frequentSplitNames={frequentSplitNames}
           enableSharedTab
           sharedLocked={sharedLocked}
         />

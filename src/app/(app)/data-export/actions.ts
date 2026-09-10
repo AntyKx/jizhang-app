@@ -47,9 +47,9 @@ export async function deleteAllUserData() {
 
 // Replace-style restore: wipes the user's existing content, then loads the
 // backup. `userSettings` is intentionally never deleted — only the
-// content-safe fields (partnerName/baseCurrency/monthStartDay) are ever
-// touched, via a scoped upsert, so a restore can never grant/revoke a
-// purchase or subscription. Every inserted row gets the *current* session's
+// content-safe fields (baseCurrency/monthStartDay) are ever touched, via a
+// scoped upsert, so a restore can never grant/revoke a purchase or
+// subscription. Every inserted row gets the *current* session's
 // userId injected fresh — the file's own contents never carry one, and even
 // if they did it would be ignored, so an uploaded backup can never write
 // into another account's data.
@@ -99,20 +99,11 @@ export async function restoreBackup(backupJson: string) {
     await db.insert(savingsGoals).values(parsed.savingsGoals.map((g) => ({ ...g, userId })));
   }
   if (parsed.sharedExpenses.length > 0) {
-    await db.insert(sharedExpenses).values(
-      // settledAt is a timestamp column (Date on the wire in/out of
-      // drizzle), but the backup JSON only ever carries strings — convert
-      // back on the way in, same as every other JSON round trip here.
-      parsed.sharedExpenses.map((s) => ({
-        ...s,
-        userId,
-        settledAt: s.settledAt ? new Date(s.settledAt) : null,
-      })),
-    );
+    await db.insert(sharedExpenses).values(parsed.sharedExpenses.map((s) => ({ ...s, userId })));
   }
 
   if (parsed.settings) {
-    const { partnerName, baseCurrency, monthStartDay } = parsed.settings;
+    const { baseCurrency, monthStartDay } = parsed.settings;
     // Only carried over when the account it points at is actually part of
     // this same backup — a dangling id would fail the FK and abort the
     // whole restore over a preference that just falls back to "自動".
@@ -123,10 +114,10 @@ export async function restoreBackup(backupJson: string) {
         : null;
     await db
       .insert(userSettings)
-      .values({ userId, partnerName, baseCurrency, monthStartDay, defaultAccountId })
+      .values({ userId, baseCurrency, monthStartDay, defaultAccountId })
       .onConflictDoUpdate({
         target: userSettings.userId,
-        set: { partnerName, baseCurrency, monthStartDay, defaultAccountId },
+        set: { baseCurrency, monthStartDay, defaultAccountId },
       });
   }
 

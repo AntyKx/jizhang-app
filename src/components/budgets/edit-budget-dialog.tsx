@@ -58,7 +58,7 @@ export function EditBudgetDialog({ budget, onClose }: { budget: Budget | null; o
 
         <div className="flex flex-col gap-2">
           <Label>預算上限</Label>
-          <AmountKeypadField value={limitAmount} onChange={setLimitAmount} />
+          <AmountKeypadField value={limitAmount} onChange={setLimitAmount} allowDecimal={false} />
         </div>
 
         <DialogFooter>

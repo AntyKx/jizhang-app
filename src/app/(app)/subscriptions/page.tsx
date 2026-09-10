@@ -69,7 +69,7 @@ export default async function SubscriptionsPage() {
   // destination for a recurring bill either.
   const pickableAccounts = accountRows
     .filter((a) => !a.excludeFromNetWorth)
-    .map((a) => ({ id: a.id, name: a.name, type: a.type }));
+    .map((a) => ({ id: a.id, name: a.name, type: a.type, currency: a.currency }));
 
   const rangeEnd = addDays(getTodayInTaipei(), 30);
 

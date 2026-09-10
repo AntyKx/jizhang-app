@@ -22,7 +22,7 @@ type Rule = {
   isSubscription: boolean;
 };
 type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
-type Account = { id: string; name: string; type: AccountType };
+type Account = { id: string; name: string; type: AccountType; currency: string };
 
 export function RuleRow({
   rule,

@@ -1,9 +1,10 @@
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/db";
-import { categories, sharedExpenses, userSettings } from "@/db/schema";
+import { categories, sharedExpenses } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { requireCoreAccess } from "@/lib/entitlements";
 import { getMonthlySharedExpenseTrend } from "@/lib/shared-trend";
+import { flattenSharedExpenseRows } from "@/lib/shared-expenses";
 import { SharedLedgerDashboard } from "@/components/shared/dashboard";
 
 export default async function SharedLedgerPage({
@@ -19,18 +20,16 @@ export default async function SharedLedgerPage({
   if (from) dateConditions.push(gte(sharedExpenses.occurredAt, from));
   if (to) dateConditions.push(lte(sharedExpenses.occurredAt, to));
 
-  const [settingsRows, expenseRows, expenseCategories, monthlyTrend] = await Promise.all([
-    db.select({ partnerName: userSettings.partnerName }).from(userSettings).where(eq(userSettings.userId, userId)),
+  const [rows, expenseCategories, monthlyTrend] = await Promise.all([
     db
       .select({
         id: sharedExpenses.id,
         name: sharedExpenses.name,
-        amount: sharedExpenses.amount,
-        paidByMe: sharedExpenses.paidByMe,
-        occurredAt: sharedExpenses.occurredAt,
-        isSettled: sharedExpenses.isSettled,
         categoryId: sharedExpenses.categoryId,
         categoryName: categories.name,
+        occurredAt: sharedExpenses.occurredAt,
+        linkedTransactionId: sharedExpenses.linkedTransactionId,
+        participants: sharedExpenses.participants,
       })
       .from(sharedExpenses)
       .leftJoin(categories, eq(sharedExpenses.categoryId, categories.id))
@@ -44,12 +43,11 @@ export default async function SharedLedgerPage({
     getMonthlySharedExpenseTrend(userId),
   ]);
 
-  const partnerName = settingsRows[0]?.partnerName || "另一半";
+  const items = flattenSharedExpenseRows(rows);
 
   return (
     <SharedLedgerDashboard
-      partnerName={partnerName}
-      expenses={expenseRows}
+      items={items}
       categories={expenseCategories}
       dateFrom={from}
       dateTo={to}

@@ -9,11 +9,11 @@ type Category = { id: string; name: string; icon: string | null; color: string |
 
 export function SharedQuickAddFlow({
   categories,
-  partnerName,
+  frequentSplitNames,
   onDone,
 }: {
   categories: Category[];
-  partnerName: string;
+  frequentSplitNames: string[];
   // Only needed when this is opened from the global quick-add FAB (wrapped
   // in its own sheet there) so it can dismiss that wrapper too — the plain
   // in-page usage on the 分帳 dashboard doesn't pass it.
@@ -27,7 +27,7 @@ export function SharedQuickAddFlow({
     return (
       <SharedTextQuickAdd
         categories={categories}
-        partnerName={partnerName}
+        frequentSplitNames={frequentSplitNames}
         initialText={quickText}
         onDone={() => {
           setShowText(false);

@@ -25,7 +25,7 @@ export default async function AppLayout({
       <GlobalQuickAddFab
         categories={quickAddContext.categories}
         accounts={quickAddContext.accounts}
-        partnerName={quickAddContext.partnerName}
+        frequentSplitNames={quickAddContext.frequentSplitNames}
         sharedLocked={!unlocked}
       />
       <MainNav />

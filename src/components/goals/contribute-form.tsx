@@ -14,6 +14,7 @@ export function ContributeForm({ goalId }: { goalId: string }) {
       <AmountKeypadField
         value={amount}
         onChange={setAmount}
+        allowDecimal={false}
         className="h-8 flex-1 rounded-md text-sm font-normal"
       />
       <Button
