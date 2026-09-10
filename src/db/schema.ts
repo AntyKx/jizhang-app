@@ -52,6 +52,14 @@ export const aiSubscriptionStatusEnum = pgEnum("ai_subscription_status", [
   "canceled",
 ]);
 
+// Which storefront an entitlement was granted through — drives the
+// /upgrade page's "manage subscription" link (Stripe billing portal vs. a
+// deep link to the OS's own subscription settings) and is otherwise just
+// support/debugging context. Null means legacy/Stripe: every row predating
+// this column has a real stripeCustomerId to build a billing-portal
+// session from, so null and "stripe" are treated the same everywhere.
+export const purchasePlatformEnum = pgEnum("purchase_platform", ["stripe", "app_store", "play_store"]);
+
 export const userSettings = pgTable("user_settings", {
   userId: text("user_id").primaryKey(), // Clerk user id
   // Preselected in CreateAccountDialog's currency picker so a user who
@@ -70,10 +78,14 @@ export const userSettings = pgTable("user_settings", {
   // stats, data export, and the shared ledger (see entitlements.ts).
   hasPurchasedCore: boolean("has_purchased_core").notNull().default(false),
   corePurchasedAt: timestamp("core_purchased_at"),
+  // Which storefront granted it — Stripe webhook and the RevenueCat
+  // webhook both write this alongside hasPurchasedCore/aiSubscriptionStatus.
+  corePurchasePlatform: purchasePlatformEnum("core_purchase_platform"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   aiSubscriptionStatus: aiSubscriptionStatusEnum("ai_subscription_status").notNull().default("none"),
   aiSubscriptionCurrentPeriodEnd: timestamp("ai_subscription_current_period_end"),
+  aiSubscriptionPlatform: purchasePlatformEnum("ai_subscription_platform"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

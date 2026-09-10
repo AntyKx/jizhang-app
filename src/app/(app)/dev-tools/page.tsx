@@ -1,18 +1,24 @@
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { userSettings, aiSubscriptionStatusEnum } from "@/db/schema";
+import { userSettings, aiSubscriptionStatusEnum, purchasePlatformEnum } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { isDevAdmin } from "@/lib/entitlements";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { setOwnAiSubscriptionStatus, setOwnCoreUnlock } from "./actions";
+import { setOwnAiSubscriptionPlatform, setOwnAiSubscriptionStatus, setOwnCoreUnlock } from "./actions";
 
 const statusLabel: Record<(typeof aiSubscriptionStatusEnum.enumValues)[number], string> = {
   none: "無訂閱",
   active: "訂閱中",
   past_due: "逾期未繳",
   canceled: "已取消",
+};
+
+const platformLabel: Record<(typeof purchasePlatformEnum.enumValues)[number], string> = {
+  stripe: "網頁 Stripe",
+  app_store: "App Store",
+  play_store: "Google Play",
 };
 
 export default async function DevToolsPage() {
@@ -23,12 +29,14 @@ export default async function DevToolsPage() {
     .select({
       hasPurchasedCore: userSettings.hasPurchasedCore,
       aiSubscriptionStatus: userSettings.aiSubscriptionStatus,
+      aiSubscriptionPlatform: userSettings.aiSubscriptionPlatform,
     })
     .from(userSettings)
     .where(eq(userSettings.userId, userId));
 
   const unlocked = settings?.hasPurchasedCore ?? false;
   const currentStatus = settings?.aiSubscriptionStatus ?? "none";
+  const currentPlatform = settings?.aiSubscriptionPlatform ?? null;
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6">
@@ -61,6 +69,36 @@ export default async function DevToolsPage() {
                 className={cn("w-full", status === currentStatus && "border-primary text-primary")}
               >
                 {statusLabel[status]}
+              </Button>
+            </form>
+          ))}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted-foreground">AI 訂閱平台</h2>
+        <p className="text-sm text-muted-foreground">
+          目前平台：{currentPlatform ? platformLabel[currentPlatform] : "無（舊資料）"}
+          ——決定「升級」頁的管理訂閱按鈕導去哪裡
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <form action={setOwnAiSubscriptionPlatform.bind(null, null)}>
+            <Button
+              type="submit"
+              variant="outline"
+              className={cn("w-full", currentPlatform === null && "border-primary text-primary")}
+            >
+              無（舊資料）
+            </Button>
+          </form>
+          {purchasePlatformEnum.enumValues.map((platform) => (
+            <form key={platform} action={setOwnAiSubscriptionPlatform.bind(null, platform)}>
+              <Button
+                type="submit"
+                variant="outline"
+                className={cn("w-full", platform === currentPlatform && "border-primary text-primary")}
+              >
+                {platformLabel[platform]}
               </Button>
             </form>
           ))}

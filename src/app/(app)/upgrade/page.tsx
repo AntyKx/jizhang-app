@@ -2,8 +2,9 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { userSettings } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { BackHistoryLink } from "@/components/back-history-link";
+import { cn } from "@/lib/utils";
 import {
   createAiSubscriptionCheckoutSession,
   createBillingPortalSession,
@@ -29,12 +30,16 @@ export default async function UpgradePage({
     .select({
       hasPurchasedCore: userSettings.hasPurchasedCore,
       aiSubscriptionStatus: userSettings.aiSubscriptionStatus,
+      aiSubscriptionPlatform: userSettings.aiSubscriptionPlatform,
     })
     .from(userSettings)
     .where(eq(userSettings.userId, userId));
 
   const unlocked = settings?.hasPurchasedCore ?? false;
   const isSubscribed = settings?.aiSubscriptionStatus === "active";
+  // Null covers every row predating this column — those subscribers all
+  // have a real stripeCustomerId, so treat null the same as "stripe".
+  const aiSubscriptionPlatform = settings?.aiSubscriptionPlatform ?? "stripe";
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6">
@@ -78,7 +83,21 @@ export default async function UpgradePage({
           <p className="text-2xl font-semibold tabular-nums">
             NT$30<span className="text-sm font-normal text-muted-foreground">/月</span>
           </p>
-          {isSubscribed ? (
+          {isSubscribed && aiSubscriptionPlatform === "app_store" ? (
+            <a
+              href="itms-apps://apps.apple.com/account/subscriptions"
+              className={cn(buttonVariants({ variant: "outline" }), "w-full")}
+            >
+              前往 App Store 管理訂閱
+            </a>
+          ) : isSubscribed && aiSubscriptionPlatform === "play_store" ? (
+            <a
+              href="https://play.google.com/store/account/subscriptions"
+              className={cn(buttonVariants({ variant: "outline" }), "w-full")}
+            >
+              前往 Google Play 管理訂閱
+            </a>
+          ) : isSubscribed ? (
             <form action={createBillingPortalSession}>
               <Button type="submit" variant="outline" className="w-full">
                 管理訂閱
