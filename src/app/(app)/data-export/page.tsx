@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { eq } from "drizzle-orm";
+import { format } from "date-fns";
 import { CalendarRange, FileSpreadsheet, FileText, Lock } from "lucide-react";
 import { db } from "@/db";
 import { accounts, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { hasCoreAccess } from "@/lib/entitlements";
+import { listSnapshots, RETENTION_DAYS } from "@/lib/backup-snapshots";
+import { getTodayInTaipei } from "@/lib/date";
 import { buttonVariants } from "@/components/ui/button";
 import { BackLink } from "@/components/back-link";
+import { CloudSnapshotList } from "@/components/data-export/cloud-snapshot-list";
 import { DeleteAllDataDialog } from "@/components/data-export/delete-all-data-dialog";
 import { RestoreBackupDialog } from "@/components/data-export/restore-backup-dialog";
 import { cn } from "@/lib/utils";
@@ -21,9 +25,13 @@ export default async function DataExportPage() {
   // deleteAllUserData()'s comments).
   const unlocked = await hasCoreAccess(userId);
 
-  const [txRows, accountRows] = await Promise.all([
+  const [txRows, accountRows, snapshots] = await Promise.all([
     db.select({ occurredAt: transactions.occurredAt }).from(transactions).where(eq(transactions.userId, userId)),
     db.select({ id: accounts.id }).from(accounts).where(eq(accounts.userId, userId)),
+    // Listing is cheap and read-only, so it runs for everyone — the gate is
+    // on restoring, matching how the rest of this page treats reading your
+    // own data as free and destructive operations as core-unlock.
+    unlocked ? listSnapshots(userId) : Promise.resolve([]),
   ]);
 
   const transactionCount = txRows.length;
@@ -96,6 +104,28 @@ export default async function DataExportPage() {
           >
             <Lock className="size-4 shrink-0" strokeWidth={1.75} />
             用備份檔案還原是核心解鎖功能，點此了解如何解鎖
+          </Link>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold text-muted-foreground">雲端自動備份</h2>
+        <p className="text-sm text-muted-foreground">
+          除了你自己下載的備份檔，系統每天也會自動幫你保存一份快照。誤刪資料或想回到某一天的狀態時，可以直接從這裡還原，不需要事先下載過任何東西。
+        </p>
+        {unlocked ? (
+          <CloudSnapshotList
+            snapshots={snapshots}
+            today={format(getTodayInTaipei(), "yyyy-MM-dd")}
+            retentionDays={RETENTION_DAYS}
+          />
+        ) : (
+          <Link
+            href="/upgrade?from=data-export"
+            className="flex items-center gap-2.5 rounded-lg border border-dashed p-3 text-sm text-muted-foreground hover:bg-muted"
+          >
+            <Lock className="size-4 shrink-0" strokeWidth={1.75} />
+            還原到指定日期是核心解鎖功能，點此了解如何解鎖
           </Link>
         )}
       </section>

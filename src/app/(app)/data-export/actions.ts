@@ -17,7 +17,8 @@ import {
 } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { requireCoreAccess } from "@/lib/entitlements";
-import { backupSchema } from "@/lib/backup-schema";
+import { backupSchema, type Backup } from "@/lib/backup-schema";
+import { listSnapshots, readSnapshot } from "@/lib/backup-snapshots";
 import { fail } from "@/lib/action-result";
 
 // The neon-http driver has no interactive `db.transaction`, but does support
@@ -55,17 +56,7 @@ export async function deleteAllUserData() {
 // userId injected fresh — the file's own contents never carry one, and even
 // if they did it would be ignored, so an uploaded backup can never write
 // into another account's data.
-export async function restoreBackup(backupJson: string) {
-  const userId = await requireUserId();
-  await requireCoreAccess(userId, "restore-backup");
-
-  let parsed;
-  try {
-    parsed = backupSchema.parse(JSON.parse(backupJson));
-  } catch {
-    return fail("備份檔案格式錯誤，無法還原");
-  }
-
+async function applyBackup(userId: string, parsed: Backup) {
   // Wipe and reload in ONE batch, so a restore is all-or-nothing. Splitting
   // them (an atomic wipe followed by sequential inserts) meant a failure
   // partway through the insert phase left the account holding a half-loaded
@@ -142,4 +133,58 @@ export async function restoreBackup(backupJson: string) {
   }
 
   revalidatePath("/", "layout");
+}
+
+// Restore from a file the user uploaded themselves.
+export async function restoreBackup(backupJson: string) {
+  const userId = await requireUserId();
+  await requireCoreAccess(userId, "restore-backup");
+
+  let parsed;
+  try {
+    parsed = backupSchema.parse(JSON.parse(backupJson));
+  } catch {
+    return fail("備份檔案格式錯誤，無法還原");
+  }
+
+  return applyBackup(userId, parsed);
+}
+
+// Restore from one of the nightly cloud snapshots. `day` is only ever used
+// to address a blob under this session's own userId prefix, so it can't be
+// pointed at another account's snapshot.
+export async function restoreFromSnapshot(day: string) {
+  const userId = await requireUserId();
+  await requireCoreAccess(userId, "restore-backup");
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return fail("備份日期格式錯誤");
+
+  let contents: string | null;
+  try {
+    contents = await readSnapshot(userId, day);
+  } catch (err) {
+    console.error("[restoreFromSnapshot] read failed:", err);
+    return fail("讀取雲端備份失敗，請稍後再試");
+  }
+  if (!contents) return fail("找不到這一天的備份");
+
+  let parsed;
+  try {
+    parsed = backupSchema.parse(JSON.parse(contents));
+  } catch {
+    // A snapshot this app wrote itself failing validation means the backup
+    // format moved on without a migration — worth surfacing plainly rather
+    // than blaming the user's file, since there is no user file here.
+    console.error("[restoreFromSnapshot] snapshot failed schema validation:", day);
+    return fail("這份雲端備份的格式無法解析，請改用手動備份檔還原");
+  }
+
+  return applyBackup(userId, parsed);
+}
+
+// Powers the point-in-time list in the UI.
+export async function getMySnapshots() {
+  const userId = await requireUserId();
+  await requireCoreAccess(userId, "restore-backup");
+  return listSnapshots(userId);
 }
