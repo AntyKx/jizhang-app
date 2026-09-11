@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { zhTW } from "@clerk/localizations";
 import { Toaster } from "@/components/ui/sonner";
 import UpdateChecker from "@/components/update-checker";
 import InstallPrompt from "@/components/install-prompt";
@@ -53,7 +54,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider localization={zhTW}>
       <html
         lang="zh-TW"
         className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
