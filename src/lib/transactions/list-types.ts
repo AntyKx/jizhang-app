@@ -23,6 +23,12 @@ export type RegularItem = {
   isSharedExpense: boolean;
   splitParticipants: { name: string; amount: string }[];
   splitLocked: boolean;
+  // Set only when this transaction is a split-settlement reimbursement —
+  // lets the list collapse consecutive settlements of the same split event
+  // into one group (see group-settlements.ts). Never set by any user-facing
+  // form.
+  linkedSharedExpenseId: string | null;
+  settlementGroupLabel: string | null;
 };
 
 export type TransferListItem = {
@@ -34,6 +40,13 @@ export type TransferListItem = {
   occurredAt: string;
   fromAccountId: string;
   toAccountId: string | null;
+  // A transfer can never be a split-settlement reimbursement — always null,
+  // never read from the DB. Declared (not omitted) so groupSettlements'
+  // ListItem-typed callers satisfy its generic constraint without a
+  // TypeScript "weak type" rejection (an all-optional constraint accepts
+  // literally any unrelated object, which TS specifically disallows).
+  linkedSharedExpenseId: null;
+  settlementGroupLabel: null;
 };
 
 export type ListItem = RegularItem | TransferListItem;

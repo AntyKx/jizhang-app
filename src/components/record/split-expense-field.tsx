@@ -20,11 +20,14 @@ export function computeSplitOverflow(totalAmount: string, participants: SplitPar
 
 // Shared by all four expense-entry paths (manual amount sheet, edit dialog,
 // AI text quick-add, receipt scan) so "分帳" looks and behaves identically
-// everywhere. Always represents "I paid the full amount, these people owe me
-// their share" — the reverse ("someone else paid, I owe them") doesn't
-// touch any of my accounts at all, so it belongs on the /shared page's own
-// standalone add-expense flow instead of hiding account/payment-method
-// fields in here like the old single-partner toggle used to.
+// everywhere. Normally always represents "I paid the full amount, these
+// people owe me their share" — the reverse ("someone else paid, I owe
+// them") doesn't touch any of my accounts at all, so by default it doesn't
+// belong here. The one exception is the /record 分帳 tab (quick-add-
+// category-flow.tsx), which passes allowTheirsDirection to also offer that
+// reverse case inline instead of a separate standalone flow — the other
+// three consumers never pass it, so they're completely unaffected and never
+// show this choice.
 export function SplitExpenseField({
   enabled,
   onEnabledChange,
@@ -32,15 +35,26 @@ export function SplitExpenseField({
   onParticipantsChange,
   totalAmount,
   suggestions,
+  allowTheirsDirection = false,
+  direction = "mine",
+  onDirectionChange,
+  theirsCounterpartyName = "",
+  onTheirsCounterpartyNameChange,
 }: {
   enabled: boolean;
   onEnabledChange: (next: boolean) => void;
   participants: SplitParticipantDraft[];
   onParticipantsChange: (next: SplitParticipantDraft[]) => void;
   // The transaction's own amount — used to compute "我的份額" and, in 均分
-  // mode, each participant's default even share.
+  // mode, each participant's default even share. Meaningless when
+  // direction is "theirs" (no real transaction, no total to speak of).
   totalAmount: string;
   suggestions: string[];
+  allowTheirsDirection?: boolean;
+  direction?: "mine" | "theirs";
+  onDirectionChange?: (next: "mine" | "theirs") => void;
+  theirsCounterpartyName?: string;
+  onTheirsCounterpartyNameChange?: (next: string) => void;
 }) {
   const [method, setMethod] = useState<"equal" | "custom">("equal");
   const [nameInput, setNameInput] = useState("");
@@ -80,6 +94,7 @@ export function SplitExpenseField({
   const overflow = Math.max(splitTotal - total, 0);
   const myShare = Math.max(total - splitTotal, 0);
   const unusedSuggestions = suggestions.filter((s) => !participants.some((p) => p.name === s));
+  const isTheirs = allowTheirsDirection && direction === "theirs";
 
   return (
     <div className="flex flex-col gap-2">
@@ -95,7 +110,7 @@ export function SplitExpenseField({
       >
         <span className="flex items-center gap-1.5">
           <Handshake className="size-4 shrink-0" strokeWidth={1.75} />
-          分帳（我先付，跟朋友分攤）
+          {allowTheirsDirection ? "分帳" : "分帳（我先付，跟朋友分攤）"}
         </span>
         <span
           className={cn(
@@ -109,122 +124,175 @@ export function SplitExpenseField({
 
       {enabled && (
         <div className="flex flex-col gap-3 rounded-2xl bg-muted/40 p-3">
-          <div className="flex rounded-lg bg-muted p-0.5 text-xs font-medium">
-            <button
-              type="button"
-              onClick={() => setMethod("equal")}
-              className={cn(
-                "flex-1 rounded-md py-1.5 transition-colors",
-                method === "equal" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
-              )}
-            >
-              均分
-            </button>
-            <button
-              type="button"
-              onClick={() => setMethod("custom")}
-              className={cn(
-                "flex-1 rounded-md py-1.5 transition-colors",
-                method === "custom" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
-              )}
-            >
-              自訂金額
-            </button>
-          </div>
-
-          {participants.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {participants.map((p, i) => (
-                <div key={p.name} className="flex items-center gap-2">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold text-secondary-foreground">
-                    {p.name.slice(0, 1)}
-                  </span>
-                  <span className="flex-1 truncate text-sm font-medium">{p.name}</span>
-                  {method === "custom" ? (
-                    <Input
-                      type="number"
-                      inputMode="decimal"
-                      value={p.amount}
-                      onChange={(e) => updateAmount(i, e.target.value)}
-                      className="h-8 w-24 border-0 bg-background text-right"
-                    />
-                  ) : (
-                    <span className="w-24 text-right text-sm font-semibold tabular-nums">
-                      ${Number(p.amount).toLocaleString("zh-TW")}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => removeParticipant(i)}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
-                  >
-                    <X className="size-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <Input
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addParticipant(nameInput);
-                }
-              }}
-              placeholder="新增分帳對象"
-              className="h-9 border-0 bg-background"
-            />
-            <button
-              type="button"
-              onClick={() => addParticipant(nameInput)}
-              disabled={!nameInput.trim()}
-              className="flex h-9 shrink-0 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-40"
-            >
-              新增
-            </button>
-          </div>
-
-          {unusedSuggestions.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {unusedSuggestions.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => addParticipant(s)}
-                  className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {participants.length > 0 && (
-            <div
-              className={cn(
-                "flex flex-wrap items-center justify-between gap-1 rounded-xl px-3 py-2.5",
-                overflow > 0 ? "bg-destructive/10" : "bg-secondary",
-              )}
-            >
-              <div className={cn("text-xs font-medium", overflow > 0 ? "text-destructive" : "text-secondary-foreground")}>
-                {overflow > 0 ? "分帳金額超出總額" : "我的份額"}
-                <span className="ml-1 opacity-70">
-                  {overflow > 0 ? "，請調整金額" : `（${participants.length} 位對象分攤）`}
-                </span>
-              </div>
-              <div
+          {allowTheirsDirection && (
+            <div className="flex rounded-lg bg-muted p-0.5 text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => onDirectionChange?.("mine")}
                 className={cn(
-                  "text-base font-extrabold tabular-nums",
-                  overflow > 0 ? "text-destructive" : "text-secondary-foreground",
+                  "flex-1 rounded-md py-1.5 transition-colors",
+                  !isTheirs ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
                 )}
               >
-                {overflow > 0 ? `+$${overflow.toLocaleString("zh-TW")}` : `$${myShare.toLocaleString("zh-TW")}`}
-              </div>
+                我付的
+              </button>
+              <button
+                type="button"
+                onClick={() => onDirectionChange?.("theirs")}
+                className={cn(
+                  "flex-1 rounded-md py-1.5 transition-colors",
+                  isTheirs ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
+                )}
+              >
+                對方付的
+              </button>
             </div>
+          )}
+
+          {isTheirs ? (
+            <div className="flex flex-col gap-2">
+              <Input
+                value={theirsCounterpartyName}
+                onChange={(e) => onTheirsCounterpartyNameChange?.(e.target.value)}
+                placeholder="誰付的？姓名"
+                maxLength={30}
+                className="h-9 border-0 bg-background"
+              />
+              {suggestions.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {suggestions.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => onTheirsCounterpartyNameChange?.(s)}
+                      className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex rounded-lg bg-muted p-0.5 text-xs font-medium">
+                <button
+                  type="button"
+                  onClick={() => setMethod("equal")}
+                  className={cn(
+                    "flex-1 rounded-md py-1.5 transition-colors",
+                    method === "equal" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
+                  )}
+                >
+                  均分
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMethod("custom")}
+                  className={cn(
+                    "flex-1 rounded-md py-1.5 transition-colors",
+                    method === "custom" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
+                  )}
+                >
+                  自訂金額
+                </button>
+              </div>
+
+              {participants.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {participants.map((p, i) => (
+                    <div key={p.name} className="flex items-center gap-2">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold text-secondary-foreground">
+                        {p.name.slice(0, 1)}
+                      </span>
+                      <span className="flex-1 truncate text-sm font-medium">{p.name}</span>
+                      {method === "custom" ? (
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          value={p.amount}
+                          onChange={(e) => updateAmount(i, e.target.value)}
+                          className="h-8 w-24 border-0 bg-background text-right"
+                        />
+                      ) : (
+                        <span className="w-24 text-right text-sm font-semibold tabular-nums">
+                          ${Number(p.amount).toLocaleString("zh-TW")}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeParticipant(i)}
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <Input
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addParticipant(nameInput);
+                    }
+                  }}
+                  placeholder="新增分帳對象"
+                  className="h-9 border-0 bg-background"
+                />
+                <button
+                  type="button"
+                  onClick={() => addParticipant(nameInput)}
+                  disabled={!nameInput.trim()}
+                  className="flex h-9 shrink-0 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-40"
+                >
+                  新增
+                </button>
+              </div>
+
+              {unusedSuggestions.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {unusedSuggestions.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => addParticipant(s)}
+                      className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {participants.length > 0 && (
+                <div
+                  className={cn(
+                    "flex flex-wrap items-center justify-between gap-1 rounded-xl px-3 py-2.5",
+                    overflow > 0 ? "bg-destructive/10" : "bg-secondary",
+                  )}
+                >
+                  <div className={cn("text-xs font-medium", overflow > 0 ? "text-destructive" : "text-secondary-foreground")}>
+                    {overflow > 0 ? "分帳金額超出總額" : "我的份額"}
+                    <span className="ml-1 opacity-70">
+                      {overflow > 0 ? "，請調整金額" : `（${participants.length} 位對象分攤）`}
+                    </span>
+                  </div>
+                  <div
+                    className={cn(
+                      "text-base font-extrabold tabular-nums",
+                      overflow > 0 ? "text-destructive" : "text-secondary-foreground",
+                    )}
+                  >
+                    {overflow > 0 ? `+$${overflow.toLocaleString("zh-TW")}` : `$${myShare.toLocaleString("zh-TW")}`}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

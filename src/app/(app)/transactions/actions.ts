@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { eq, and, or, lt, ne, desc, inArray, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { accounts, categories, sharedExpenses, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
@@ -57,6 +58,12 @@ const createTransactionSchema = z.object({
   merchant: z.string().max(100).optional(),
   occurredAt: z.string().min(1),
   splitParticipants: z.array(splitParticipantInputSchema).max(20).optional(),
+  // Internal only — never set by any user-facing form. Written by
+  // shared/actions.ts's createSettlementTransaction to mark a transaction as
+  // the reimbursement for one particular split event, so transaction lists
+  // can collapse multiple settlements of the same event into one display
+  // group (see src/lib/transactions/group-settlements.ts).
+  linkedSharedExpenseId: z.string().uuid().optional(),
 });
 
 export async function createTransaction(input: {
@@ -75,6 +82,7 @@ export async function createTransaction(input: {
   // accounts, so it doesn't belong here — see shared/actions.ts's
   // createSplitExpense for that standalone case instead.
   splitParticipants?: { name: string; amount: number }[];
+  linkedSharedExpenseId?: string;
 }) {
   const userId = await requireUserId();
   const parsed = createTransactionSchema.parse(input);
@@ -109,6 +117,7 @@ export async function createTransaction(input: {
       note: parsed.note,
       merchant: parsed.merchant,
       occurredAt: parsed.occurredAt,
+      linkedSharedExpenseId: parsed.linkedSharedExpenseId,
     })
     .returning({ id: transactions.id });
   const updateAccountBalance = db
@@ -595,6 +604,15 @@ export async function loadMoreTransactions(cursor: TransactionsCursor, filter?: 
   // scrolled past what the server sent on first load.
   const filterConditions = transactionsFilterConditions(filter);
 
+  // Aliased second join against the same table — the first join (below)
+  // pulls a transaction's OWN split-participant data (the 分帳 toggle on the
+  // transaction itself); this one pulls the split EVENT a settlement
+  // transaction was created to reimburse, the opposite direction, so
+  // multiple settlements of one event can be collapsed into one display
+  // group (see group-settlements.ts). Must stay consistent with the initial
+  // page's query in /transactions's page.tsx so "load more" doesn't drift.
+  const originExpense = alias(sharedExpenses, "originExpense");
+
   const [regularRows, transferRows] = await Promise.all([
     db
       .select({
@@ -612,10 +630,13 @@ export async function loadMoreTransactions(cursor: TransactionsCursor, filter?: 
         paymentMethod: transactions.paymentMethod,
         accountId: transactions.accountId,
         sharedExpenseParticipants: sharedExpenses.participants,
+        linkedSharedExpenseId: transactions.linkedSharedExpenseId,
+        settlementGroupLabel: originExpense.name,
       })
       .from(transactions)
       .leftJoin(categories, eq(transactions.categoryId, categories.id))
       .leftJoin(sharedExpenses, eq(sharedExpenses.linkedTransactionId, transactions.id))
+      .leftJoin(originExpense, eq(originExpense.id, transactions.linkedSharedExpenseId))
       .where(
         and(
           eq(transactions.userId, userId),
@@ -665,7 +686,7 @@ export async function loadMoreTransactions(cursor: TransactionsCursor, filter?: 
         ...deriveSplitFields(sharedExpenseParticipants),
       };
     }),
-    ...transferRows.map((t) => ({ ...t, kind: "transfer" as const })),
+    ...transferRows.map((t) => ({ ...t, kind: "transfer" as const, linkedSharedExpenseId: null, settlementGroupLabel: null })),
   ].sort((a, b) => {
     if (a.occurredAt !== b.occurredAt) return a.occurredAt < b.occurredAt ? 1 : -1;
     return a.createdAt < b.createdAt ? 1 : -1;

@@ -10,6 +10,7 @@ import {
   subMonths,
 } from "date-fns";
 import { and, eq, gte, lte } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { db } from "@/db";
 import { accounts, categories, sharedExpenses, transactions } from "@/db/schema";
@@ -19,6 +20,8 @@ import { deriveSplitFields, getFrequentSplitNames } from "@/lib/shared-expenses"
 import { PaymentMethodIcon } from "@/components/transactions/payment-method-icon";
 import { CategoryIcon } from "@/components/category-icon";
 import { TodayTransactionRow } from "@/components/record/today-transaction-row";
+import { SettlementGroupRow } from "@/components/transactions/settlement-group-row";
+import { groupSettlements, isSettlementGroup } from "@/lib/transactions/group-settlements";
 import { BearIllustration } from "@/components/bear-illustration";
 import { heatmapLevel, SEQUENTIAL_HEATMAP_STEPS, SEQUENTIAL_HEATMAP_TEXT } from "@/components/stats/chart-colors";
 import { StaggerList } from "@/components/motion/stagger-list";
@@ -49,6 +52,14 @@ export default async function CalendarPage({
   const todayKey = format(today, "yyyy-MM-dd");
   const selectedDay = params.day ?? (monthKey === format(today, "yyyy-MM") ? todayKey : null);
 
+  // Aliased second join against the same table — the first join (above)
+  // pulls a transaction's OWN split-participant data (the 分帳 toggle on the
+  // transaction itself); this one pulls the split EVENT a settlement
+  // transaction was created to reimburse, the opposite direction, so
+  // multiple settlements of one event can be collapsed into one display
+  // group (see group-settlements.ts).
+  const originExpense = alias(sharedExpenses, "originExpense");
+
   const [monthTransactionRows, userCategories, userAccounts, frequentSplitNames] = await Promise.all([
     db
       .select({
@@ -68,11 +79,14 @@ export default async function CalendarPage({
         accountId: transactions.accountId,
         accountName: accounts.name,
         sharedExpenseParticipants: sharedExpenses.participants,
+        linkedSharedExpenseId: transactions.linkedSharedExpenseId,
+        settlementGroupLabel: originExpense.name,
       })
       .from(transactions)
       .leftJoin(categories, eq(transactions.categoryId, categories.id))
       .innerJoin(accounts, eq(transactions.accountId, accounts.id))
       .leftJoin(sharedExpenses, eq(sharedExpenses.linkedTransactionId, transactions.id))
+      .leftJoin(originExpense, eq(originExpense.id, transactions.linkedSharedExpenseId))
       .where(
         and(
           eq(transactions.userId, userId),
@@ -234,16 +248,38 @@ export default async function CalendarPage({
       <>
         {editableTransactions.length > 0 && (
           <StaggerList className="flex flex-col divide-y">
-            {editableTransactions.map((t) => (
-              <TodayTransactionRow
-                key={t.id}
-                transaction={t}
-                categories={userCategories}
-                accounts={userAccounts.filter((a) => !a.excludeFromNetWorth)}
-                showAccount={userAccounts.length > 1}
-                frequentSplitNames={frequentSplitNames}
-              />
-            ))}
+            {groupSettlements(editableTransactions).map((node) =>
+              isSettlementGroup(node) ? (
+                <SettlementGroupRow
+                  key={node.groupId}
+                  label={node.label}
+                  total={node.items.reduce((sum, t) => sum + Number(t.amount), 0)}
+                  count={node.items.length}
+                  categoryIcon={node.items[0].categoryIcon}
+                  categoryColor={node.items[0].categoryColor}
+                >
+                  {node.items.map((t) => (
+                    <TodayTransactionRow
+                      key={t.id}
+                      transaction={t}
+                      categories={userCategories}
+                      accounts={userAccounts.filter((a) => !a.excludeFromNetWorth)}
+                      showAccount={userAccounts.length > 1}
+                      frequentSplitNames={frequentSplitNames}
+                    />
+                  ))}
+                </SettlementGroupRow>
+              ) : (
+                <TodayTransactionRow
+                  key={node.id}
+                  transaction={node}
+                  categories={userCategories}
+                  accounts={userAccounts.filter((a) => !a.excludeFromNetWorth)}
+                  showAccount={userAccounts.length > 1}
+                  frequentSplitNames={frequentSplitNames}
+                />
+              ),
+            )}
           </StaggerList>
         )}
 

@@ -34,6 +34,27 @@ const quickAddSchema = z.object({
   occurredAt: z
     .string()
     .describe("交易發生日期，格式 yyyy-MM-dd，未提及日期則用今天"),
+  isSharedExpense: z
+    .boolean()
+    .describe(
+      "是否為跟別人分攤/分帳的支出——使用者明確提到「分帳」「各付」「AA」「算我的」「他/她付的」「我先付」等分攤語意才是 true；只是提到「跟誰一起吃/去」但沒有分攤金額的語意，仍是 false",
+    ),
+  splitDirection: z
+    .enum(["mine", "theirs"])
+    .nullable()
+    .describe(
+      "分帳方向。mine = 使用者自己已經付了全額，對方要還他一部分；theirs = 對方已經付了錢，使用者欠對方一部分。isSharedExpense 為 false 時必須是 null",
+    ),
+  splitCounterpartyName: z
+    .string()
+    .nullable()
+    .describe("分帳對象的名字（人名）。isSharedExpense 為 false 時為 null"),
+  splitParticipantAmount: z
+    .number()
+    .nullable()
+    .describe(
+      "只在 splitDirection 為 mine 時使用：對方要還使用者多少錢（不是總額）。splitDirection 為 theirs 時，主要的 amount 欄位本身就已經是使用者要還對方的金額，這個欄位設為 null；isSharedExpense 為 false 時也是 null",
+    ),
 });
 
 export async function POST(req: Request) {
@@ -87,7 +108,12 @@ export async function POST(req: Request) {
 
 使用者輸入：「${text}」
 
-請解析出金額、收入或支出、最符合的分類名稱（須完全符合上述清單其中之一）、付款方式、最符合的帳戶名稱（只有使用者明確提到才選，須完全符合上述帳戶清單其中之一，否則為 null）、商家、備註與日期。`,
+請解析出金額、收入或支出、最符合的分類名稱（須完全符合上述清單其中之一）、付款方式、最符合的帳戶名稱（只有使用者明確提到才選，須完全符合上述帳戶清單其中之一，否則為 null）、商家、備註與日期。
+
+如果使用者提到分帳、AA、各付一半、算我的、對方付的等語意，額外判斷 isSharedExpense、splitDirection、splitCounterpartyName、splitParticipantAmount。
+例如「晚餐1000，我跟老婆各付一半」→ isSharedExpense=true, splitDirection=mine, splitCounterpartyName=老婆, splitParticipantAmount=500。
+例如「老婆付的午餐300，算我的」→ isSharedExpense=true, splitDirection=theirs, splitCounterpartyName=老婆, amount=300。
+只是提到「跟誰一起」但沒有分攤金額語意（例如「晚餐1000，跟老婆一起吃」）則 isSharedExpense=false，其餘分帳欄位為 null。`,
     }));
   } catch {
     return NextResponse.json({ error: "AI 解析失敗，請稍後再試或手動記帳" }, { status: 502 });

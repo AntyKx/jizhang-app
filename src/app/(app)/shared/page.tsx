@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { categories, sharedExpenses } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { requireCoreAccess } from "@/lib/entitlements";
+import { listAccounts } from "@/lib/account";
 import { getMonthlySharedExpenseTrend } from "@/lib/shared-trend";
 import { flattenSharedExpenseRows } from "@/lib/shared-expenses";
 import { SharedLedgerDashboard } from "@/components/shared/dashboard";
@@ -20,13 +21,15 @@ export default async function SharedLedgerPage({
   if (from) dateConditions.push(gte(sharedExpenses.occurredAt, from));
   if (to) dateConditions.push(lte(sharedExpenses.occurredAt, to));
 
-  const [rows, expenseCategories, monthlyTrend] = await Promise.all([
+  const [rows, expenseCategories, accounts, monthlyTrend] = await Promise.all([
     db
       .select({
         id: sharedExpenses.id,
         name: sharedExpenses.name,
         categoryId: sharedExpenses.categoryId,
         categoryName: categories.name,
+        categoryIcon: categories.icon,
+        categoryColor: categories.color,
         occurredAt: sharedExpenses.occurredAt,
         linkedTransactionId: sharedExpenses.linkedTransactionId,
         participants: sharedExpenses.participants,
@@ -40,6 +43,7 @@ export default async function SharedLedgerPage({
       .from(categories)
       .where(and(eq(categories.type, "expense"), eq(categories.userId, userId)))
       .orderBy(categories.sortOrder),
+    listAccounts(userId),
     getMonthlySharedExpenseTrend(userId),
   ]);
 
@@ -49,6 +53,7 @@ export default async function SharedLedgerPage({
     <SharedLedgerDashboard
       items={items}
       categories={expenseCategories}
+      accounts={accounts}
       dateFrom={from}
       dateTo={to}
       monthlyTrend={monthlyTrend}

@@ -9,20 +9,30 @@ import { Button } from "@/components/ui/button";
 import { deleteSplitExpense, settleParticipant, unsettleParticipant } from "@/app/(app)/shared/actions";
 import { isFail } from "@/lib/action-result";
 import { EditSplitExpenseDialog } from "@/components/shared/edit-expense-dialog";
+import { SettleAccountControl } from "@/components/shared/settle-account-control";
 import { SwipeToDelete } from "@/components/transactions/swipe-to-delete";
 import type { FlatSplitItem } from "@/lib/shared-expenses";
+import type { AccountType } from "@/lib/account-type";
 
 type Category = { id: string; name: string; icon: string | null; color: string | null };
+type Account = { id: string; name: string; type: AccountType };
 
-export function SharedExpenseRow({ item, categories }: { item: FlatSplitItem; categories: Category[] }) {
+export function SharedExpenseRow({
+  item,
+  categories,
+  accounts,
+}: {
+  item: FlatSplitItem;
+  categories: Category[];
+  accounts: Account[];
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
 
-  function handleSettle(e: React.MouseEvent) {
-    e.stopPropagation();
+  function handleSettle(accountId?: string) {
     startTransition(async () => {
-      const result = await settleParticipant(item.sharedExpenseId, item.participantIndex);
+      const result = await settleParticipant(item.sharedExpenseId, item.participantIndex, accountId);
       if (isFail(result)) {
         toast.error(result.error);
         return;
@@ -82,41 +92,42 @@ export function SharedExpenseRow({ item, categories }: { item: FlatSplitItem; ca
                 badges + secondary text together below where there's no
                 similar long/unbreakable string to fight them for space. */}
             <span className="truncate text-sm font-medium">{item.itemName}</span>
-            <div className="flex min-w-0 items-center gap-1.5">
-              {item.categoryName && <Badge variant="outline">{item.categoryName}</Badge>}
-              {isLinked && <Badge variant="outline">來自交易</Badge>}
-              {/* Who owes whom is folded into this string instead of the
-                  generic "你欠對方" it used to say — in the flat 已結清 list
-                  (rendered ungrouped, mixing every counterparty together,
-                  unlike the per-person unsettled cards) that was the only
-                  place a settled row's counterparty ever showed up at all.
-                  Split into two spans so the date gets a shrink-0 slot: the
-                  combined string used to share one truncating span with two
-                  shrink-0 badges, and since Tailwind's truncate doesn't set
-                  min-width:0, that span couldn't actually shrink — the row
-                  just overflowed past the app-wide overflow-x:hidden and
-                  silently clipped the date instead of showing an ellipsis. */}
+            {/* Category no longer repeated per participant row — it's one
+                value per event (sharedExpenses.categoryId), already shown
+                once on SplitEventCard's own header via CategoryIconBadge,
+                so showing it again on every row here was pure repetition. */}
+            {isLinked && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge variant="outline">來自交易</Badge>
+              </div>
+            )}
+            {/* Own line, no badges to compete with for width — putting this
+                on the same line as the badges (a prior attempt) meant two
+                shrink-0 badges plus a shrink-0 date left nothing for this
+                text to shrink into, so it silently rendered at zero width
+                and vanished entirely. Who owes whom is folded into this
+                string instead of the generic "你欠對方" it used to say — in
+                the flat 已結清 list (rendered ungrouped, mixing every
+                counterparty together, unlike the per-person unsettled
+                cards) this is the only place a settled row's counterparty
+                ever shows up. Still two spans so the date keeps a shrink-0
+                slot — Tailwind's truncate doesn't set min-width:0 on its
+                own, so without shrink-0 the date is what a flex row silently
+                drops first (cut off by the app-wide overflow-x:hidden
+                instead of getting an ellipsis). */}
+            <div className="flex min-w-0 items-center gap-1">
               <span className="min-w-0 truncate text-xs text-muted-foreground">
                 {item.iOwe ? `你欠 ${item.name}` : `${item.name} 欠你`}
               </span>
               <span className="shrink-0 text-xs text-muted-foreground">・{item.occurredAt}</span>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-start gap-2">
             <span className="text-sm font-semibold tabular-nums">
               NT$ {Number(item.amount).toLocaleString("zh-TW")}
             </span>
             {!item.isSettled ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={pending}
-                onPointerDown={(e) => e.stopPropagation()}
-                onPointerUp={(e) => e.stopPropagation()}
-                onClick={handleSettle}
-              >
-                結清
-              </Button>
+              <SettleAccountControl label="結清" accounts={accounts} pending={pending} onSettle={handleSettle} />
             ) : (
               <Button
                 size="sm"

@@ -18,6 +18,8 @@ import {
   type EditableTransaction,
 } from "@/components/record/edit-transaction-dialog";
 import { SwipeToDelete } from "@/components/transactions/swipe-to-delete";
+import { SettlementGroupRow } from "@/components/transactions/settlement-group-row";
+import { groupSettlements, isSettlementGroup } from "@/lib/transactions/group-settlements";
 import { deleteTransaction, loadMoreTransactions } from "@/app/(app)/transactions/actions";
 import { isFail } from "@/lib/action-result";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
@@ -312,16 +314,49 @@ export function TransactionsList({
           {monthGroups.map((group) => (
             <div key={group.monthKey} className="flex flex-col gap-2">
               <span className="text-sm font-semibold text-muted-foreground">{monthLabel(group.monthKey)}</span>
+              {/* Grouped PER MONTH BUCKET, not once over the whole flat list
+                  — structurally guarantees a settlement group can never span
+                  two month headers, even if a settlement transaction's date
+                  is later edited into a different month (grouping-within-
+                  month just can't merge across arrays it never sees together;
+                  it degrades to two smaller/singleton groups instead). */}
               <div className="flex flex-col divide-y">
-                {group.items.map((item) =>
-                  item.kind === "transfer" ? (
-                    <TransferRow key={item.id} item={item} accountsById={accountsById} />
+                {groupSettlements(group.items).map((node) =>
+                  isSettlementGroup(node) ? (
+                    <SettlementGroupRow
+                      key={node.groupId}
+                      label={node.label}
+                      total={node.items.reduce((sum, i) => sum + Number(i.amount), 0)}
+                      count={node.items.length}
+                      // A settlement group can only ever contain RegularItem
+                      // (never TransferListItem — a transfer's
+                      // linkedSharedExpenseId is always null, so it can never
+                      // satisfy groupSettlements' grouping condition), but
+                      // the array's static type is still the ListItem union.
+                      categoryIcon={node.items.find((i) => i.kind === "transaction")?.categoryIcon ?? null}
+                      categoryColor={node.items.find((i) => i.kind === "transaction")?.categoryColor ?? null}
+                    >
+                      {node.items.map((item) =>
+                        item.kind === "transfer" ? (
+                          <TransferRow key={item.id} item={item} accountsById={accountsById} />
+                        ) : (
+                          <RegularRow
+                            key={item.id}
+                            item={item}
+                            onSelect={() => setSelected(item)}
+                            onDelete={() => handleDeleteRegular(item.id)}
+                          />
+                        ),
+                      )}
+                    </SettlementGroupRow>
+                  ) : node.kind === "transfer" ? (
+                    <TransferRow key={node.id} item={node} accountsById={accountsById} />
                   ) : (
                     <RegularRow
-                      key={item.id}
-                      item={item}
-                      onSelect={() => setSelected(item)}
-                      onDelete={() => handleDeleteRegular(item.id)}
+                      key={node.id}
+                      item={node}
+                      onSelect={() => setSelected(node)}
+                      onDelete={() => handleDeleteRegular(node.id)}
                     />
                   ),
                 )}

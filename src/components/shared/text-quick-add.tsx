@@ -63,8 +63,12 @@ export function SharedTextQuickAdd({
         throw new Error("解析失敗");
       }
       const { result } = (await res.json()) as { result: Draft };
-      setDraft(result);
-      setAmountText(String(result.amount));
+      // Split amounts are always TWD-style (no decimal), same as the
+      // keypad's own allowDecimal={false} below — round away anything the
+      // AI parsed out of free text ("晚餐 150.5元").
+      const roundedAmount = Math.round(result.amount);
+      setDraft({ ...result, amount: roundedAmount });
+      setAmountText(String(roundedAmount));
       const matchedCategory = categories.find((c) => c.name === result.categoryName);
       setCategoryId(matchedCategory?.id ?? "");
     } catch (err) {

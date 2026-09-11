@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BottomSheet, BottomSheetContent, BottomSheetTitle } from "@/components/ui/bottom-sheet";
 import { createTransaction, deleteTransaction } from "@/app/(app)/transactions/actions";
+import { createSplitExpense, deleteSplitExpense } from "@/app/(app)/shared/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { currencyAllowsDecimal } from "@/lib/currency";
@@ -90,6 +91,13 @@ export function QuickAddCategoryFlow({
   const [note, setNote] = useState("");
   const [isSharedExpense, setIsSharedExpense] = useState(false);
   const [splitParticipants, setSplitParticipants] = useState<SplitParticipantDraft[]>([]);
+  // Only meaningful inside the 分帳 tab — "mine" (現有 behaviour: a real
+  // transaction, money leaves my account, others owe me their share) vs
+  // "theirs" (no real transaction at all — someone else paid, so this is
+  // just an IOU recorded via createSplitExpense; a real expense only shows
+  // up later when it's settled, see shared/actions.ts's settleParticipant).
+  const [sharedDirection, setSharedDirection] = useState<"mine" | "theirs">("mine");
+  const [theirsCounterpartyName, setTheirsCounterpartyName] = useState("");
   const initialAccountId = accounts.find((a) => a.id === defaultAccountId)?.id ?? accounts[0]?.id ?? "";
   const [accountId, setAccountId] = useState(initialAccountId);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
@@ -112,6 +120,8 @@ export function QuickAddCategoryFlow({
     setNote("");
     setIsSharedExpense(false);
     setSplitParticipants([]);
+    setSharedDirection("mine");
+    setTheirsCounterpartyName("");
     const currentAccount = accounts.find((a) => a.id === accountId);
     setPaymentMethod(accountTypeToPaymentMethod[currentAccount?.type ?? "cash"]);
     setOccurredAt(defaultDate ?? todayInTaipeiString());
@@ -122,14 +132,21 @@ export function QuickAddCategoryFlow({
       router.push("/upgrade?from=shared");
       return;
     }
+    // 分帳 only shows/works inside the 分帳 tab now (一律從分帳入口進去) — clear
+    // any split state on every tab switch so nothing carries over invisibly
+    // if someone fills in a split, then switches tabs before saving.
+    setIsSharedExpense(false);
+    setSplitParticipants([]);
+    setSharedDirection("mine");
+    setTheirsCounterpartyName("");
     setTab(next);
   }
 
   function openCategory(c: QuickAddCategory) {
     setSelected(c);
     // Pre-check the shared-expense toggle when opened from the 分帳 tab —
-    // still just a personal expense transaction under the hood, so the
-    // toggle stays visible/editable below in case they change their mind.
+    // either direction (我付的/對方付的) is still just this toggle turned on,
+    // decided inside SplitExpenseField itself.
     setIsSharedExpense(tab === "shared");
     setAmountSheetOpen(true);
   }
@@ -150,6 +167,45 @@ export function QuickAddCategoryFlow({
   function handleSave() {
     if (!selected || !amount || Number(amount) <= 0) return;
     const savedAmount = amount;
+
+    // 對方付的 — no real transaction at all (money never left my account),
+    // just a standalone IOU record. A real expense only appears later, when
+    // this gets settled (see shared/actions.ts's settleParticipant). Also
+    // requires isSharedExpense: the direction toggle only renders inside
+    // SplitExpenseField's own expanded (enabled) panel, so if the user
+    // picked "theirs" and then turned that panel back off, sharedDirection
+    // is left stale at "theirs" — without this check, saving would still
+    // wrongly take this branch instead of a normal transaction.
+    if (tab === "shared" && isSharedExpense && sharedDirection === "theirs") {
+      const counterparty = theirsCounterpartyName.trim();
+      if (!counterparty) return;
+      startTransition(async () => {
+        const created = await createSplitExpense({
+          name: note.trim() || selected.name,
+          categoryId: selected.id,
+          occurredAt,
+          participants: [{ name: counterparty, amount: Number(savedAmount), iOwe: true }],
+        });
+        if (isFail(created)) {
+          toast.error(created.error);
+          return;
+        }
+        toast.success(`已記錄「${counterparty}」付的，結清後才會出現支出明細`, {
+          action: {
+            label: "復原",
+            onClick: async () => {
+              await deleteSplitExpense(created.id);
+              router.refresh();
+            },
+          },
+        });
+        setAmountSheetOpen(false);
+        router.refresh();
+        onDone?.();
+      });
+      return;
+    }
+
     startTransition(async () => {
       const created = await createTransaction({
         categoryId: selected.id,
@@ -160,7 +216,7 @@ export function QuickAddCategoryFlow({
         note: note || undefined,
         occurredAt,
         splitParticipants:
-          selected.type === "expense" && isSharedExpense
+          selected.type === "expense" && tab === "shared" && isSharedExpense
             ? splitParticipants.map((p) => ({ name: p.name, amount: Number(p.amount) }))
             : undefined,
       });
@@ -182,6 +238,8 @@ export function QuickAddCategoryFlow({
       onDone?.();
     });
   }
+
+  const isTheirs = tab === "shared" && isSharedExpense && sharedDirection === "theirs";
 
   return (
     <>
@@ -321,11 +379,15 @@ export function QuickAddCategoryFlow({
                   value={amount}
                   onChange={setAmount}
                   autoOpen
-                  allowDecimal={currencyAllowsDecimal(accounts.find((a) => a.id === accountId)?.currency)}
+                  // 對方付的 has no real account involved (no money moves),
+                  // so there's no currency to check — always no-decimal,
+                  // matching the old standalone split dialog's own fixed
+                  // allowDecimal={false}.
+                  allowDecimal={isTheirs ? false : currencyAllowsDecimal(accounts.find((a) => a.id === accountId)?.currency)}
                 />
               </div>
 
-              {accounts.length > 1 && (
+              {!isTheirs && accounts.length > 1 && (
                 <div className="flex flex-col gap-2">
                   <Label>帳戶</Label>
                   <div className="flex flex-wrap gap-2">
@@ -349,13 +411,18 @@ export function QuickAddCategoryFlow({
                 </div>
               )}
 
-              <PaymentMethodField
-                accountType={accounts.find((a) => a.id === accountId)?.type}
-                value={paymentMethod}
-                onChange={setPaymentMethod}
-              />
+              {!isTheirs && (
+                <PaymentMethodField
+                  accountType={accounts.find((a) => a.id === accountId)?.type}
+                  value={paymentMethod}
+                  onChange={setPaymentMethod}
+                />
+              )}
 
-              {selected.type === "expense" && (
+              {/* 分帳 only reachable via the 分帳 tab now — a plain 支出 entry
+                  never offers it, so there's exactly one way in regardless
+                  of who paid. */}
+              {selected.type === "expense" && tab === "shared" && (
                 <SplitExpenseField
                   enabled={isSharedExpense}
                   onEnabledChange={setIsSharedExpense}
@@ -363,6 +430,11 @@ export function QuickAddCategoryFlow({
                   onParticipantsChange={setSplitParticipants}
                   totalAmount={amount}
                   suggestions={frequentSplitNames}
+                  allowTheirsDirection
+                  direction={sharedDirection}
+                  onDirectionChange={setSharedDirection}
+                  theirsCounterpartyName={theirsCounterpartyName}
+                  onTheirsCounterpartyNameChange={setTheirsCounterpartyName}
                 />
               )}
 
@@ -396,7 +468,9 @@ export function QuickAddCategoryFlow({
                     pending ||
                     !amount ||
                     Number(amount) <= 0 ||
-                    (isSharedExpense && computeSplitOverflow(amount, splitParticipants) > 0)
+                    (isTheirs
+                      ? !theirsCounterpartyName.trim()
+                      : isSharedExpense && computeSplitOverflow(amount, splitParticipants) > 0)
                   }
                   onClick={handleSave}
                 >

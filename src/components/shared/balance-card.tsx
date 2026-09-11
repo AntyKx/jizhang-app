@@ -1,10 +1,11 @@
 import { PartyPopper } from "lucide-react";
 
 // Purely display now — settling used to be a single "一鍵結清" button here
-// because there was exactly one fixed partner to settle against. With N
-// different named counterparties, settling is inherently per-person (see
-// PersonGroupCard's own settle button), so this card just shows the
-// overall picture.
+// because there was exactly one fixed partner to settle against. Now there
+// are two settle entry points depending on the dashboard's view mode: one
+// event at a time (依事件 view, SplitEventCard's own button) or netted
+// across every event for one counterparty (依對象 view, PersonGroupCard's
+// button) — this card just shows the overall picture regardless of which.
 export function BalanceCard({
   netBalance,
   owedToMe,

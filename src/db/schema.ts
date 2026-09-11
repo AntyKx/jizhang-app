@@ -11,6 +11,7 @@ import {
   index,
   unique,
   jsonb,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 export const accountTypeEnum = pgEnum("account_type", [
@@ -203,6 +204,18 @@ export const transactions = pgTable("transactions", {
   occurredAt: date("occurred_at").notNull(),
   recurringRuleId: uuid("recurring_rule_id").references(
     () => recurringRules.id,
+    { onDelete: "set null" },
+  ),
+  // Set only on a settlement transaction produced by settleParticipant
+  // (never by the old cross-event net-settle path) — reverse pointer of
+  // sharedExpenses.linkedTransactionId. Lets transaction lists collapse
+  // every settlement of one split event into one display group without
+  // merging the underlying rows; each settlement still needs independent
+  // traceability. set null (not cascade) since deleteSplitExpense already
+  // refuses once any participant is settled — this is just a safe degrade
+  // if that invariant is ever broken outside the app.
+  linkedSharedExpenseId: uuid("linked_shared_expense_id").references(
+    (): AnyPgColumn => sharedExpenses.id,
     { onDelete: "set null" },
   ),
   createdAt: timestamp("created_at").notNull().defaultNow(),

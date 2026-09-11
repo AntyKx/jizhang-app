@@ -24,10 +24,22 @@ function revalidateSharedPaths() {
 // outstanding forever, even after the money actually changed hands.
 async function createSettlementTransaction(
   userId: string,
-  input: { amount: string; iOwe: boolean; categoryId: string | null; label: string; linkedTransactionId: string | null },
+  input: {
+    amount: string;
+    iOwe: boolean;
+    categoryId: string | null;
+    label: string;
+    linkedTransactionId: string | null;
+    sharedExpenseId: string;
+    // User-chosen override from the 結清 button's account picker — lets them
+    // represent which account actually paid/received the money instead of
+    // always falling back to the linked transaction's account or the
+    // default account below.
+    accountId?: string;
+  },
 ) {
-  let accountId: string | undefined;
-  if (input.linkedTransactionId) {
+  let accountId = input.accountId;
+  if (!accountId && input.linkedTransactionId) {
     const [linked] = await db
       .select({ accountId: transactions.accountId })
       .from(transactions)
@@ -43,6 +55,7 @@ async function createSettlementTransaction(
     accountId,
     note: `分帳結算：${input.label}`,
     occurredAt: todayInTaipeiString(),
+    linkedSharedExpenseId: input.sharedExpenseId,
   });
 }
 
@@ -86,15 +99,19 @@ export async function createSplitExpense(input: {
   await requireCoreAccess(userId, "shared");
   const parsed = splitExpenseInputSchema.parse(input);
 
-  await db.insert(sharedExpenses).values({
-    userId,
-    categoryId: parsed.categoryId,
-    name: parsed.name,
-    occurredAt: parsed.occurredAt,
-    participants: toParticipantRows(parsed.participants),
-  });
+  const [row] = await db
+    .insert(sharedExpenses)
+    .values({
+      userId,
+      categoryId: parsed.categoryId,
+      name: parsed.name,
+      occurredAt: parsed.occurredAt,
+      participants: toParticipantRows(parsed.participants),
+    })
+    .returning({ id: sharedExpenses.id });
 
   revalidateSharedPaths();
+  return { id: row.id };
 }
 
 const updateSplitExpenseSchema = splitExpenseInputSchema.extend({
@@ -136,7 +153,7 @@ export async function updateSplitExpense(input: {
   revalidateSharedPaths();
 }
 
-export async function settleParticipant(sharedExpenseId: string, participantIndex: number) {
+export async function settleParticipant(sharedExpenseId: string, participantIndex: number, accountId?: string) {
   const userId = await requireUserId();
   await requireCoreAccess(userId, "shared");
 
@@ -157,6 +174,8 @@ export async function settleParticipant(sharedExpenseId: string, participantInde
     categoryId: row.categoryId,
     label: `${row.name}（${participant.name}）`,
     linkedTransactionId: row.linkedTransactionId,
+    sharedExpenseId: row.id,
+    accountId,
   });
   if (isFail(settlement)) return settlement;
 
@@ -176,13 +195,60 @@ export async function settleParticipant(sharedExpenseId: string, participantInde
   revalidateSharedPaths();
 }
 
+// Settles every still-unsettled participant of ONE split event — the
+// /shared page's per-event "一次結清全部" button (依事件 view). Deliberately
+// calls settleParticipant once per person instead of netting everyone into
+// a single transaction the way settleAllForName below does: different
+// participants within one event are independent, real money flows
+// (different people, possibly paying back on different days), and merging
+// them would lose exactly the per-person traceability the 依事件 view is
+// built to keep. A multi-person event settled this way naturally produces
+// one transaction per person, all created together — which is exactly the
+// scenario the transaction-list settlement grouping (groupSettlements)
+// exists to collapse back into one display row.
+export async function settleAllParticipantsInEvent(sharedExpenseId: string, accountId?: string) {
+  const userId = await requireUserId();
+  await requireCoreAccess(userId, "shared");
+
+  const [row] = await db
+    .select()
+    .from(sharedExpenses)
+    .where(and(eq(sharedExpenses.id, sharedExpenseId), eq(sharedExpenses.userId, userId)));
+  if (!row) return fail("找不到指定的分帳項目");
+
+  const unsettledIndexes = row.participants
+    .map((p, i) => (p.isSettled ? -1 : i))
+    .filter((i) => i >= 0);
+  if (unsettledIndexes.length === 0) return { succeeded: 0 };
+
+  let succeeded = 0;
+  const errors: string[] = [];
+  for (const index of unsettledIndexes) {
+    const result = await settleParticipant(sharedExpenseId, index, accountId);
+    if (isFail(result)) errors.push(`${row.participants[index].name}：${result.error}`);
+    else succeeded++;
+  }
+
+  if (errors.length > 0) return fail(`已結清 ${succeeded} 人，${errors.length} 人失敗（${errors.join("；")}）`);
+  return { succeeded };
+}
+
 // Bulk-settles every unsettled participant across every split event that
 // matches `name`, netted into a single reimbursement transaction instead of
-// one per item — mirrors the old settleAllSharedExpenses, just scoped to one
-// counterparty's name (the /shared page's per-person "全部結清" button)
-// instead of the whole book, since there's no longer a single fixed partner
-// to settle everything against at once.
-export async function settleAllForName(name: string, range?: { from?: string; to?: string }) {
+// one per item — the /shared page's 依對象 view, for a long-running fixed
+// counterparty (e.g. a couple who record everything under one account and
+// settle once a month) where dozens/hundreds of small per-event IOUs get
+// paid back as one real lump sum, not individually on different days. This
+// is the opposite tradeoff from settleAllParticipantsInEvent above: there,
+// different participants are genuinely independent real payments and must
+// stay separate transactions; here, it's always the SAME two people
+// settling everything together in one real moment, so netting to one
+// transaction is the accurate representation, not a loss of traceability.
+export async function settleAllForName(
+  name: string,
+  range?: { from?: string; to?: string },
+  accountId?: string,
+) {
   const userId = await requireUserId();
   await requireCoreAccess(userId, "shared");
 
@@ -195,22 +261,21 @@ export async function settleAllForName(name: string, range?: { from?: string; to
     .from(sharedExpenses)
     .where(and(...conditions));
 
-  const targets = rows
-    .flatMap((row) =>
-      row.participants
-        .map((p, participantIndex) => ({ row, p, participantIndex }))
-        .filter(({ p }) => p.name === name && !p.isSettled),
-    );
+  const targets = rows.flatMap((row) =>
+    row.participants
+      .map((p, participantIndex) => ({ row, p, participantIndex }))
+      .filter(({ p }) => p.name === name && !p.isSettled),
+  );
   if (targets.length === 0) return;
 
   const net = computeNetBalance(targets.map((t) => t.p));
   let settlementTransactionId: string | null = null;
   if (Math.abs(net) >= 1) {
-    const accountId = await getDefaultAccountId(userId);
+    const resolvedAccountId = accountId ?? (await getDefaultAccountId(userId));
     const settlement = await createTransaction({
       type: net > 0 ? "income" : "expense",
       amount: Math.abs(net),
-      accountId,
+      accountId: resolvedAccountId,
       note: `分帳一鍵結清（${name}，共 ${targets.length} 筆）`,
       occurredAt: todayInTaipeiString(),
     });
@@ -246,10 +311,11 @@ export async function settleAllForName(name: string, range?: { from?: string; to
 
 // Reverts a mistaken settle — removes the reimbursement transaction it
 // produced (reversing its balance effect) and puts the participant back to
-// unsettled. A batch-settled participant shares its settlementBatchId with
-// every other participant settled in the same settleAllForName call, all
-// funded by one net transaction that can't be split back out per person, so
-// reverting any one of them reverts the whole batch together.
+// unsettled. A non-null settlementBatchId comes from settleAllForName above
+// (or from historical data written before this app's 依事件 redesign) —
+// every participant in the same call shares one net transaction that can't
+// be split back out per person, so reverting any one of them reverts the
+// whole batch together.
 export async function unsettleParticipant(sharedExpenseId: string, participantIndex: number) {
   const userId = await requireUserId();
   await requireCoreAccess(userId, "shared");

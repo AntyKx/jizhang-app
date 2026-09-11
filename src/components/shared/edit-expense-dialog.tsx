@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DeleteConfirmFooter } from "@/components/ui/delete-confirm-footer";
 import { deleteSplitExpense, updateSplitExpense } from "@/app/(app)/shared/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
@@ -39,14 +39,22 @@ export function EditSplitExpenseDialog({
   const [categoryId, setCategoryId] = useState("");
   const [occurredAt, setOccurredAt] = useState("");
   const [prevItem, setPrevItem] = useState(item);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [pending, startTransition] = useTransition();
 
   if (item !== prevItem) {
     setPrevItem(item);
+    setConfirmingDelete(false);
     if (item) {
       setName(item.itemName);
       setCounterpartyName(item.name);
-      setAmount(item.amount);
+      // A split share is often the result of dividing a total across N
+      // people ($50 / 3 = 16.67) and stored with that exact fraction — but
+      // the keypad below is allowDecimal={false} (this app's TWD/JPY
+      // convention), which only removes the "." key going forward. Without
+      // rounding here, an existing fractional amount still displayed with
+      // its decimal on open, unedited, even though it couldn't be typed.
+      setAmount(Math.round(Number(item.amount)).toString());
       setIOwe(item.iOwe);
       setCategoryId(item.categoryId ?? "");
       setOccurredAt(item.occurredAt);
@@ -158,17 +166,20 @@ export function EditSplitExpenseDialog({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="destructive" disabled={pending} onClick={handleDelete}>
-            刪除
-          </Button>
+        <DeleteConfirmFooter
+          confirming={confirmingDelete}
+          onConfirmingChange={setConfirmingDelete}
+          confirmMessage="確定要刪除這筆分帳支出嗎？"
+          onDelete={handleDelete}
+          pending={pending}
+        >
           <Button
             onClick={handleSave}
             disabled={pending || !name.trim() || !counterpartyName.trim() || !amount || Number(amount) <= 0}
           >
             {pending ? "儲存中…" : "儲存"}
           </Button>
-        </DialogFooter>
+        </DeleteConfirmFooter>
       </DialogContent>
     </Dialog>
   );

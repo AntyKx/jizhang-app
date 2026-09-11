@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createTransaction, deleteTransaction } from "@/app/(app)/transactions/actions";
+import { createSplitExpense, deleteSplitExpense } from "@/app/(app)/shared/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
@@ -39,6 +40,10 @@ type Draft = {
   merchant: string | null;
   note: string | null;
   occurredAt: string;
+  isSharedExpense: boolean;
+  splitDirection: "mine" | "theirs" | null;
+  splitCounterpartyName: string | null;
+  splitParticipantAmount: number | null;
 };
 
 export function TextQuickAdd({
@@ -74,6 +79,14 @@ export function TextQuickAdd({
   const [parseFailed, setParseFailed] = useState(false);
   const [isSharedExpense, setIsSharedExpense] = useState(false);
   const [splitParticipants, setSplitParticipants] = useState<SplitParticipantDraft[]>([]);
+  // Only meaningful when isSharedExpense is true — "mine" (a real
+  // transaction, others owe me their share) vs "theirs" (no real
+  // transaction, someone else paid and I owe them — see shared/actions.ts's
+  // createSplitExpense). Pre-set from the AI's own guess in handleParse,
+  // same as every other field here; user can still override via
+  // SplitExpenseField before confirming.
+  const [sharedDirection, setSharedDirection] = useState<"mine" | "theirs">("mine");
+  const [theirsCounterpartyName, setTheirsCounterpartyName] = useState("");
   const [pending, startTransition] = useTransition();
 
   async function handleParse(overrideText?: string) {
@@ -95,14 +108,51 @@ export function TextQuickAdd({
         throw new Error("解析失敗");
       }
       const { result } = (await res.json()) as { result: Draft };
+      const matchedAccount = accounts.find((a) => a.name === result.accountName);
+      const resolvedAccountId = matchedAccount?.id ?? defaultAccountId;
+      setAccountId(resolvedAccountId);
+      const detectedIsTheirs = result.isSharedExpense && result.splitDirection === "theirs";
+      // The AI can parse a decimal out of free text ("150.5元") — round it
+      // away up front when the resolved account's currency doesn't take
+      // decimals, same as every other amount field in this app. "對方付的"
+      // has no real account involved at all (no money moves), so it's
+      // always no-decimal regardless of account currency, same as the
+      // 分帳 tab's own amount field. Both draft.amount (what actually gets
+      // saved) and amountText (what the keypad displays) need the same
+      // rounded value, or accepting the AI's guess without touching the
+      // keypad would silently save the un-rounded original while the field
+      // showed a rounded number.
+      const resolvedCurrency = accounts.find((a) => a.id === resolvedAccountId)?.currency;
+      const roundedAmount =
+        !detectedIsTheirs && currencyAllowsDecimal(resolvedCurrency) ? result.amount : Math.round(result.amount);
       // Only the note field is shown/edited in this form — fold the AI's
       // merchant guess into it so that detail isn't silently dropped.
-      setDraft({ ...result, note: result.note ?? result.merchant });
-      setAmountText(String(result.amount));
+      setDraft({ ...result, amount: roundedAmount, note: result.note ?? result.merchant });
+      setAmountText(String(roundedAmount));
       const matchedCategory = categories.find((c) => c.name === result.categoryName);
       setCategoryId(matchedCategory?.id ?? "");
-      const matchedAccount = accounts.find((a) => a.name === result.accountName);
-      setAccountId(matchedAccount?.id ?? defaultAccountId);
+
+      // Pre-set the split toggle/direction from the AI's own read of the
+      // text — still just a suggestion, SplitExpenseField below lets the
+      // user correct it before confirming, same as every other AI guess.
+      const detectedShared = result.type === "expense" && result.isSharedExpense;
+      setIsSharedExpense(detectedShared);
+      if (detectedShared && result.splitDirection === "theirs") {
+        setSharedDirection("theirs");
+        setTheirsCounterpartyName(result.splitCounterpartyName ?? "");
+        setSplitParticipants([]);
+      } else if (detectedShared && result.splitDirection === "mine" && result.splitCounterpartyName) {
+        setSharedDirection("mine");
+        const participantAmount = Math.round(result.splitParticipantAmount ?? 0);
+        setSplitParticipants(
+          participantAmount > 0 ? [{ name: result.splitCounterpartyName, amount: String(participantAmount) }] : [],
+        );
+        setTheirsCounterpartyName("");
+      } else {
+        setSharedDirection("mine");
+        setSplitParticipants([]);
+        setTheirsCounterpartyName("");
+      }
     } catch (err) {
       // Keep whatever the user typed and drop them into the manual-entry
       // form instead of dead-ending them back to icon-based recording.
@@ -115,6 +165,10 @@ export function TextQuickAdd({
       setCategoryId("");
       setAccountId(defaultAccountId);
       setAmountText("0");
+      setIsSharedExpense(false);
+      setSplitParticipants([]);
+      setSharedDirection("mine");
+      setTheirsCounterpartyName("");
       setDraft({
         amount: 0,
         type: "expense",
@@ -124,6 +178,10 @@ export function TextQuickAdd({
         merchant: null,
         note: input,
         occurredAt: defaultDate ?? todayInTaipeiString(),
+        isSharedExpense: false,
+        splitDirection: null,
+        splitCounterpartyName: null,
+        splitParticipantAmount: null,
       });
     } finally {
       setParsing(false);
@@ -139,6 +197,40 @@ export function TextQuickAdd({
 
   function handleConfirm() {
     if (!draft) return;
+
+    // 對方付的 — no real transaction at all (money never left my account),
+    // just a standalone IOU record. A real expense only appears later, when
+    // this gets settled (see shared/actions.ts's settleParticipant). Same
+    // branch as quick-add-category-flow.tsx's 分帳 tab.
+    const isTheirs = draft.type === "expense" && isSharedExpense && sharedDirection === "theirs";
+    if (isTheirs) {
+      const counterparty = theirsCounterpartyName.trim();
+      if (!counterparty) return;
+      startTransition(async () => {
+        const created = await createSplitExpense({
+          name: draft.note?.trim() || categories.find((c) => c.id === categoryId)?.name || "分帳支出",
+          categoryId: categoryId || undefined,
+          occurredAt: draft.occurredAt,
+          participants: [{ name: counterparty, amount: draft.amount, iOwe: true }],
+        });
+        if (isFail(created)) {
+          toast.error(created.error);
+          return;
+        }
+        toast.success(`已記錄「${counterparty}」付的，結清後才會出現支出明細`, {
+          action: {
+            label: "復原",
+            onClick: async () => {
+              await deleteSplitExpense(created.id);
+              router.refresh();
+            },
+          },
+        });
+        onDone();
+      });
+      return;
+    }
+
     startTransition(async () => {
       const created = await createTransaction({
         categoryId: categoryId || undefined,
@@ -178,6 +270,7 @@ export function TextQuickAdd({
   }
 
   const relevantCategories = categories.filter((c) => c.type === (draft?.type ?? "expense"));
+  const isTheirs = Boolean(draft) && draft?.type === "expense" && isSharedExpense && sharedDirection === "theirs";
 
   return (
     <div className="flex flex-col gap-4">
@@ -247,7 +340,10 @@ export function TextQuickAdd({
                   setAmountText(text);
                   setDraft({ ...draft, amount: text === "" || text === "." ? 0 : Number(text) });
                 }}
-                allowDecimal={currencyAllowsDecimal(accounts.find((a) => a.id === accountId)?.currency)}
+                // 對方付的 has no real account involved (no money moves), so
+                // there's no currency to check — always no-decimal, matching
+                // the 分帳 tab's own amount field.
+                allowDecimal={isTheirs ? false : currencyAllowsDecimal(accounts.find((a) => a.id === accountId)?.currency)}
               />
             </div>
           </div>
@@ -257,13 +353,15 @@ export function TextQuickAdd({
             <CategoryPickerSheet categories={relevantCategories} value={categoryId} onChange={setCategoryId} />
           </div>
 
-          <PaymentMethodField
-            accountType={accounts.find((a) => a.id === accountId)?.type}
-            value={draft.paymentMethod}
-            onChange={(paymentMethod) => setDraft({ ...draft, paymentMethod })}
-          />
+          {!isTheirs && (
+            <PaymentMethodField
+              accountType={accounts.find((a) => a.id === accountId)?.type}
+              value={draft.paymentMethod}
+              onChange={(paymentMethod) => setDraft({ ...draft, paymentMethod })}
+            />
+          )}
 
-          {accounts.length > 1 && (
+          {!isTheirs && accounts.length > 1 && (
             <div className="flex flex-col gap-2">
               <Label>帳戶</Label>
               <div className="flex flex-wrap gap-2">
@@ -298,6 +396,11 @@ export function TextQuickAdd({
               onParticipantsChange={setSplitParticipants}
               totalAmount={amountText}
               suggestions={frequentSplitNames}
+              allowTheirsDirection
+              direction={sharedDirection}
+              onDirectionChange={setSharedDirection}
+              theirsCounterpartyName={theirsCounterpartyName}
+              onTheirsCounterpartyNameChange={setTheirsCounterpartyName}
             />
           )}
 
@@ -325,7 +428,9 @@ export function TextQuickAdd({
               pending ||
               !draft.amount ||
               draft.amount <= 0 ||
-              (isSharedExpense && computeSplitOverflow(amountText, splitParticipants) > 0)
+              (isTheirs
+                ? !theirsCounterpartyName.trim()
+                : isSharedExpense && computeSplitOverflow(amountText, splitParticipants) > 0)
             }
           >
             {pending ? "儲存中…" : "確認記帳"}

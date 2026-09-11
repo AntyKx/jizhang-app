@@ -26,6 +26,8 @@ export type FlatSplitItem = {
   itemName: string;
   categoryId: string | null;
   categoryName: string | null;
+  categoryIcon: string | null;
+  categoryColor: string | null;
   occurredAt: string;
   linkedTransactionId: string | null;
 } & SplitParticipant;
@@ -36,6 +38,8 @@ export function flattenSharedExpenseRows(
     name: string;
     categoryId: string | null;
     categoryName: string | null;
+    categoryIcon: string | null;
+    categoryColor: string | null;
     occurredAt: string;
     linkedTransactionId: string | null;
     participants: SplitParticipant[];
@@ -50,6 +54,8 @@ export function flattenSharedExpenseRows(
         itemName: row.name,
         categoryId: row.categoryId,
         categoryName: row.categoryName,
+        categoryIcon: row.categoryIcon,
+        categoryColor: row.categoryColor,
         occurredAt: row.occurredAt,
         linkedTransactionId: row.linkedTransactionId,
         ...p,

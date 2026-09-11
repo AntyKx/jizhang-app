@@ -41,6 +41,12 @@ export type TodayTransaction = {
   isSharedExpense: boolean;
   splitParticipants: { name: string; amount: string }[];
   splitLocked: boolean;
+  // Set only when this transaction is a split-settlement reimbursement —
+  // lets the containing list collapse consecutive settlements of the same
+  // split event into one group (see group-settlements.ts). Never set by any
+  // user-facing form.
+  linkedSharedExpenseId: string | null;
+  settlementGroupLabel: string | null;
 };
 
 export function TodayTransactionRow({

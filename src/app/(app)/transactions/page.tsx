@@ -1,4 +1,5 @@
 import { and, desc, eq, ne } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { categories, sharedExpenses, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
@@ -26,6 +27,14 @@ export default async function TransactionsPage({
     : undefined;
   const filterConditions = transactionsFilterConditions(filter);
 
+  // Aliased second join against the same table — the first join (below)
+  // pulls a transaction's OWN split-participant data (the 分帳 toggle on the
+  // transaction itself); this one pulls the split EVENT a settlement
+  // transaction was created to reimburse, the opposite direction, so
+  // multiple settlements of one event can be collapsed into one display
+  // group (see group-settlements.ts).
+  const originExpense = alias(sharedExpenses, "originExpense");
+
   const [regularRows, transferRows, userCategories, userAccounts, archivedAccounts, frequentSplitNames] = await Promise.all([
     db
       .select({
@@ -43,10 +52,13 @@ export default async function TransactionsPage({
         paymentMethod: transactions.paymentMethod,
         accountId: transactions.accountId,
         sharedExpenseParticipants: sharedExpenses.participants,
+        linkedSharedExpenseId: transactions.linkedSharedExpenseId,
+        settlementGroupLabel: originExpense.name,
       })
       .from(transactions)
       .leftJoin(categories, eq(transactions.categoryId, categories.id))
       .leftJoin(sharedExpenses, eq(sharedExpenses.linkedTransactionId, transactions.id))
+      .leftJoin(originExpense, eq(originExpense.id, transactions.linkedSharedExpenseId))
       .where(
         and(
           eq(transactions.userId, userId),
@@ -110,7 +122,7 @@ export default async function TransactionsPage({
         ...deriveSplitFields(sharedExpenseParticipants),
       };
     }),
-    ...transferRows.map((t) => ({ ...t, kind: "transfer" as const })),
+    ...transferRows.map((t) => ({ ...t, kind: "transfer" as const, linkedSharedExpenseId: null, settlementGroupLabel: null })),
   ].sort((a, b) => {
     if (a.occurredAt !== b.occurredAt) return a.occurredAt < b.occurredAt ? 1 : -1;
     return a.createdAt < b.createdAt ? 1 : -1;
