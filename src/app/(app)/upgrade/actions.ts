@@ -29,7 +29,12 @@ async function getOrCreateStripeCustomerId(userId: string): Promise<string> {
   return customer.id;
 }
 
-export async function createCoreCheckoutSession() {
+// The NT$120 all-in-one buyout — replaces the old separate NT$99 core-only
+// checkout for new purchases. checkout.session.completed (mode "payment")
+// always sets hasPurchasedCore=true regardless of which price was bought,
+// so the webhook needs no change; entitlements.ts grants the AI usage cap
+// bump off hasPurchasedCore alone.
+export async function createAllInOneCheckoutSession() {
   const userId = await requireUserId();
   const customerId = await getOrCreateStripeCustomerId(userId);
   const origin = await getSiteOrigin();
@@ -38,7 +43,7 @@ export async function createCoreCheckoutSession() {
     mode: "payment",
     customer: customerId,
     client_reference_id: userId,
-    line_items: [{ price: process.env.STRIPE_PRICE_CORE_UNLOCK!, quantity: 1 }],
+    line_items: [{ price: process.env.STRIPE_PRICE_ALL_IN_ONE!, quantity: 1 }],
     success_url: `${origin}/upgrade?status=success`,
     cancel_url: `${origin}/upgrade?status=canceled`,
   });

@@ -11,6 +11,13 @@ import { getTodayInTaipei } from "@/lib/date";
 const AI_RATE_LIMIT_PER_HOUR = 20;
 const FREE_QUICK_ADD_PER_MONTH = 20;
 const FREE_RECEIPT_SCAN_PER_MONTH = 5;
+// Granted to anyone with hasPurchasedCore (the NT$120 all-in-one buyout now
+// includes AI) but no separate recurring AI subscription — well above the
+// heaviest real usage observed pre-launch (~36 calls/month) so it never
+// bites a genuine user, while still bounding a compromised-account or
+// scripted-abuse scenario. See docs/legal + monetization plan discussion.
+const CORE_QUICK_ADD_CAP_PER_MONTH = 120;
+const CORE_RECEIPT_SCAN_CAP_PER_MONTH = 30;
 const SUBSCRIBED_SOFT_CAP_PER_MONTH = 1000;
 
 export type AiUsageKind = "quick_add" | "receipt_scan" | "shared_quick_add";
@@ -62,7 +69,10 @@ export async function getAiUsageStatus(userId: string, kind: AiUsageKind): Promi
   }
 
   const [settings] = await db
-    .select({ aiSubscriptionStatus: userSettings.aiSubscriptionStatus })
+    .select({
+      aiSubscriptionStatus: userSettings.aiSubscriptionStatus,
+      hasPurchasedCore: userSettings.hasPurchasedCore,
+    })
     .from(userSettings)
     .where(eq(userSettings.userId, userId));
 
@@ -81,9 +91,13 @@ export async function getAiUsageStatus(userId: string, kind: AiUsageKind): Promi
   const monthlyLimit =
     settings?.aiSubscriptionStatus === "active"
       ? SUBSCRIBED_SOFT_CAP_PER_MONTH
-      : kind === "receipt_scan"
-        ? FREE_RECEIPT_SCAN_PER_MONTH
-        : FREE_QUICK_ADD_PER_MONTH;
+      : settings?.hasPurchasedCore
+        ? kind === "receipt_scan"
+          ? CORE_RECEIPT_SCAN_CAP_PER_MONTH
+          : CORE_QUICK_ADD_CAP_PER_MONTH
+        : kind === "receipt_scan"
+          ? FREE_RECEIPT_SCAN_PER_MONTH
+          : FREE_QUICK_ADD_PER_MONTH;
 
   if (monthCount >= monthlyLimit) {
     return { allowed: false, reason: "quota_exceeded" };
