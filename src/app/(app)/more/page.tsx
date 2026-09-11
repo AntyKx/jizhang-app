@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { ChartNoAxesColumn, DatabaseBackup, FileText, HeartHandshake, Lock, PiggyBank, ReceiptText, RefreshCw, ShieldCheck, Sparkles, Tags, UserCog, Wrench } from "lucide-react";
+import { BookOpen, ChartNoAxesColumn, DatabaseBackup, FileText, HeartHandshake, Lock, PiggyBank, ReceiptText, RefreshCw, ShieldCheck, Sparkles, Tags, UserCog, Wrench } from "lucide-react";
 import { requireUserId } from "@/lib/auth";
 import { hasCoreAccess, isDevAdmin } from "@/lib/entitlements";
 
 const links = [
+  { href: "/guide", Icon: BookOpen, label: "使用說明", desc: "功能導覽與操作教學" },
   { href: "/account", Icon: UserCog, label: "帳號設定", desc: "大頭貼、姓名、Email、登出" },
   { href: "/shared", Icon: HeartHandshake, label: "分帳", desc: "跟另一半平分的支出、結算紀錄", lockable: true },
   { href: "/categories", Icon: Tags, label: "分類管理", desc: "新增自己的記帳分類" },
