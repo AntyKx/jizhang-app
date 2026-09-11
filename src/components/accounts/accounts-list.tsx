@@ -23,6 +23,14 @@ import { isFail } from "@/lib/action-result";
 import { accountTypeLabels, type AccountType } from "@/lib/account-type";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { EditAccountDialog } from "@/components/accounts/edit-account-dialog";
 import { SwipeToDelete } from "@/components/transactions/swipe-to-delete";
 import { cn } from "@/lib/utils";
@@ -64,6 +72,12 @@ function SortableAccountRow({
     data: { type: a.type },
   });
   const balance = Number(a.currentBalance);
+  // Archiving used to fire straight off the swipe drawer's tap — a user
+  // reported this made it too easy to archive an account by mistake, same
+  // class of issue as the edit-dialog delete buttons fixed elsewhere this
+  // session. Tapping 封存 now only opens this confirm step instead of
+  // calling onArchive directly.
+  const [confirmArchive, setConfirmArchive] = useState(false);
 
   return (
     <div
@@ -75,10 +89,20 @@ function SortableAccountRow({
         disabled={archiving}
         onTap={() => !isDragging && onOpen()}
         actions={[
+          // The pencil button that used to sit at the end of every row read
+          // as visual clutter across a long account list — moved into the
+          // swipe drawer instead, alongside 封存, so the row itself only
+          // ever shows icon/name/balance.
+          {
+            label: "編輯",
+            icon: <Pencil className="size-4" />,
+            onClick: onEdit,
+            className: "bg-secondary text-secondary-foreground",
+          },
           {
             label: archiving ? "封存中" : "封存",
             icon: <Archive className="size-4" />,
-            onClick: onArchive,
+            onClick: () => setConfirmArchive(true),
             className: "bg-muted text-muted-foreground",
           },
         ]}
@@ -130,21 +154,34 @@ function SortableAccountRow({
             )}
             {balance.toLocaleString("zh-TW")}
           </span>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="編輯帳戶"
-            onPointerDown={(e) => e.stopPropagation()}
-            onPointerUp={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit();
-            }}
-          >
-            <Pencil className="size-4" />
-          </Button>
         </div>
       </SwipeToDelete>
+
+      <Dialog open={confirmArchive} onOpenChange={setConfirmArchive}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>封存「{a.name}」？</DialogTitle>
+            <DialogDescription>
+              封存後這個帳戶會從帳戶清單和記帳的帳戶選項中隱藏，交易紀錄都會保留，之後可以到「已封存帳戶」取消封存。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmArchive(false)}>
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={archiving}
+              onClick={() => {
+                setConfirmArchive(false);
+                onArchive();
+              }}
+            >
+              {archiving ? "處理中…" : "確定封存"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
