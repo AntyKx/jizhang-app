@@ -11,6 +11,8 @@ import { isFail } from "@/lib/action-result";
 import { EditSplitExpenseDialog } from "@/components/shared/edit-expense-dialog";
 import { SettleAccountControl } from "@/components/shared/settle-account-control";
 import { SwipeToDelete } from "@/components/transactions/swipe-to-delete";
+import { CategoryIconBadge } from "@/components/category-icon";
+import { OTHER_COLOR } from "@/components/stats/chart-colors";
 import type { FlatSplitItem } from "@/lib/shared-expenses";
 import type { AccountType } from "@/lib/account-type";
 
@@ -21,10 +23,17 @@ export function SharedExpenseRow({
   item,
   categories,
   accounts,
+  // 依事件 view already shows one category once on SplitEventCard's own
+  // header (every row in that card shares the same event, so the same
+  // category) — showCategory stays false there. 依對象 view groups rows
+  // across possibly-many different events/categories with no shared header
+  // to show it on, so PersonGroupCard passes true to show it per row instead.
+  showCategory = false,
 }: {
   item: FlatSplitItem;
   categories: Category[];
   accounts: Account[];
+  showCategory?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -91,11 +100,17 @@ export function SharedExpenseRow({
                 as today-transaction-row.tsx's proven layout: name alone,
                 badges + secondary text together below where there's no
                 similar long/unbreakable string to fight them for space. */}
-            <span className="truncate text-sm font-medium">{item.itemName}</span>
-            {/* Category no longer repeated per participant row — it's one
-                value per event (sharedExpenses.categoryId), already shown
-                once on SplitEventCard's own header via CategoryIconBadge,
-                so showing it again on every row here was pure repetition. */}
+            <div className="flex min-w-0 items-center gap-1.5">
+              {showCategory && (
+                <CategoryIconBadge
+                  icon={item.categoryIcon}
+                  color={item.categoryColor ?? OTHER_COLOR}
+                  className="h-5 w-5 shrink-0"
+                  iconClassName="h-3 w-3"
+                />
+              )}
+              <span className="min-w-0 truncate text-sm font-medium">{item.itemName}</span>
+            </div>
             {isLinked && (
               <div className="flex flex-wrap items-center gap-1.5">
                 <Badge variant="outline">來自交易</Badge>

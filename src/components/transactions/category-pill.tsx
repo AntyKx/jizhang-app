@@ -8,7 +8,7 @@ import { categoryTint } from "@/lib/category-tint";
 export function CategoryPill({ name, color }: { name: string; color: string }) {
   return (
     <span
-      className="rounded-full px-2 py-0.5 text-[11px] font-medium"
+      className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium"
       style={{ backgroundColor: categoryTint(color), color }}
     >
       {name}

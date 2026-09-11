@@ -73,9 +73,9 @@ export function SplitEventCard({
           className="h-9 w-9"
           iconClassName="h-4 w-4"
         />
-        <span className="flex flex-1 flex-col">
-          <span className="text-sm font-semibold text-foreground">{eventName}</span>
-          <span className="text-xs text-muted-foreground">
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm font-semibold text-foreground">{eventName}</span>
+          <span className="truncate text-xs text-muted-foreground">
             {items.length}人
             {unsettled.length > 0 ? (
               <>

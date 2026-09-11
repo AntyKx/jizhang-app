@@ -70,43 +70,43 @@ function TransferRow({
         },
       ]}
     >
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground">
             <Repeat2 className="h-5 w-5" />
           </div>
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1.5 font-medium">
-              <span className="flex items-center gap-1">
+          <div className="flex min-w-0 flex-col gap-1">
+            <div className="flex min-w-0 items-center gap-1.5 font-medium">
+              <span className="flex min-w-0 items-center gap-1">
                 {from ? (
                   <>
-                    <AccountTypeIcon type={from.type} className="size-3.5" />
-                    {from.name}
+                    <AccountTypeIcon type={from.type} className="size-3.5 shrink-0" />
+                    <span className="truncate">{from.name}</span>
                   </>
                 ) : (
                   "（已刪除帳戶）"
                 )}
               </span>
-              <span className="text-muted-foreground">→</span>
-              <span className="flex items-center gap-1">
+              <span className="shrink-0 text-muted-foreground">→</span>
+              <span className="flex min-w-0 items-center gap-1">
                 {to ? (
                   <>
-                    <AccountTypeIcon type={to.type} className="size-3.5" />
-                    {to.name}
+                    <AccountTypeIcon type={to.type} className="size-3.5 shrink-0" />
+                    <span className="truncate">{to.name}</span>
                   </>
                 ) : (
                   "（已刪除帳戶）"
                 )}
               </span>
             </div>
-            <span className="text-muted-foreground text-xs">
+            <span className="truncate text-muted-foreground text-xs">
               {item.occurredAt}
               {Number(item.feeAmount) > 0 ? `・手續費 ${Number(item.feeAmount).toLocaleString("zh-TW")}` : ""}
               {item.note ? `・${item.note}` : ""}
             </span>
           </div>
         </div>
-        <span className="font-semibold tabular-nums">{Number(item.amount).toLocaleString("zh-TW")}</span>
+        <span className="shrink-0 font-semibold tabular-nums">{Number(item.amount).toLocaleString("zh-TW")}</span>
       </div>
     </SwipeToDelete>
   );
@@ -133,23 +133,28 @@ function RegularRow({
       ]}
       onTap={onSelect}
     >
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
           <CategoryIconBadge
             icon={item.categoryIcon}
             color={item.categoryColor ?? OTHER_COLOR}
             className="h-8 w-8"
             iconClassName="h-4 w-4"
           />
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{item.merchant || item.note || "（無備註）"}</span>
+          <div className="flex min-w-0 flex-col gap-1">
+            {/* min-w-0 on every level down to the text itself — without it a
+                long merchant/note just keeps wrapping across many lines
+                instead of truncating, pushing the badge beside it down with
+                it (CJK text can break between any two characters, so it
+                wraps instead of overflowing even with no truncate at all). */}
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="min-w-0 truncate font-medium">{item.merchant || item.note || "（無備註）"}</span>
               {item.categoryName && (
                 <CategoryPill name={item.categoryName} color={item.categoryColor ?? OTHER_COLOR} />
               )}
               <PaymentMethodIcon method={item.paymentMethod} className="text-muted-foreground" />
             </div>
-            <span className="text-muted-foreground text-xs">
+            <span className="truncate text-muted-foreground text-xs">
               {/* Title falls back to merchant -> note, so a note is
                   otherwise invisible whenever merchant is also set —
                   surface it here so editing 備註 always shows somewhere. */}
@@ -161,7 +166,7 @@ function RegularRow({
         </div>
         <span
           className={cn(
-            "font-semibold tabular-nums",
+            "shrink-0 font-semibold tabular-nums",
             item.type === "expense" ? "text-destructive" : "text-emerald-600",
           )}
         >

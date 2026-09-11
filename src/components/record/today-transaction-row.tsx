@@ -145,27 +145,32 @@ export function TodayTransactionRow({
         onTap={() => setEditOpen(true)}
         onLongPress={() => setQuickCategoryOpen(true)}
       >
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-2">
             <CategoryIconBadge
               icon={t.categoryIcon}
               color={t.categoryColor ?? OTHER_COLOR}
               className="h-8 w-8"
               iconClassName="h-4 w-4"
             />
-            <div className="flex flex-col gap-0.5">
-              <span className="text-sm">{t.merchant || t.note || t.categoryName || "（無備註）"}</span>
-              <div className="flex items-center gap-1.5">
+            {/* min-w-0 all the way down to the title span — without it a
+                long merchant/note keeps wrapping across many lines instead
+                of truncating (CJK text can break between any two
+                characters, so it wraps instead of overflowing even with no
+                truncate at all), pushing the badge beside it down with it. */}
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="min-w-0 truncate text-sm">{t.merchant || t.note || t.categoryName || "（無備註）"}</span>
+              <div className="flex min-w-0 items-center gap-1.5">
                 {t.categoryName && <CategoryPill name={t.categoryName} color={t.categoryColor ?? OTHER_COLOR} />}
-                <span className="text-xs text-muted-foreground">{secondaryParts.join("・")}</span>
+                <span className="min-w-0 truncate text-xs text-muted-foreground">{secondaryParts.join("・")}</span>
               </div>
             </div>
           </div>
           <span
             className={
               t.type === "expense"
-                ? "text-sm font-semibold text-destructive tabular-nums"
-                : "text-sm font-semibold text-emerald-600 tabular-nums"
+                ? "shrink-0 text-sm font-semibold text-destructive tabular-nums"
+                : "shrink-0 text-sm font-semibold text-emerald-600 tabular-nums"
             }
           >
             {t.type === "expense" ? "-" : "+"}

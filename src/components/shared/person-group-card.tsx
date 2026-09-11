@@ -64,11 +64,11 @@ export function PersonGroupCard({
         <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-bold text-secondary-foreground">
           {name.slice(0, 1)}
         </span>
-        <span className="flex flex-1 flex-col">
-          <span className="text-sm font-semibold text-foreground">{name}</span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm font-semibold text-foreground">{name}</span>
           <span className="text-xs text-muted-foreground">{items.length} 筆未結清</span>
         </span>
-        <span className="flex flex-col items-end">
+        <span className="flex shrink-0 flex-col items-end">
           <span className={cn("text-sm font-bold tabular-nums", owedToMe ? "text-emerald-600" : "text-destructive")}>
             ${rounded.toLocaleString("zh-TW")}
           </span>
@@ -84,6 +84,7 @@ export function PersonGroupCard({
               item={item}
               categories={categories}
               accounts={accounts}
+              showCategory
             />
           ))}
         </div>

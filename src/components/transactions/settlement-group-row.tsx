@@ -43,11 +43,16 @@ export function SettlementGroupRow({
           className="h-9 w-9"
           iconClassName="h-4 w-4"
         />
-        <span className="flex flex-1 flex-col">
-          <span className="text-sm font-medium text-foreground">分帳結算：{label}</span>
+        {/* min-w-0 is required for a flex-1 child to actually shrink below
+            its content's width — without it a long event name just keeps
+            wrapping the label across many lines instead of truncating,
+            pushing everything (including the icon it sits beside) down with
+            it. truncate on the label then caps it to one line. */}
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm font-medium text-foreground">分帳結算：{label}</span>
           <span className="text-xs text-muted-foreground">{count} 筆</span>
         </span>
-        <span className="text-sm font-semibold tabular-nums">
+        <span className="shrink-0 text-sm font-semibold tabular-nums">
           NT$ {Math.round(total).toLocaleString("zh-TW")}
         </span>
         <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
