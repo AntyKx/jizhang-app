@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -23,6 +22,7 @@ import { cancelRecurringRule, updateRecurringRule } from "@/app/(app)/subscripti
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
+import { DeleteConfirmFooter } from "@/components/ui/delete-confirm-footer";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { PaymentMethodField } from "@/components/record/payment-method-field";
 import { type PaymentMethod } from "@/lib/payment-methods";
@@ -60,12 +60,32 @@ export function EditRuleDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
-  const [amount, setAmount] = useState(rule.amount);
+  // A stored amount can carry a decimal the keypad below won't let you type
+  // when this account's currency doesn't allow one — round it away up
+  // front rather than only going forward (allowDecimal only removes the
+  // "." key for new input, it doesn't retroactively reformat an existing
+  // value).
+  const [amount, setAmount] = useState(
+    currencyAllowsDecimal(accounts.find((a) => a.id === rule.accountId)?.currency)
+      ? rule.amount
+      : Math.round(Number(rule.amount)).toString(),
+  );
   const [type, setType] = useState(rule.type);
   const [categoryId, setCategoryId] = useState(rule.categoryId ?? "");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(rule.paymentMethod);
   const [accountId, setAccountId] = useState(rule.accountId);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  // This dialog is mounted once per subscription row (see rule-row.tsx),
+  // always for the same `rule` — only `open` ever toggles — so resetting
+  // confirmingDelete only needs to track that, not a changing item identity
+  // like the other edit dialogs' prevX pattern.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    setConfirmingDelete(false);
+  }
 
   const relevantCategories = categories.filter((c) => c.type === type);
 
@@ -215,12 +235,16 @@ export function EditRuleDialog({
           )}
           <input type="hidden" name="accountId" value={accountId} />
 
-          <DialogFooter>
-            <Button type="button" variant="destructive" disabled={pending} onClick={handleCancel}>
-              {pending ? "處理中…" : rule.isSubscription ? "取消訂閱" : "刪除項目"}
-            </Button>
+          <DeleteConfirmFooter
+            confirming={confirmingDelete}
+            onConfirmingChange={setConfirmingDelete}
+            confirmMessage={rule.isSubscription ? "確定要取消這個訂閱嗎？" : "確定要刪除這個項目嗎？"}
+            deleteLabel={rule.isSubscription ? "取消訂閱" : "刪除項目"}
+            onDelete={handleCancel}
+            pending={pending}
+          >
             <Button type="submit">儲存</Button>
-          </DialogFooter>
+          </DeleteConfirmFooter>
         </form>
       </DialogContent>
     </Dialog>

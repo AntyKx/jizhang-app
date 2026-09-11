@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { DeleteConfirmFooter } from "@/components/ui/delete-confirm-footer";
 import { deleteBudget, updateBudget } from "@/app/(app)/budgets/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
@@ -20,11 +20,16 @@ type Budget = { id: string; categoryName: string | null; limitAmount: string };
 export function EditBudgetDialog({ budget, onClose }: { budget: Budget | null; onClose: () => void }) {
   const [limitAmount, setLimitAmount] = useState("");
   const [prevBudget, setPrevBudget] = useState(budget);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [pending, startTransition] = useTransition();
 
   if (budget !== prevBudget) {
     setPrevBudget(budget);
-    if (budget) setLimitAmount(budget.limitAmount);
+    setConfirmingDelete(false);
+    // Budgets are always TWD-denominated (no per-budget currency), so
+    // decimals are never meaningful — round away any legacy fractional
+    // value the allowDecimal={false} keypad below couldn't have typed.
+    if (budget) setLimitAmount(Math.round(Number(budget.limitAmount)).toString());
   }
 
   function handleSave() {
@@ -61,14 +66,17 @@ export function EditBudgetDialog({ budget, onClose }: { budget: Budget | null; o
           <AmountKeypadField value={limitAmount} onChange={setLimitAmount} allowDecimal={false} />
         </div>
 
-        <DialogFooter>
-          <Button variant="destructive" disabled={pending} onClick={handleDelete}>
-            刪除
-          </Button>
+        <DeleteConfirmFooter
+          confirming={confirmingDelete}
+          onConfirmingChange={setConfirmingDelete}
+          confirmMessage="確定要刪除這個預算嗎？"
+          onDelete={handleDelete}
+          pending={pending}
+        >
           <Button onClick={handleSave} disabled={pending || !limitAmount || Number(limitAmount) <= 0}>
             {pending ? "儲存中…" : "儲存"}
           </Button>
-        </DialogFooter>
+        </DeleteConfirmFooter>
       </DialogContent>
     </Dialog>
   );

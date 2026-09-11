@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -20,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
+import { DeleteConfirmFooter } from "@/components/ui/delete-confirm-footer";
 import { deleteTransaction, updateTransaction } from "@/app/(app)/transactions/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
@@ -80,6 +80,7 @@ export function EditTransactionDialog({
   const [isSharedExpense, setIsSharedExpense] = useState(false);
   const [splitParticipants, setSplitParticipants] = useState<SplitParticipantDraft[]>([]);
   const [splitLocked, setSplitLocked] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [pending, startTransition] = useTransition();
 
   // Re-seed the form from `transaction` right when the dialog opens, rather
@@ -90,9 +91,20 @@ export function EditTransactionDialog({
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
+    setConfirmingDelete(false);
     if (open && transaction) {
       setType(transaction.type);
-      setAmount(transaction.amount);
+      // A stored amount can carry a decimal the keypad below won't let you
+      // type (e.g. TWD/JPY, or any currency where currencyAllowsDecimal is
+      // false for this transaction's own account) — legacy data, an FX
+      // rounding artifact, or a receipt-scan/AI-parsed value. Round it here
+      // so the field never displays a decimal the "." key can't produce.
+      const transactionCurrency = accounts.find((a) => a.id === transaction.accountId)?.currency;
+      setAmount(
+        currencyAllowsDecimal(transactionCurrency)
+          ? transaction.amount
+          : Math.round(Number(transaction.amount)).toString(),
+      );
       setCategoryId(transaction.categoryId ?? "");
       setPaymentMethod(transaction.paymentMethod);
       setAccountId(transaction.accountId);
@@ -268,10 +280,13 @@ export function EditTransactionDialog({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="destructive" disabled={pending} onClick={handleDelete}>
-            刪除
-          </Button>
+        <DeleteConfirmFooter
+          confirming={confirmingDelete}
+          onConfirmingChange={setConfirmingDelete}
+          confirmMessage="確定要刪除這筆交易嗎？"
+          onDelete={handleDelete}
+          pending={pending}
+        >
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             取消
           </Button>
@@ -286,7 +301,7 @@ export function EditTransactionDialog({
           >
             {pending ? "儲存中…" : "儲存"}
           </Button>
-        </DialogFooter>
+        </DeleteConfirmFooter>
       </DialogContent>
     </Dialog>
   );

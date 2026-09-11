@@ -55,7 +55,14 @@ export function EditAccountDialog({
       setName(account.name);
       setType(account.type);
       setExcludeFromNetWorth(account.excludeFromNetWorth);
-      setInitialBalance(account.initialBalance);
+      // Round away any legacy decimal when this currency doesn't take one —
+      // allowDecimal only removes the "." key for new input, it doesn't
+      // retroactively reformat an existing stored value.
+      setInitialBalance(
+        currencyAllowsDecimal(account.currency)
+          ? account.initialBalance
+          : Math.round(Number(account.initialBalance)).toString(),
+      );
       setStatementDay(account.statementDay != null ? String(account.statementDay) : undefined);
     }
   }

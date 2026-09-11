@@ -104,12 +104,19 @@ export function ReceiptScanQuickAdd({
       const { result } = (await res.json()) as {
         result: Omit<Draft, "type">;
       };
-      setDraft({ ...result, type: "expense" });
-      setAmountText(String(result.amount));
+      const matchedAccount = accounts.find((a) => a.name === result.accountName);
+      const resolvedAccountId = matchedAccount?.id ?? defaultAccountId;
+      setAccountId(resolvedAccountId);
+      // OCR can read a decimal off a real receipt ("$150.50") — round it
+      // away up front when the resolved account's currency doesn't take
+      // decimals. Both draft.amount (what gets saved) and amountText (what
+      // the keypad displays) need the same rounded value.
+      const resolvedCurrency = accounts.find((a) => a.id === resolvedAccountId)?.currency;
+      const roundedAmount = currencyAllowsDecimal(resolvedCurrency) ? result.amount : Math.round(result.amount);
+      setDraft({ ...result, amount: roundedAmount, type: "expense" });
+      setAmountText(String(roundedAmount));
       const matchedCategory = categories.find((c) => c.name === result.categoryName);
       setCategoryId(matchedCategory?.id ?? "");
-      const matchedAccount = accounts.find((a) => a.name === result.accountName);
-      setAccountId(matchedAccount?.id ?? defaultAccountId);
     } catch (err) {
       toast.error(
         err instanceof Error && err.message !== "解析失敗"
