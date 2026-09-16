@@ -1,10 +1,31 @@
 import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { startOfMonth } from "date-fns";
 import { db } from "@/db";
 import { aiUsageEvents, userSettings } from "@/db/schema";
 import { getTodayInTaipei } from "@/lib/date";
+
+// One-time, non-renewing — granted once per account the first time
+// hasCoreAccess ever runs for it (new signups) or retroactively backfilled
+// for pre-existing free accounts (see hasCoreAccess below).
+const TRIAL_DAYS = 7;
+
+function newTrialEndsAt(): Date {
+  return new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+}
+
+export function isTrialActive(trialEndsAt: Date | null | undefined): boolean {
+  return trialEndsAt != null && trialEndsAt.getTime() > Date.now();
+}
+
+// For the /upgrade page's "試用中，還剩 N 天" banner — pulled out of that
+// Server Component so its Date.now() read doesn't trip the
+// components-must-be-pure lint rule.
+export function trialDaysRemaining(trialEndsAt: Date | null | undefined): number {
+  if (!isTrialActive(trialEndsAt)) return 0;
+  return Math.max(1, Math.ceil((trialEndsAt!.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+}
 
 // Free-tier limits — starting values, expected to be tuned after launch
 // against real usage (see docs/legal + monetization plan discussion).
@@ -31,10 +52,30 @@ export function isDevAdmin(userId: string): boolean {
 
 export async function hasCoreAccess(userId: string): Promise<boolean> {
   const [row] = await db
-    .select({ hasPurchasedCore: userSettings.hasPurchasedCore })
+    .select({ hasPurchasedCore: userSettings.hasPurchasedCore, trialEndsAt: userSettings.trialEndsAt })
     .from(userSettings)
     .where(eq(userSettings.userId, userId));
-  return row?.hasPurchasedCore ?? false;
+
+  if (!row) {
+    // First time this account has ever touched a protected page/action —
+    // start its one-time trial now. onConflictDoNothing covers a race with
+    // another request creating the same row concurrently; whichever insert
+    // wins, the trial window is the same to within milliseconds.
+    await db.insert(userSettings).values({ userId, trialEndsAt: newTrialEndsAt() }).onConflictDoNothing();
+    return true;
+  }
+
+  if (row.hasPurchasedCore) return true;
+  if (row.trialEndsAt) return isTrialActive(row.trialEndsAt);
+
+  // Pre-existing free account from before the trial feature shipped —
+  // backfill its one-time trial retroactively, once, right now. Guarded on
+  // trial_ends_at still being null so a concurrent request can't re-roll it.
+  await db
+    .update(userSettings)
+    .set({ trialEndsAt: newTrialEndsAt() })
+    .where(and(eq(userSettings.userId, userId), isNull(userSettings.trialEndsAt)));
+  return true;
 }
 
 // Page-level gate — mirrors requireUserId()'s redirect convention. `from` is
@@ -72,6 +113,7 @@ export async function getAiUsageStatus(userId: string, kind: AiUsageKind): Promi
     .select({
       aiSubscriptionStatus: userSettings.aiSubscriptionStatus,
       hasPurchasedCore: userSettings.hasPurchasedCore,
+      trialEndsAt: userSettings.trialEndsAt,
     })
     .from(userSettings)
     .where(eq(userSettings.userId, userId));
@@ -91,7 +133,7 @@ export async function getAiUsageStatus(userId: string, kind: AiUsageKind): Promi
   const monthlyLimit =
     settings?.aiSubscriptionStatus === "active"
       ? SUBSCRIBED_SOFT_CAP_PER_MONTH
-      : settings?.hasPurchasedCore
+      : settings?.hasPurchasedCore || isTrialActive(settings?.trialEndsAt)
         ? kind === "receipt_scan"
           ? CORE_RECEIPT_SCAN_CAP_PER_MONTH
           : CORE_QUICK_ADD_CAP_PER_MONTH

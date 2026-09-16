@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { userSettings } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
+import { isTrialActive, trialDaysRemaining } from "@/lib/entitlements";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { BackHistoryLink } from "@/components/back-history-link";
 import { cn } from "@/lib/utils";
@@ -27,11 +28,15 @@ export default async function UpgradePage({
       hasPurchasedCore: userSettings.hasPurchasedCore,
       aiSubscriptionStatus: userSettings.aiSubscriptionStatus,
       aiSubscriptionPlatform: userSettings.aiSubscriptionPlatform,
+      trialEndsAt: userSettings.trialEndsAt,
     })
     .from(userSettings)
     .where(eq(userSettings.userId, userId));
 
   const unlocked = settings?.hasPurchasedCore ?? false;
+  const trialEndsAt = settings?.trialEndsAt ?? null;
+  const trialActive = !unlocked && isTrialActive(trialEndsAt);
+  const trialDaysLeft = trialDaysRemaining(trialEndsAt);
   const isSubscribed = settings?.aiSubscriptionStatus === "active";
   // Null covers every row predating this column — those subscribers all
   // have a real stripeCustomerId, so treat null the same as "stripe".
@@ -65,11 +70,18 @@ export default async function UpgradePage({
               已解鎖
             </div>
           ) : (
-            <form action={createAllInOneCheckoutSession}>
-              <Button type="submit" className="w-full">
-                立即解鎖
-              </Button>
-            </form>
+            <>
+              {trialActive && (
+                <div className="rounded-lg bg-amber-500/10 px-3 py-2 text-center text-sm font-medium text-amber-700">
+                  試用中，還剩 {trialDaysLeft} 天
+                </div>
+              )}
+              <form action={createAllInOneCheckoutSession}>
+                <Button type="submit" className="w-full">
+                  立即解鎖
+                </Button>
+              </form>
+            </>
           )}
         </section>
 

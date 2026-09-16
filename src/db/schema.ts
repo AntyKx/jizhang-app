@@ -87,6 +87,12 @@ export const userSettings = pgTable("user_settings", {
   aiSubscriptionStatus: aiSubscriptionStatusEnum("ai_subscription_status").notNull().default("none"),
   aiSubscriptionCurrentPeriodEnd: timestamp("ai_subscription_current_period_end"),
   aiSubscriptionPlatform: purchasePlatformEnum("ai_subscription_platform"),
+  // Set once, the first time this row is created for a never-purchased user
+  // (see entitlements.ts's hasCoreAccess) — never touched again after that,
+  // so it's a one-shot grant rather than something that could be re-rolled
+  // by re-triggering row creation. Null for anyone who already has
+  // hasPurchasedCore, since it'd be irrelevant.
+  trialEndsAt: timestamp("trial_ends_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
