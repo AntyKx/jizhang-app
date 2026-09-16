@@ -18,6 +18,15 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Deep-link callback for the Google-OAuth-in-system-browser handoff:
+                 see MainActivity's shouldOverrideUrlLoading override and
+                 src/app/native-auth-callback. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="bearledger" android:host="auth-callback" />
+            </intent-filter>
         </activity>
 
         <provider

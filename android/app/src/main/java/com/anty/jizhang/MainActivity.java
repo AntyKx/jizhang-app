@@ -2,12 +2,17 @@ package com.anty.jizhang;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.webkit.PermissionRequest;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebView;
 import androidx.annotation.NonNull;
+import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebChromeClient;
+import com.getcapacitor.BridgeWebViewClient;
 
 // The web app's voice quick-add records audio with navigator.mediaDevices.getUserMedia
 // directly inside the WebView. Capacitor's default WebChromeClient doesn't forward that
@@ -18,6 +23,19 @@ import com.getcapacitor.BridgeWebChromeClient;
 public class MainActivity extends BridgeActivity {
     private static final int RECORD_AUDIO_REQUEST_CODE = 1001;
     private PermissionRequest pendingMediaRequest;
+
+    // Google refuses to render its own sign-in/consent screen inside anything it
+    // detects as an embedded WebView (the "disallowed_useragent" policy), and
+    // Clerk's OAuth redirect hops through its own Frontend API host (a different
+    // origin than the app's) on the way there — both need to happen in a real
+    // browser context, not this WebView. Chrome Custom Tabs gives that real
+    // browser context while still feeling part of the app; the trip back in is
+    // handled by the bearledger:// deep link registered in AndroidManifest.xml
+    // (see src/app/native-auth-callback and MainActivity's @capacitor/app
+    // appUrlOpen listener on the JS side).
+    private static boolean isOAuthHandoffHost(String host) {
+        return "accounts.google.com".equals(host) || "clerk.bearledger.app".equals(host);
+    }
 
     @Override
     public void onStart() {
@@ -41,6 +59,17 @@ public class MainActivity extends BridgeActivity {
                         new String[] { Manifest.permission.RECORD_AUDIO },
                         RECORD_AUDIO_REQUEST_CODE
                 );
+            }
+        });
+        bridge.getWebView().setWebViewClient(new BridgeWebViewClient(bridge) {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri url = request.getUrl();
+                if (request.isForMainFrame() && isOAuthHandoffHost(url.getHost())) {
+                    new CustomTabsIntent.Builder().build().launchUrl(MainActivity.this, url);
+                    return true;
+                }
+                return super.shouldOverrideUrlLoading(view, request);
             }
         });
     }
