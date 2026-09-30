@@ -41,7 +41,7 @@ const CORE_QUICK_ADD_CAP_PER_MONTH = 120;
 const CORE_RECEIPT_SCAN_CAP_PER_MONTH = 30;
 const SUBSCRIBED_SOFT_CAP_PER_MONTH = 1000;
 
-export type AiUsageKind = "quick_add" | "receipt_scan" | "shared_quick_add";
+export type AiUsageKind = "quick_add" | "receipt_scan" | "shared_quick_add" | "monthly_summary" | "icon_generation";
 
 // Gates the /dev-tools entitlement-testing panel to a single hardcoded
 // account (via env var, not committed as a literal ID) — everyone else gets
@@ -76,6 +76,19 @@ export async function hasCoreAccess(userId: string): Promise<boolean> {
     .set({ trialEndsAt: newTrialEndsAt() })
     .where(and(eq(userSettings.userId, userId), isNull(userSettings.trialEndsAt)));
   return true;
+}
+
+// Read-only variant of hasCoreAccess for background jobs (the nightly backup
+// cron): never starts or backfills a trial. hasCoreAccess's side effects are
+// meant to fire when a user actually opens the app — calling it from the
+// cron started every dormant account's one-time 7-day trial overnight,
+// without the user ever seeing it.
+export async function peekCoreAccess(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ hasPurchasedCore: userSettings.hasPurchasedCore, trialEndsAt: userSettings.trialEndsAt })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId));
+  return Boolean(row?.hasPurchasedCore) || isTrialActive(row?.trialEndsAt);
 }
 
 // Page-level gate — mirrors requireUserId()'s redirect convention. `from` is

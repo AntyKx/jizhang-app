@@ -20,7 +20,14 @@ const isPublicRoute = createRouteMatcher([
 
 export default clerkMiddleware(async (auth, req) => {
   if (!isPublicRoute(req)) {
-    await auth.protect();
+    // Clerk's default protect() only redirects to sign-in when the request
+    // "looks like" a browser page load (Sec-Fetch-Dest: document, or an
+    // Accept header containing text/html) — anything else, including plain
+    // bots/crawlers like Google Play's account/data-deletion URL checker,
+    // falls through to a bare 404 instead. Pinning unauthenticatedUrl makes
+    // every unauthenticated request redirect the same way regardless of
+    // what client sent it.
+    await auth.protect({ unauthenticatedUrl: new URL("/sign-in", req.url).toString() });
   }
 });
 

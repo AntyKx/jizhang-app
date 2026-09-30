@@ -57,7 +57,10 @@ function claimSplashTurn(): boolean {
 // tapping between tabs.
 export function BearSplashScreen() {
   const pathname = usePathname();
-  const isAuthPage = pathname?.startsWith("/sign-in") || pathname?.startsWith("/sign-up");
+  const isAuthPage =
+    pathname?.startsWith("/sign-in") ||
+    pathname?.startsWith("/sign-up") ||
+    pathname?.startsWith("/native-auth-callback");
   // /sign-in and /sign-up are their own full page load (root layout mounts
   // fresh) separate from the app content that follows once auth succeeds —
   // skipping it there means the one real playback happens on the way into

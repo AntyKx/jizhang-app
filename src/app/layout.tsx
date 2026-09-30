@@ -9,6 +9,8 @@ import VersionBadge from "@/components/version-badge";
 import ServiceWorkerCleanup from "@/components/service-worker-cleanup";
 import { BearSplashScreen } from "@/components/bear-splash-screen";
 import { GestureLock } from "@/components/gesture-lock";
+import { NativeAuthListener } from "@/components/native-auth-listener";
+import { NativePurchasesInit } from "@/components/native-purchases-init";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -57,12 +59,14 @@ export default function RootLayout({
     <ClerkProvider localization={zhTW}>
       <html
         lang="zh-TW"
-        className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} h-[100dvh] antialiased`}
       >
-        <body className="min-h-full flex flex-col bg-background pt-[env(safe-area-inset-top)] text-foreground">
+        <body className="min-h-[100dvh] flex flex-col bg-background pt-[env(safe-area-inset-top)] text-foreground">
           <ServiceWorkerCleanup />
           <UpdateChecker />
           <GestureLock />
+          <NativeAuthListener />
+          <NativePurchasesInit />
           {children}
           <InstallPrompt />
           <VersionBadge />

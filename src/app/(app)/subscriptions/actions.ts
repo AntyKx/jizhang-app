@@ -9,7 +9,8 @@ import { requireUserId } from "@/lib/auth";
 import { getDefaultAccountId } from "@/lib/account";
 import { ownedCategoryId } from "@/lib/category";
 import { advanceOccurrence } from "@/lib/recurrence";
-import { createTransaction, deleteTransactionUnchecked } from "@/app/(app)/transactions/actions";
+import { createTransaction } from "@/app/(app)/transactions/actions";
+import { deleteTransactionUnchecked } from "@/lib/transactions/delete-row";
 import { fail, isFail, type Fail } from "@/lib/action-result";
 
 // Shared ownership check for a user-supplied accountId — the create/edit
@@ -42,14 +43,25 @@ function revalidateOccurrencePaths() {
 // Advances `nextOccurrence` by one interval, and deactivates the rule if
 // that pushes it past `endDate` — otherwise a finished rule would keep
 // nagging forever with an occurrence date beyond when it was meant to stop.
-async function advanceRule(userId: string, rule: typeof recurringRules.$inferSelect) {
+// Guarded on nextOccurrence still being what the caller read, so a
+// double-tapped 一鍵入帳/略過 advances the rule only once; returns whether
+// this call was the one that advanced it.
+async function advanceRule(userId: string, rule: typeof recurringRules.$inferSelect): Promise<boolean> {
   const nextOccurrence = advanceOccurrence(rule.nextOccurrence, rule.frequency, rule.interval);
   const isActive = rule.endDate ? nextOccurrence <= rule.endDate : true;
 
-  await db
+  const updated = await db
     .update(recurringRules)
     .set({ nextOccurrence, isActive })
-    .where(and(eq(recurringRules.id, rule.id), eq(recurringRules.userId, userId)));
+    .where(
+      and(
+        eq(recurringRules.id, rule.id),
+        eq(recurringRules.userId, userId),
+        eq(recurringRules.nextOccurrence, rule.nextOccurrence),
+      ),
+    )
+    .returning({ id: recurringRules.id });
+  return updated.length > 0;
 }
 
 const paymentMethodSchema = z
@@ -201,11 +213,19 @@ export async function postRecurringOccurrence(ruleId: string) {
   // due and the next "一鍵入帳" tap would post a *second* copy of the same
   // charge. Undo the transaction instead so the whole action is all-or-
   // nothing and the user can simply retry.
+  let advanced: boolean;
   try {
-    await advanceRule(userId, rule);
+    advanced = await advanceRule(userId, rule);
   } catch {
-    await deleteTransactionUnchecked(created.id);
+    await deleteTransactionUnchecked(userId, created.id);
     return fail("入帳失敗，請稍後再試");
+  }
+  if (!advanced) {
+    // Another request (a double tap, a second device) already posted this
+    // same occurrence — drop the duplicate this call just created.
+    await deleteTransactionUnchecked(userId, created.id);
+    revalidateOccurrencePaths();
+    return fail("這筆已經入帳過了");
   }
 
   revalidateOccurrencePaths();

@@ -24,7 +24,12 @@ import { accountTypeToPaymentMethod, type AccountType } from "@/lib/account-type
 import { currencyAllowsDecimal } from "@/lib/currency";
 import { PaymentMethodField } from "@/components/record/payment-method-field";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
-import { SplitExpenseField, computeSplitOverflow, type SplitParticipantDraft } from "@/components/record/split-expense-field";
+import {
+  SplitExpenseField,
+  computeSplitOverflow,
+  findNewSplitNames,
+  type SplitParticipantDraft,
+} from "@/components/record/split-expense-field";
 import { todayInTaipeiString } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
@@ -87,6 +92,12 @@ export function TextQuickAdd({
   // SplitExpenseField before confirming.
   const [sharedDirection, setSharedDirection] = useState<"mine" | "theirs">("mine");
   const [theirsCounterpartyName, setTheirsCounterpartyName] = useState("");
+  // Names the AI guessed out of the text that don't match this user's known
+  // split history — reset on every parse, cleared per-name once the user
+  // taps 確認 on that name's NewNameConfirm badge (see handleParse and
+  // SplitExpenseField's pendingNewNames prop).
+  const [aiNewNames, setAiNewNames] = useState<string[]>([]);
+  const [confirmedNewNames, setConfirmedNewNames] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
 
   async function handleParse(overrideText?: string) {
@@ -153,6 +164,8 @@ export function TextQuickAdd({
         setSplitParticipants([]);
         setTheirsCounterpartyName("");
       }
+      setConfirmedNewNames(new Set());
+      setAiNewNames(findNewSplitNames([detectedShared ? result.splitCounterpartyName : null], frequentSplitNames));
     } catch (err) {
       // Keep whatever the user typed and drop them into the manual-entry
       // form instead of dead-ending them back to icon-based recording.
@@ -169,6 +182,8 @@ export function TextQuickAdd({
       setSplitParticipants([]);
       setSharedDirection("mine");
       setTheirsCounterpartyName("");
+      setAiNewNames([]);
+      setConfirmedNewNames(new Set());
       setDraft({
         amount: 0,
         type: "expense",
@@ -401,6 +416,8 @@ export function TextQuickAdd({
               onDirectionChange={setSharedDirection}
               theirsCounterpartyName={theirsCounterpartyName}
               onTheirsCounterpartyNameChange={setTheirsCounterpartyName}
+              pendingNewNames={aiNewNames.filter((n) => !confirmedNewNames.has(n))}
+              onConfirmNewName={(name) => setConfirmedNewNames((prev) => new Set(prev).add(name))}
             />
           )}
 
@@ -430,7 +447,8 @@ export function TextQuickAdd({
               draft.amount <= 0 ||
               (isTheirs
                 ? !theirsCounterpartyName.trim()
-                : isSharedExpense && computeSplitOverflow(amountText, splitParticipants) > 0)
+                : isSharedExpense && computeSplitOverflow(amountText, splitParticipants) > 0) ||
+              (isSharedExpense && aiNewNames.some((n) => !confirmedNewNames.has(n)))
             }
           >
             {pending ? "儲存中…" : "確認記帳"}

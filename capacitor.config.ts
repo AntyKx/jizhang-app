@@ -9,7 +9,14 @@ const config: CapacitorConfig = {
   appName: "小熊記帳本",
   webDir: "public",
   server: {
-    url: "https://jizhang-app-sand.vercel.app",
+    // Clerk's dev instances (pk_test_* keys) needed a cross-domain
+    // "dev browser" handshake through their own accounts.dev host, which
+    // Android's WebView refuses to complete inline and kicks out to the
+    // system browser instead. Moving to this custom domain + Clerk's
+    // production instance (pk_live_*) puts Clerk's Frontend API on
+    // clerk.bearledger.app — same registrable domain, no handshake, no
+    // escape to the external browser.
+    url: "https://jizhang.bearledger.app",
     cleartext: false,
   },
 };

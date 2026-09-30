@@ -19,7 +19,10 @@ const lucideIconSlugs = new Set(Object.keys(categoryIconRegistry));
 
 const iconSchema = z
   .string()
-  .max(10_000_000)
+  // Generous for a 1024px AI-generated PNG (~1.5-2MB as base64), but no
+  // longer lets one crafted request park a 10MB blob in a category row that
+  // every transaction-list query then joins and ships to the client.
+  .max(3_000_000)
   .refine((v) => lucideIconSlugs.has(v) || bearIconPaths.has(v) || dataImagePattern.test(v));
 
 const createCategorySchema = z.object({

@@ -1,5 +1,4 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { userSettings } from "@/db/schema";
@@ -55,7 +54,10 @@ function verifySignature(rawBody: string, header: string | null, secret: string 
   // this server's clock can each drift a little in either direction, so a
   // signature timestamped a few seconds in the "future" from this server's
   // point of view is still legitimate, not a replay.
-  const age = Date.now() - Number(timestamp);
+  // `t` is unix SECONDS (per RevenueCat's docs), not milliseconds —
+  // comparing it raw against Date.now() made every delivery look ~56 years
+  // stale and rejected all of them.
+  const age = Date.now() - Number(timestamp) * 1000;
   if (!Number.isFinite(age) || Math.abs(age) > SIGNATURE_MAX_AGE_MS) return false;
 
   const expectedSignature = createHmac("sha256", secret).update(`${timestamp}.${rawBody}`).digest("hex");
@@ -64,6 +66,16 @@ function verifySignature(rawBody: string, header: string | null, secret: string 
   const provided = Buffer.from(providedSignature, "hex");
   if (expected.length !== provided.length) return false;
   return timingSafeEqual(expected, provided);
+}
+
+// Upsert, not update: a purchase can arrive for an account that has never
+// written a user_settings row (those are created lazily), and a plain UPDATE
+// would silently match nothing and drop the purchase on the floor.
+async function upsertSettings(userId: string, values: Partial<typeof userSettings.$inferInsert>) {
+  await db
+    .insert(userSettings)
+    .values({ userId, ...values })
+    .onConflictDoUpdate({ target: userSettings.userId, set: values });
 }
 
 type RevenueCatEvent = {
@@ -94,18 +106,22 @@ export async function POST(req: Request) {
 
   const event = payload.event;
   const userId = event.app_user_id;
+  // The client always configures RevenueCat with the Clerk userId, so an
+  // anonymous id here means a purchase made before sign-in finished — there
+  // is no account to credit, and upserting would create an orphan row.
+  if (!userId || userId.startsWith("$RCAnonymousID")) {
+    console.warn(`[webhooks/revenuecat] ignoring event for non-Clerk app_user_id ${userId}`);
+    return NextResponse.json({ received: true });
+  }
   const entitlements = event.entitlement_ids ?? [];
   const platform = mapStore(event.store ?? "");
 
   if (entitlements.includes(CORE_ENTITLEMENT) && event.type === "NON_RENEWING_PURCHASE") {
-    await db
-      .update(userSettings)
-      .set({
+    await upsertSettings(userId, {
         hasPurchasedCore: true,
         corePurchasedAt: event.purchased_at_ms ? new Date(event.purchased_at_ms) : new Date(),
         corePurchasePlatform: platform,
-      })
-      .where(eq(userSettings.userId, userId));
+      });
   }
 
   if (entitlements.includes(AI_ENTITLEMENT)) {
@@ -114,14 +130,11 @@ export async function POST(req: Request) {
       case "RENEWAL":
       case "UNCANCELLATION":
       case "PRODUCT_CHANGE": {
-        await db
-          .update(userSettings)
-          .set({
+        await upsertSettings(userId, {
             aiSubscriptionStatus: "active",
             aiSubscriptionCurrentPeriodEnd: event.expiration_at_ms ? new Date(event.expiration_at_ms) : null,
             aiSubscriptionPlatform: platform,
-          })
-          .where(eq(userSettings.userId, userId));
+          });
         break;
       }
       case "CANCELLATION": {
@@ -131,25 +144,16 @@ export async function POST(req: Request) {
         // out to its existing aiSubscriptionCurrentPeriodEnd and gets
         // revoked later by the EXPIRATION event.
         if (event.cancel_reason === "CUSTOMER_SUPPORT") {
-          await db
-            .update(userSettings)
-            .set({ aiSubscriptionStatus: "canceled" })
-            .where(eq(userSettings.userId, userId));
+          await upsertSettings(userId, { aiSubscriptionStatus: "canceled" });
         }
         break;
       }
       case "EXPIRATION": {
-        await db
-          .update(userSettings)
-          .set({ aiSubscriptionStatus: "canceled" })
-          .where(eq(userSettings.userId, userId));
+        await upsertSettings(userId, { aiSubscriptionStatus: "canceled" });
         break;
       }
       case "BILLING_ISSUE": {
-        await db
-          .update(userSettings)
-          .set({ aiSubscriptionStatus: "past_due" })
-          .where(eq(userSettings.userId, userId));
+        await upsertSettings(userId, { aiSubscriptionStatus: "past_due" });
         break;
       }
       case "TRANSFER": {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { format } from "date-fns";
 import { db } from "@/db";
 import { accounts } from "@/db/schema";
-import { hasCoreAccess } from "@/lib/entitlements";
+import { peekCoreAccess } from "@/lib/entitlements";
 import { buildBackup } from "@/lib/backup";
 import { pruneSnapshots, retentionCutoff, writeSnapshot } from "@/lib/backup-snapshots";
 import { getTodayInTaipei } from "@/lib/date";
@@ -48,7 +48,7 @@ export async function GET(req: Request) {
       // depends on the plan. Pruning reads the entitlement per user so a
       // plan change takes effect on the next nightly pass without needing
       // any migration of what's already stored.
-      pruned += await pruneSnapshots(userId, retentionCutoff(today, await hasCoreAccess(userId)));
+      pruned += await pruneSnapshots(userId, retentionCutoff(today, await peekCoreAccess(userId)));
     } catch (err) {
       console.error(`[cron/backup] failed for ${userId}:`, err);
       failed.push(userId);

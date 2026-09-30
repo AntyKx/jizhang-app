@@ -74,10 +74,14 @@ export async function POST(req: Request) {
           typeof session.customer === "string" ? session.customer : (session.customer?.id ?? null);
         const userId = (customerId && (await findUserIdByCustomerId(customerId))) || session.client_reference_id;
         if (userId) {
+          // Upsert: the client_reference_id fallback can name an account
+          // whose user_settings row doesn't exist, where an UPDATE would
+          // silently drop a paid purchase.
+          const values = { hasPurchasedCore: true, corePurchasedAt: new Date(), corePurchasePlatform: "stripe" as const };
           await db
-            .update(userSettings)
-            .set({ hasPurchasedCore: true, corePurchasedAt: new Date() })
-            .where(eq(userSettings.userId, userId));
+            .insert(userSettings)
+            .values({ userId, ...values })
+            .onConflictDoUpdate({ target: userSettings.userId, set: values });
         }
       }
       break;

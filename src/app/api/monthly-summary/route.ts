@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { generateText } from "ai";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
+import { getAiUsageStatus, recordAiUsage } from "@/lib/entitlements";
 import { db } from "@/db";
 import { categories, transactions } from "@/db/schema";
 import { detectSpendingAnomalies } from "@/lib/analytics";
@@ -64,7 +65,19 @@ export async function POST(request: Request) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
 
-  const { text } = await generateText({
+  // Same abuse guard every other AI endpoint has — this one used to be
+  // unmetered. Checked after the empty-period early return above, which
+  // never calls the model and so shouldn't cost the user any quota.
+  const usage = await getAiUsageStatus(userId, "monthly_summary");
+  if (!usage.allowed) {
+    const summary =
+      usage.reason === "rate_limited" ? "AI 摘要產生太頻繁，請稍後再試。" : "本月 AI 摘要次數已用完。";
+    return NextResponse.json({ summary }, { status: 429 });
+  }
+
+  let text: string;
+  try {
+    ({ text } = await generateText({
     model: "anthropic/claude-haiku-4-5",
     prompt: `你是理財顧問，根據以下數據，用繁體中文寫一段 3-5 句話的記帳摘要，語氣自然、具體指出重點與建議，不要條列，不要客套開場白。
 
@@ -82,7 +95,11 @@ export async function POST(request: Request) {
             .join("、")
         : "無"
     }`,
-  });
+    }));
+  } catch {
+    return NextResponse.json({ summary: "目前無法產生摘要，請稍後再試。" }, { status: 502 });
+  }
+  await recordAiUsage(userId, "monthly_summary");
 
   return NextResponse.json({ summary: text });
 }

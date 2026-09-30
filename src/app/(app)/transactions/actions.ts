@@ -1,7 +1,6 @@
 "use server";
 
 import { z } from "zod";
-import { revalidatePath } from "next/cache";
 import { eq, and, or, lt, ne, desc, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
@@ -18,6 +17,11 @@ import {
 } from "@/lib/transactions/list-types";
 import { transactionsFilterConditions } from "@/lib/transactions/filter";
 import { fail, isFail, type Fail } from "@/lib/action-result";
+import {
+  deleteTransactionRow,
+  isSettlementTransaction,
+  revalidateTransactionPaths,
+} from "@/lib/transactions/delete-row";
 
 // getExchangeRateToTwd throws its own user-facing message (unreachable FX
 // API, unsupported currency) — converted to the same fail() shape as this
@@ -30,15 +34,6 @@ async function tryExchangeRate(currency: string, date: string): Promise<number |
   } catch (err) {
     return fail(err instanceof Error ? err.message : "無法取得匯率，請稍後再試");
   }
-}
-
-function revalidateTransactionPaths() {
-  revalidatePath("/record");
-  revalidatePath("/calendar");
-  revalidatePath("/stats");
-  revalidatePath("/transactions");
-  revalidatePath("/shared");
-  revalidatePath("/accounts");
 }
 
 const splitParticipantInputSchema = z.object({
@@ -95,6 +90,19 @@ export async function createTransaction(input: {
     .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)));
   if (!ownedAccount) return fail("找不到指定的帳戶");
 
+  // createTransaction is itself a client-callable server action, so this
+  // "internal only" field can still arrive from a crafted request — drop it
+  // unless it names one of this user's own split events (otherwise the list
+  // queries' join would surface another user's event name on this row).
+  let linkedSharedExpenseId: string | undefined;
+  if (parsed.linkedSharedExpenseId) {
+    const [ownedShared] = await db
+      .select({ id: sharedExpenses.id })
+      .from(sharedExpenses)
+      .where(and(eq(sharedExpenses.id, parsed.linkedSharedExpenseId), eq(sharedExpenses.userId, userId)));
+    linkedSharedExpenseId = ownedShared?.id;
+  }
+
   const exchangeRate = await tryExchangeRate(ownedAccount.currency, parsed.occurredAt);
   if (isFail(exchangeRate)) return exchangeRate;
 
@@ -117,7 +125,7 @@ export async function createTransaction(input: {
       note: parsed.note,
       merchant: parsed.merchant,
       occurredAt: parsed.occurredAt,
-      linkedSharedExpenseId: parsed.linkedSharedExpenseId,
+      linkedSharedExpenseId,
     })
     .returning({ id: transactions.id });
   const updateAccountBalance = db
@@ -281,6 +289,11 @@ export async function updateTransaction(input: {
   // never opens this dialog for a transfer row; this is the same guard
   // duplicateTransaction already has, for anything that calls in directly.
   if (existing.type === "transfer") return fail("轉帳紀錄請用刪除後重新建立的方式修改");
+  // Same guard deleteTransaction has — editing a settlement's amount/type
+  // would desync it from the split participant it settled.
+  if (await isSettlementTransaction(userId, existing.id)) {
+    return fail("這是分帳結算交易，請到分帳頁面用「回復結清」處理");
+  }
 
   const [ownedAccount] = await db
     .select({ id: accounts.id, currency: accounts.currency })
@@ -413,7 +426,7 @@ export async function updateTransactionCategory(transactionId: string, categoryI
 
   await db
     .update(transactions)
-    .set({ categoryId })
+    .set({ categoryId: await ownedCategoryId(userId, categoryId) })
     .where(and(eq(transactions.id, transactionId), eq(transactions.userId, userId)));
 
   revalidateTransactionPaths();
@@ -472,54 +485,6 @@ export async function duplicateTransaction(transactionId: string) {
   return { id: insertedRows[0].id };
 }
 
-// Shared by deleteTransaction and shared/actions.ts's unsettleSharedExpense
-// — both need to delete a transaction row and reverse its balance effect
-// exactly the same way, just gated by different guards (or none, for the
-// settlement-revert path, which is itself the sanctioned way to remove a
-// settlement transaction).
-async function deleteTransactionRow(userId: string, tx: typeof transactions.$inferSelect) {
-  const deleteTx = db
-    .delete(transactions)
-    .where(and(eq(transactions.id, tx.id), eq(transactions.userId, userId)));
-
-  if (tx.type === "transfer") {
-    // Undo both legs: give the amount (+ any fee, which only ever left the
-    // source account) back to the source account, and take the amount back
-    // out of the destination account.
-    const refundToSource = Number(tx.amount) + Number(tx.feeAmount);
-    if (tx.toAccountId) {
-      await db.batch([
-        deleteTx,
-        db
-          .update(accounts)
-          .set({ currentBalance: sql`${accounts.currentBalance} + ${refundToSource}` })
-          .where(and(eq(accounts.id, tx.accountId), eq(accounts.userId, userId))),
-        db
-          .update(accounts)
-          .set({ currentBalance: sql`${accounts.currentBalance} - ${tx.amount}` })
-          .where(and(eq(accounts.id, tx.toAccountId), eq(accounts.userId, userId))),
-      ]);
-    } else {
-      await db.batch([
-        deleteTx,
-        db
-          .update(accounts)
-          .set({ currentBalance: sql`${accounts.currentBalance} + ${refundToSource}` })
-          .where(and(eq(accounts.id, tx.accountId), eq(accounts.userId, userId))),
-      ]);
-    }
-  } else {
-    const delta = tx.type === "expense" ? Number(tx.amount) : -Number(tx.amount);
-    await db.batch([
-      deleteTx,
-      db
-        .update(accounts)
-        .set({ currentBalance: sql`${accounts.currentBalance} + ${delta}` })
-        .where(and(eq(accounts.id, tx.accountId), eq(accounts.userId, userId))),
-    ]);
-  }
-}
-
 export async function deleteTransaction(transactionId: string) {
   const userId = await requireUserId();
 
@@ -548,44 +513,12 @@ export async function deleteTransaction(transactionId: string) {
   // 結清" with no reimbursement to back it up. Revert the settlement from
   // /shared instead, which removes this transaction the same way but also
   // resets the participant.
-  const [settledFrom] = await db
-    .select({ id: sharedExpenses.id })
-    .from(sharedExpenses)
-    .where(
-      and(
-        eq(sharedExpenses.userId, userId),
-        sql`${sharedExpenses.participants} @> ${JSON.stringify([{ settlementTransactionId: transactionId }])}::jsonb`,
-      ),
-    );
-  if (settledFrom) {
+  if (await isSettlementTransaction(userId, transactionId)) {
     return fail("這是分帳結算交易，請到分帳頁面用「回復結清」處理");
   }
 
   await deleteTransactionRow(userId, tx);
   revalidateTransactionPaths();
-}
-
-// Deletes a transaction and reverses its balance effect, skipping every
-// guard deleteTransaction applies. Only for callers that are themselves the
-// sanctioned way to remove the transaction they created — shared/actions.ts
-// reverting a settlement it made, and subscriptions/actions.ts undoing a
-// just-posted occurrence whose rule failed to advance.
-export async function deleteTransactionUnchecked(transactionId: string) {
-  const userId = await requireUserId();
-
-  const [tx] = await db
-    .select()
-    .from(transactions)
-    .where(and(eq(transactions.id, transactionId), eq(transactions.userId, userId)));
-  if (!tx) return;
-
-  await deleteTransactionRow(userId, tx);
-  revalidateTransactionPaths();
-}
-
-// Kept as the name shared/actions.ts already calls; same unguarded delete.
-export async function deleteSettlementTransaction(transactionId: string) {
-  await deleteTransactionUnchecked(transactionId);
 }
 
 export async function loadMoreTransactions(cursor: TransactionsCursor, filter?: TransactionsFilter) {

@@ -1,11 +1,13 @@
 package com.anty.jizhang;
 
 import android.Manifest;
+import android.content.ActivityNotFoundException;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.webkit.PermissionRequest;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
+import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.core.app.ActivityCompat;
@@ -66,7 +68,16 @@ public class MainActivity extends BridgeActivity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri url = request.getUrl();
                 if (request.isForMainFrame() && isOAuthHandoffHost(url.getHost())) {
-                    new CustomTabsIntent.Builder().build().launchUrl(MainActivity.this, url);
+                    // Devices without Chrome (or any other Custom-Tabs-capable
+                    // browser) — stripped-down ROMs, bare emulators — throw here
+                    // instead of launching. Falling back to the WebView would just
+                    // hit Google's "disallowed_useragent" wall, so there's no real
+                    // recovery beyond telling the user what to install.
+                    try {
+                        new CustomTabsIntent.Builder().build().launchUrl(MainActivity.this, url);
+                    } catch (ActivityNotFoundException e) {
+                        Toast.makeText(MainActivity.this, "請先安裝或啟用 Chrome 瀏覽器才能完成登入", Toast.LENGTH_LONG).show();
+                    }
                     return true;
                 }
                 return super.shouldOverrideUrlLoading(view, request);

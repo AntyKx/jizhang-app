@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { createSplitExpense } from "@/app/(app)/shared/actions";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
+import { NewNameConfirm, findNewSplitNames } from "@/components/record/split-expense-field";
 import { todayInTaipeiString } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,13 @@ export function SharedTextQuickAdd({
   const [categoryId, setCategoryId] = useState("");
   const [parsing, setParsing] = useState(false);
   const [parseFailed, setParseFailed] = useState(false);
+  // The AI's guessed counterparty name, when it doesn't match anyone in
+  // frequentSplitNames — cleared once the user taps 確認 on the badge below,
+  // or the moment they edit the field away from this exact value (a manual
+  // edit is its own review, no confirmation needed). Never set for a name
+  // the user typed or picked from the suggestion chips themselves.
+  const [aiNewName, setAiNewName] = useState<string | null>(null);
+  const [newNameConfirmed, setNewNameConfirmed] = useState(false);
   const [pending, startTransition] = useTransition();
 
   async function handleParse(overrideText?: string) {
@@ -71,6 +79,8 @@ export function SharedTextQuickAdd({
       setAmountText(String(roundedAmount));
       const matchedCategory = categories.find((c) => c.name === result.categoryName);
       setCategoryId(matchedCategory?.id ?? "");
+      setNewNameConfirmed(false);
+      setAiNewName(findNewSplitNames([result.counterpartyName], frequentSplitNames)[0] ?? null);
     } catch (err) {
       toast.error(
         err instanceof Error && err.message !== "解析失敗"
@@ -80,6 +90,8 @@ export function SharedTextQuickAdd({
       setParseFailed(true);
       setCategoryId("");
       setAmountText("0");
+      setAiNewName(null);
+      setNewNameConfirmed(false);
       setDraft({
         amount: 0,
         categoryName: null,
@@ -173,6 +185,9 @@ export function SharedTextQuickAdd({
               placeholder="姓名"
               maxLength={30}
             />
+            {aiNewName && draft.counterpartyName.trim() === aiNewName && !newNameConfirmed && (
+              <NewNameConfirm name={aiNewName} onConfirm={() => setNewNameConfirmed(true)} />
+            )}
             {frequentSplitNames.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {frequentSplitNames.map((n) => (
@@ -231,7 +246,13 @@ export function SharedTextQuickAdd({
 
           <Button
             onClick={handleConfirm}
-            disabled={pending || !draft.amount || draft.amount <= 0 || !draft.counterpartyName.trim()}
+            disabled={
+              pending ||
+              !draft.amount ||
+              draft.amount <= 0 ||
+              !draft.counterpartyName.trim() ||
+              (aiNewName !== null && draft.counterpartyName.trim() === aiNewName && !newNameConfirmed)
+            }
           >
             {pending ? "儲存中…" : "確認新增"}
           </Button>

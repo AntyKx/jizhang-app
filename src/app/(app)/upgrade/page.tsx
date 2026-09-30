@@ -5,6 +5,7 @@ import { requireUserId } from "@/lib/auth";
 import { isTrialActive, trialDaysRemaining } from "@/lib/entitlements";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { BackHistoryLink } from "@/components/back-history-link";
+import { CoreUnlockCta } from "@/components/upgrade/core-unlock-cta";
 import { cn } from "@/lib/utils";
 import { createAllInOneCheckoutSession, createBillingPortalSession } from "./actions";
 
@@ -76,11 +77,7 @@ export default async function UpgradePage({
                   試用中，還剩 {trialDaysLeft} 天
                 </div>
               )}
-              <form action={createAllInOneCheckoutSession}>
-                <Button type="submit" className="w-full">
-                  立即解鎖
-                </Button>
-              </form>
+              <CoreUnlockCta purchaseCoreAction={createAllInOneCheckoutSession} />
             </>
           )}
         </section>

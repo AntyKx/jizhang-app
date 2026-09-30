@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { sharedExpenses, transactions, type SplitParticipant } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
@@ -10,12 +10,24 @@ import { requireCoreAccess } from "@/lib/entitlements";
 import { getDefaultAccountId } from "@/lib/account";
 import { todayInTaipeiString } from "@/lib/date";
 import { computeNetBalance } from "@/lib/shared-balance";
-import { createTransaction, deleteSettlementTransaction } from "@/app/(app)/transactions/actions";
+import { createTransaction } from "@/app/(app)/transactions/actions";
+import { deleteTransactionUnchecked } from "@/lib/transactions/delete-row";
 import { fail, isFail } from "@/lib/action-result";
 
 function revalidateSharedPaths() {
   revalidatePath("/shared");
 }
+
+// Optimistic-concurrency predicate: matches the row only if its participants
+// are still exactly what this request read. A settle writes the reimbursement
+// transaction first (money-before-flag ordering) and only then flips the
+// participant — without this, a double-tapped 結清 (or two devices) would both
+// see "unsettled", both create a reimbursement, and double-count the money.
+function participantsUnchanged(participants: SplitParticipant[]) {
+  return sql`${sharedExpenses.participants} = ${JSON.stringify(participants)}::jsonb`;
+}
+
+const CONCURRENT_UPDATE_MESSAGE = "這筆分帳剛剛已被更新，請重新整理後再試";
 
 // Settling records the other side's reimbursement as a real personal
 // transaction — a settled "they owe me" participant means they paid me back
@@ -187,10 +199,24 @@ export async function settleParticipant(sharedExpenseId: string, participantInde
     settlementTransactionId: settlement.id,
   };
 
-  await db
+  const updated = await db
     .update(sharedExpenses)
     .set({ participants: nextParticipants })
-    .where(and(eq(sharedExpenses.id, sharedExpenseId), eq(sharedExpenses.userId, userId)));
+    .where(
+      and(
+        eq(sharedExpenses.id, sharedExpenseId),
+        eq(sharedExpenses.userId, userId),
+        participantsUnchanged(row.participants),
+      ),
+    )
+    .returning({ id: sharedExpenses.id });
+  if (updated.length === 0) {
+    // Lost the race — another request already changed this event. Undo the
+    // reimbursement this call just created so it isn't double-counted.
+    await deleteTransactionUnchecked(userId, settlement.id);
+    revalidateSharedPaths();
+    return fail(CONCURRENT_UPDATE_MESSAGE);
+  }
 
   revalidateSharedPaths();
 }
@@ -296,14 +322,54 @@ export async function settleAllForName(
     byRow.set(t.row.id, entry);
   }
 
-  for (const { row, indices } of byRow.values()) {
-    const nextParticipants = row.participants.map((p, i) =>
+  const planned = Array.from(byRow.values()).map(({ row, indices }) => ({
+    row,
+    nextParticipants: row.participants.map((p, i) =>
       indices.has(i) ? { ...p, isSettled: true, settledAt, settlementTransactionId, settlementBatchId } : p,
-    );
-    await db
+    ),
+  }));
+
+  // One atomic batch, each update guarded on the row still matching what was
+  // read above (see participantsUnchanged). A guard that misses doesn't abort
+  // the batch — it just updates 0 rows — so check afterwards and roll the
+  // whole thing back if any row moved underneath us.
+  const [firstUpdate, ...restUpdates] = planned.map(({ row, nextParticipants }) =>
+    db
       .update(sharedExpenses)
       .set({ participants: nextParticipants })
-      .where(and(eq(sharedExpenses.id, row.id), eq(sharedExpenses.userId, userId)));
+      .where(
+        and(
+          eq(sharedExpenses.id, row.id),
+          eq(sharedExpenses.userId, userId),
+          participantsUnchanged(row.participants),
+        ),
+      )
+      .returning({ id: sharedExpenses.id }),
+  );
+  const results = await db.batch([firstUpdate, ...restUpdates]);
+
+  if (results.some((r) => r.length === 0)) {
+    const reverts = planned
+      .filter((_, i) => results[i].length > 0)
+      .map(({ row, nextParticipants }) =>
+        db
+          .update(sharedExpenses)
+          .set({ participants: row.participants })
+          .where(
+            and(
+              eq(sharedExpenses.id, row.id),
+              eq(sharedExpenses.userId, userId),
+              participantsUnchanged(nextParticipants),
+            ),
+          ),
+      );
+    if (reverts.length > 0) {
+      const [firstRevert, ...restReverts] = reverts;
+      await db.batch([firstRevert, ...restReverts]);
+    }
+    if (settlementTransactionId) await deleteTransactionUnchecked(userId, settlementTransactionId);
+    revalidateSharedPaths();
+    return fail(CONCURRENT_UPDATE_MESSAGE);
   }
 
   revalidateSharedPaths();
@@ -329,7 +395,7 @@ export async function unsettleParticipant(sharedExpenseId: string, participantIn
   if (!participant || !participant.isSettled) return;
 
   if (participant.settlementTransactionId) {
-    await deleteSettlementTransaction(participant.settlementTransactionId);
+    await deleteTransactionUnchecked(userId, participant.settlementTransactionId);
   }
 
   const batchId = participant.settlementBatchId;

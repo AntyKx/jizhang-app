@@ -7,6 +7,24 @@ import { cn } from "@/lib/utils";
 
 export type SplitParticipantDraft = { name: string; amount: string };
 
+// Inline "confirm this AI-guessed name" prompt — shown once per flagged
+// name, dismissed by tapping 確認 (never auto-dismisses, since silently
+// trusting an unrecognized name is exactly what this exists to prevent).
+export function NewNameConfirm({ name, onConfirm }: { name: string; onConfirm: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+      <span>🆕 「{name}」是新的分帳對象，請確認名字沒打錯</span>
+      <button
+        type="button"
+        onClick={onConfirm}
+        className="shrink-0 rounded-full bg-amber-500/20 px-2.5 py-1 font-medium text-amber-700"
+      >
+        確認
+      </button>
+    </div>
+  );
+}
+
 // How much 自訂金額 mode's entered amounts exceed the transaction total by
 // (0 when within bounds, or when 均分 mode makes this impossible by
 // construction) — exported so each of the 4 entry-point forms can fold this
@@ -16,6 +34,24 @@ export function computeSplitOverflow(totalAmount: string, participants: SplitPar
   const total = Number(totalAmount) || 0;
   const splitTotal = participants.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   return Math.max(splitTotal - total, 0);
+}
+
+// Which of an AI-guessed name (or names) don't match anyone in this user's
+// known split history — trimmed, case-insensitive. Used right after an AI
+// parse to decide which names need an explicit tap-to-confirm before saving
+// (see NewNameConfirm below); never applied to names the user typed or
+// picked themselves.
+export function findNewSplitNames(candidates: (string | null | undefined)[], known: string[]): string[] {
+  const knownSet = new Set(known.map((n) => n.trim().toLowerCase()));
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of candidates) {
+    const name = raw?.trim();
+    if (!name || knownSet.has(name.toLowerCase()) || seen.has(name)) continue;
+    seen.add(name);
+    result.push(name);
+  }
+  return result;
 }
 
 // Shared by all four expense-entry paths (manual amount sheet, edit dialog,
@@ -40,6 +76,8 @@ export function SplitExpenseField({
   onDirectionChange,
   theirsCounterpartyName = "",
   onTheirsCounterpartyNameChange,
+  pendingNewNames = [],
+  onConfirmNewName,
 }: {
   enabled: boolean;
   onEnabledChange: (next: boolean) => void;
@@ -55,6 +93,13 @@ export function SplitExpenseField({
   onDirectionChange?: (next: "mine" | "theirs") => void;
   theirsCounterpartyName?: string;
   onTheirsCounterpartyNameChange?: (next: string) => void;
+  // Names the AI guessed out of free text that don't match anyone in
+  // `suggestions` (this user's known split history) yet — surfaced so the
+  // consumer can require an explicit tap-to-confirm before saving, instead
+  // of silently trusting a possibly mis-heard/mis-typed name. Names the user
+  // typed or picked themselves are never in here.
+  pendingNewNames?: string[];
+  onConfirmNewName?: (name: string) => void;
 }) {
   const [method, setMethod] = useState<"equal" | "custom">("equal");
   const [nameInput, setNameInput] = useState("");
@@ -158,6 +203,12 @@ export function SplitExpenseField({
                 maxLength={30}
                 className="h-9 border-0 bg-background"
               />
+              {pendingNewNames.includes(theirsCounterpartyName.trim()) && (
+                <NewNameConfirm
+                  name={theirsCounterpartyName.trim()}
+                  onConfirm={() => onConfirmNewName?.(theirsCounterpartyName.trim())}
+                />
+              )}
               {suggestions.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {suggestions.map((s) => (
@@ -201,31 +252,36 @@ export function SplitExpenseField({
               {participants.length > 0 && (
                 <div className="flex flex-col gap-2">
                   {participants.map((p, i) => (
-                    <div key={p.name} className="flex items-center gap-2">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold text-secondary-foreground">
-                        {p.name.slice(0, 1)}
-                      </span>
-                      <span className="flex-1 truncate text-sm font-medium">{p.name}</span>
-                      {method === "custom" ? (
-                        <Input
-                          type="number"
-                          inputMode="decimal"
-                          value={p.amount}
-                          onChange={(e) => updateAmount(i, e.target.value)}
-                          className="h-8 w-24 border-0 bg-background text-right"
-                        />
-                      ) : (
-                        <span className="w-24 text-right text-sm font-semibold tabular-nums">
-                          ${Number(p.amount).toLocaleString("zh-TW")}
+                    <div key={p.name} className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold text-secondary-foreground">
+                          {p.name.slice(0, 1)}
                         </span>
+                        <span className="flex-1 truncate text-sm font-medium">{p.name}</span>
+                        {method === "custom" ? (
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            value={p.amount}
+                            onChange={(e) => updateAmount(i, e.target.value)}
+                            className="h-8 w-24 border-0 bg-background text-right"
+                          />
+                        ) : (
+                          <span className="w-24 text-right text-sm font-semibold tabular-nums">
+                            ${Number(p.amount).toLocaleString("zh-TW")}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeParticipant(i)}
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </div>
+                      {pendingNewNames.includes(p.name) && (
+                        <NewNameConfirm name={p.name} onConfirm={() => onConfirmNewName?.(p.name)} />
                       )}
-                      <button
-                        type="button"
-                        onClick={() => removeParticipant(i)}
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
-                      >
-                        <X className="size-3" />
-                      </button>
                     </div>
                   ))}
                 </div>

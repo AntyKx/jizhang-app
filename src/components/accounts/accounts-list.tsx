@@ -264,7 +264,7 @@ export function AccountsList({
         <div className="flex flex-col">
           {groups.map(({ type, accounts: groupAccounts }) => (
             <div key={type} className="flex flex-col">
-              <div className="flex items-baseline justify-between px-1 pt-4 pb-1.5 first:pt-0">
+              <div className="flex items-baseline justify-between px-1 pt-4 pb-2.5 first:pt-0">
                 <span className="text-xs font-semibold text-muted-foreground">
                   {accountTypeLabels[type]}
                 </span>

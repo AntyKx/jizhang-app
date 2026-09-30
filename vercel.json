@@ -5,5 +5,29 @@
       "path": "/api/cron/backup",
       "schedule": "0 18 * * *"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "jizhang-app-sand.vercel.app"
+        }
+      ],
+      "destination": "https://jizhang.bearledger.app/",
+      "permanent": false
+    },
+    {
+      "source": "/:path((?!api/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "jizhang-app-sand.vercel.app"
+        }
+      ],
+      "destination": "https://jizhang.bearledger.app/:path*",
+      "permanent": false
+    }
   ]
 }
