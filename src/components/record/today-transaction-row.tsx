@@ -1,5 +1,6 @@
 "use client";
 
+import { formatSignedAmount } from "@/lib/transactions/signed-amount";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -168,13 +169,12 @@ export function TodayTransactionRow({
           </div>
           <span
             className={
-              t.type === "expense"
-                ? "shrink-0 text-sm font-semibold text-destructive tabular-nums"
-                : "shrink-0 text-sm font-semibold text-emerald-600 tabular-nums"
+              formatSignedAmount(t).isInflow
+                ? "shrink-0 text-sm font-semibold text-emerald-600 tabular-nums"
+                : "shrink-0 text-sm font-semibold text-destructive tabular-nums"
             }
           >
-            {t.type === "expense" ? "-" : "+"}
-            {Number(t.amount).toLocaleString("zh-TW")}
+            {formatSignedAmount(t).text}
           </span>
         </div>
       </SwipeToDelete>

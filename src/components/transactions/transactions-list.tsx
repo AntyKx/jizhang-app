@@ -1,5 +1,6 @@
 "use client";
 
+import { formatSignedAmount, signedAmount } from "@/lib/transactions/signed-amount";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -167,11 +168,10 @@ function RegularRow({
         <span
           className={cn(
             "shrink-0 font-semibold tabular-nums",
-            item.type === "expense" ? "text-destructive" : "text-emerald-600",
+            formatSignedAmount(item).isInflow ? "text-emerald-600" : "text-destructive",
           )}
         >
-          {item.type === "expense" ? "-" : "+"}
-          {Number(item.amount).toLocaleString("zh-TW")}
+          {formatSignedAmount(item).text}
         </span>
       </div>
     </SwipeToDelete>
@@ -331,7 +331,7 @@ export function TransactionsList({
                     <SettlementGroupRow
                       key={node.groupId}
                       label={node.label}
-                      total={node.items.reduce((sum, i) => sum + Number(i.amount), 0)}
+                      total={node.items.reduce((sum, i) => sum + (i.kind === "transaction" ? signedAmount(i) : 0), 0)}
                       count={node.items.length}
                       // A settlement group can only ever contain RegularItem
                       // (never TransferListItem — a transfer's

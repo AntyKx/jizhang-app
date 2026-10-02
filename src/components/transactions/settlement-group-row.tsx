@@ -52,8 +52,11 @@ export function SettlementGroupRow({
           <span className="truncate text-sm font-medium text-foreground">分帳結算：{label}</span>
           <span className="text-xs text-muted-foreground">{count} 筆</span>
         </span>
-        <span className="shrink-0 text-sm font-semibold tabular-nums">
-          NT$ {Math.round(total).toLocaleString("zh-TW")}
+        {/* `total` is the signed account effect (money in positive) — a
+            group can mix refunds (money back) and expenses (money I paid). */}
+        <span className={cn("shrink-0 text-sm font-semibold tabular-nums", total >= 0 ? "text-emerald-600" : "text-destructive")}>
+          {total >= 0 ? "+" : "-"}
+          {Math.round(Math.abs(total)).toLocaleString("zh-TW")}
         </span>
         <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
       </CollapsibleTrigger>

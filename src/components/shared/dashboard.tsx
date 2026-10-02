@@ -58,15 +58,25 @@ export function SharedLedgerDashboard({
   // 依對象 view — for a long-running fixed counterparty (e.g. a couple
   // settling monthly), grouping by person and netting across every one of
   // their unsettled events is what makes bulk-settling dozens/hundreds of
-  // small IOUs practical. Unsettled only — this view exists to act on an
-  // outstanding balance, not to browse history (that's what 依事件 is for).
-  const unsettledByName = new Map<string, FlatSplitItem[]>();
-  for (const item of unsettled) {
-    const list = unsettledByName.get(item.name) ?? [];
+  // small IOUs practical. Includes settled items too: each person card keeps
+  // a 結清紀錄 of what every past settlement covered — this view used to be
+  // unsettled-only, so a person simply vanished once settled, with no way to
+  // look back at what was paid.
+  const byName = new Map<string, FlatSplitItem[]>();
+  for (const item of items) {
+    const list = byName.get(item.name) ?? [];
     list.push(item);
-    unsettledByName.set(item.name, list);
+    byName.set(item.name, list);
   }
-  const personGroups = [...unsettledByName.entries()].sort((a, b) => b[1].length - a[1].length);
+  const unsettledCount = (group: FlatSplitItem[]) => group.filter((i) => !i.isSettled).length;
+  const latestSettledAt = (group: FlatSplitItem[]) =>
+    group.reduce((max, i) => ((i.settledAt ?? "") > max ? (i.settledAt ?? "") : max), "");
+  const pendingPeople = [...byName.entries()]
+    .filter(([, group]) => unsettledCount(group) > 0)
+    .sort((a, b) => unsettledCount(b[1]) - unsettledCount(a[1]));
+  const settledPeople = [...byName.entries()]
+    .filter(([, group]) => unsettledCount(group) === 0)
+    .sort((a, b) => latestSettledAt(b[1]).localeCompare(latestSettledAt(a[1])));
 
   return (
     <div className="flex flex-col gap-6">
@@ -155,30 +165,51 @@ export function SharedLedgerDashboard({
             </div>
           )}
         </>
-      ) : personGroups.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium text-muted-foreground">
-            未結清・依對象（{personGroups.length}）
-          </span>
-          <div className="flex flex-col divide-y rounded-2xl border bg-card">
-            {personGroups.map(([name, groupItems]) => (
-              <PersonGroupCard
-                key={name}
-                name={name}
-                items={groupItems}
-                categories={categories}
-                accounts={accounts}
-                dateFrom={dateFrom}
-                dateTo={dateTo}
-              />
-            ))}
-          </div>
-        </div>
       ) : (
-        <div className="flex flex-col items-center gap-2 py-8 text-center">
-          <BearIllustration name="multi-account" size={96} />
-          <p className="text-sm text-muted-foreground">目前沒有未結清的分帳對象。</p>
-        </div>
+        <>
+          {pendingPeople.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-muted-foreground">
+                未結清・依對象（{pendingPeople.length}）
+              </span>
+              <div className="flex flex-col divide-y rounded-2xl border bg-card">
+                {pendingPeople.map(([name, groupItems]) => (
+                  <PersonGroupCard
+                    key={name}
+                    name={name}
+                    items={groupItems}
+                    categories={categories}
+                    accounts={accounts}
+                    dateFrom={dateFrom}
+                    dateTo={dateTo}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="py-2 text-center text-sm text-muted-foreground">目前沒有未結清的分帳對象。</p>
+          )}
+          {settledPeople.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-muted-foreground">
+                已全部結清（{settledPeople.length}）
+              </span>
+              <div className="flex flex-col divide-y rounded-2xl border bg-card opacity-70">
+                {settledPeople.map(([name, groupItems]) => (
+                  <PersonGroupCard
+                    key={name}
+                    name={name}
+                    items={groupItems}
+                    categories={categories}
+                    accounts={accounts}
+                    dateFrom={dateFrom}
+                    dateTo={dateTo}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <section className="flex flex-col gap-2">

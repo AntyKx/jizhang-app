@@ -441,6 +441,9 @@ export async function duplicateTransaction(transactionId: string) {
     .where(and(eq(transactions.id, transactionId), eq(transactions.userId, userId)));
   if (!existing) return fail("找不到指定的交易");
   if (existing.type === "transfer") return fail("轉帳紀錄不能複製");
+  // A settlement is tied to the split participants it settled (and a refund
+  // carries a negative amount) — a copy would be money with no split behind it.
+  if (await isSettlementTransaction(userId, existing.id)) return fail("分帳結算交易不能複製");
 
   // Duplicate means duplicate — the copy keeps the source transaction's own
   // date (and the exchange rate for that date, not today's), not just

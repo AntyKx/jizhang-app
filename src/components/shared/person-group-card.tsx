@@ -10,6 +10,7 @@ import { isFail } from "@/lib/action-result";
 import { computeNetBalance } from "@/lib/shared-balance";
 import { SharedExpenseRow } from "@/components/shared/expense-row";
 import { SettleAccountControl } from "@/components/shared/settle-account-control";
+import { SettlementHistory } from "@/components/shared/settlement-history";
 import type { FlatSplitItem } from "@/lib/shared-expenses";
 import type { AccountType } from "@/lib/account-type";
 import { cn } from "@/lib/utils";
@@ -42,7 +43,11 @@ export function PersonGroupCard({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const net = computeNetBalance(items);
+  // Every item for this person, settled or not — unsettled ones drive the
+  // header total and the 全部結清 button, settled ones feed 結清紀錄 below.
+  const unsettled = items.filter((i) => !i.isSettled);
+  const settled = items.filter((i) => i.isSettled);
+  const net = computeNetBalance(unsettled);
   const rounded = Math.round(Math.abs(net));
   const owedToMe = net >= 0;
 
@@ -66,31 +71,40 @@ export function PersonGroupCard({
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-sm font-semibold text-foreground">{name}</span>
-          <span className="text-xs text-muted-foreground">{items.length} 筆未結清</span>
-        </span>
-        <span className="flex shrink-0 flex-col items-end">
-          <span className={cn("text-sm font-bold tabular-nums", owedToMe ? "text-emerald-600" : "text-destructive")}>
-            ${rounded.toLocaleString("zh-TW")}
+          <span className="text-xs text-muted-foreground">
+            {unsettled.length > 0 ? `${unsettled.length} 筆未結清` : "已全部結清"}
           </span>
-          <span className="text-[11px] text-muted-foreground">{owedToMe ? "欠你" : "你欠"}</span>
         </span>
+        {unsettled.length > 0 && (
+          <span className="flex shrink-0 flex-col items-end">
+            <span className={cn("text-sm font-bold tabular-nums", owedToMe ? "text-emerald-600" : "text-destructive")}>
+              NT${rounded.toLocaleString("zh-TW")}
+            </span>
+            <span className="text-[11px] text-muted-foreground">{owedToMe ? "欠你" : "你欠"}</span>
+          </span>
+        )}
         <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
       </CollapsibleTrigger>
       <CollapsiblePanel>
-        <div className="flex flex-col divide-y">
-          {items.map((item) => (
-            <SharedExpenseRow
-              key={`${item.sharedExpenseId}-${item.participantIndex}`}
-              item={item}
-              categories={categories}
-              accounts={accounts}
-              showCategory
-            />
-          ))}
-        </div>
-        <div className="flex flex-col items-end gap-2 px-4 py-2.5">
-          <SettleAccountControl label="全部結清" accounts={accounts} pending={pending} onSettle={handleSettleAll} />
-        </div>
+        {unsettled.length > 0 && (
+          <>
+            <div className="flex flex-col divide-y">
+              {unsettled.map((item) => (
+                <SharedExpenseRow
+                  key={`${item.sharedExpenseId}-${item.participantIndex}`}
+                  item={item}
+                  categories={categories}
+                  accounts={accounts}
+                  showCategory
+                />
+              ))}
+            </div>
+            <div className="flex flex-col items-end gap-2 px-4 py-2.5">
+              <SettleAccountControl label="全部結清" accounts={accounts} pending={pending} onSettle={handleSettleAll} />
+            </div>
+          </>
+        )}
+        <SettlementHistory items={settled} />
       </CollapsiblePanel>
     </Collapsible>
   );

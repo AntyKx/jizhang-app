@@ -59,7 +59,11 @@ export function SharedExpenseRow({
         toast.error(result.error);
         return;
       }
-      toast.success("已復原結清");
+      // A 依對象 bulk settle reverts as one unit (it produced one netted
+      // transaction that can't be split back per item) — say so, instead of
+      // silently bringing back items from other events too.
+      const reverted = result?.reverted ?? 1;
+      toast.success(reverted > 1 ? `已復原這次整批結清（共 ${reverted} 筆）` : "已復原結清");
       router.refresh();
     });
   }
@@ -152,7 +156,7 @@ export function SharedExpenseRow({
                 onPointerUp={(e) => e.stopPropagation()}
                 onClick={handleUnsettle}
               >
-                回復結清
+                {item.settlementBatchId ? "回復整批結清" : "回復結清"}
               </Button>
             )}
           </div>

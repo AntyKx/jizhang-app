@@ -1,3 +1,4 @@
+import { signedAmount } from "@/lib/transactions/signed-amount";
 import Link from "next/link";
 import {
   addMonths,
@@ -253,7 +254,7 @@ export default async function CalendarPage({
                 <SettlementGroupRow
                   key={node.groupId}
                   label={node.label}
-                  total={node.items.reduce((sum, t) => sum + Number(t.amount), 0)}
+                  total={node.items.reduce((sum, t) => sum + signedAmount(t), 0)}
                   count={node.items.length}
                   categoryIcon={node.items[0].categoryIcon}
                   categoryColor={node.items[0].categoryColor}

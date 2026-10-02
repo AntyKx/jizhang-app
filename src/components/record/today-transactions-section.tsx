@@ -1,3 +1,4 @@
+import { signedAmount } from "@/lib/transactions/signed-amount";
 import { format } from "date-fns";
 import { and, desc, eq, ne } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -100,7 +101,7 @@ export async function TodayTransactionsSection({
             <SettlementGroupRow
               key={node.groupId}
               label={node.label}
-              total={node.items.reduce((sum, t) => sum + Number(t.amount), 0)}
+              total={node.items.reduce((sum, t) => sum + signedAmount(t), 0)}
               count={node.items.length}
               categoryIcon={node.items[0].categoryIcon}
               categoryColor={node.items[0].categoryColor}

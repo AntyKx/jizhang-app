@@ -56,8 +56,14 @@ export async function getCategoryBreakdown(
     }
   }
 
-  const total = [...byCategory.values()].reduce((sum, c) => sum + c.amount, 0);
-  return [...byCategory.entries()]
+  // A split reimbursement is a negative-amount expense (a refund against the
+  // original category), so a category can net to zero or below in a period
+  // where the refund landed but the original spend didn't (paid back next
+  // month). A slice can't be negative — drop those rather than corrupt the
+  // donut and the percentages.
+  const positive = [...byCategory.entries()].filter(([, c]) => c.amount > 0.005);
+  const total = positive.reduce((sum, [, c]) => sum + c.amount, 0);
+  return positive
     .map(([key, c]) => ({
       categoryId: key === "uncategorized" ? null : key,
       name: c.name,
@@ -162,8 +168,11 @@ export async function getAccountBreakdown(userId: string, range: StatsRange): Pr
     if (existing) existing.amount += amount;
     else byAccount.set(r.accountId, { name: r.accountName, color: r.accountColor ?? OTHER_COLOR, amount });
   }
-  const total = [...byAccount.values()].reduce((sum, a) => sum + a.amount, 0);
-  return [...byAccount.entries()]
+  // Same refund caveat as getCategoryBreakdown: an account can net to zero
+  // or below in a period, which a bar/percentage can't show.
+  const positive = [...byAccount.entries()].filter(([, a]) => a.amount > 0.005);
+  const total = positive.reduce((sum, [, a]) => sum + a.amount, 0);
+  return positive
     .map(([accountId, a]) => ({
       accountId,
       name: a.name,

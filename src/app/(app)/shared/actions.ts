@@ -4,13 +4,11 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { sharedExpenses, transactions, type SplitParticipant } from "@/db/schema";
+import { sharedExpenses, type SplitParticipant } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { requireCoreAccess } from "@/lib/entitlements";
 import { getDefaultAccountId } from "@/lib/account";
-import { todayInTaipeiString } from "@/lib/date";
-import { computeNetBalance } from "@/lib/shared-balance";
-import { createTransaction } from "@/app/(app)/transactions/actions";
+import { bookSettlementExpense } from "@/lib/transactions/settlement";
 import { deleteTransactionUnchecked } from "@/lib/transactions/delete-row";
 import { fail, isFail } from "@/lib/action-result";
 
@@ -29,11 +27,12 @@ function participantsUnchanged(participants: SplitParticipant[]) {
 
 const CONCURRENT_UPDATE_MESSAGE = "這筆分帳剛剛已被更新，請重新整理後再試";
 
-// Settling records the other side's reimbursement as a real personal
-// transaction — a settled "they owe me" participant means they paid me back
-// (income), a settled "I owe them" participant means I paid my share to them
-// (expense). Without this, personal stats would keep showing the split as
-// outstanding forever, even after the money actually changed hands.
+// Settling records the money that actually changed hands as a real personal
+// transaction, in the split event's own category (see
+// lib/transactions/settlement.ts): "I owe them" → an expense (my real
+// spend), "they owe me" → a refund (negative expense) against the category I
+// originally fronted the whole bill in. Without this, personal stats would
+// keep showing the split as outstanding forever.
 async function createSettlementTransaction(
   userId: string,
   input: {
@@ -46,27 +45,16 @@ async function createSettlementTransaction(
     // User-chosen override from the 結清 button's account picker — lets them
     // represent which account actually paid/received the money instead of
     // always falling back to the linked transaction's account or the
-    // default account below.
+    // default account.
     accountId?: string;
   },
 ) {
-  let accountId = input.accountId;
-  if (!accountId && input.linkedTransactionId) {
-    const [linked] = await db
-      .select({ accountId: transactions.accountId })
-      .from(transactions)
-      .where(and(eq(transactions.id, input.linkedTransactionId), eq(transactions.userId, userId)));
-    accountId = linked?.accountId;
-  }
-  if (!accountId) accountId = await getDefaultAccountId(userId);
-
-  return createTransaction({
-    categoryId: input.categoryId ?? undefined,
-    type: input.iOwe ? "expense" : "income",
-    amount: Number(input.amount),
-    accountId,
+  return bookSettlementExpense(userId, {
+    expenseAmount: input.iOwe ? Number(input.amount) : -Number(input.amount),
+    categoryId: input.categoryId,
     note: `分帳結算：${input.label}`,
-    occurredAt: todayInTaipeiString(),
+    accountId: input.accountId,
+    linkedTransactionId: input.linkedTransactionId,
     linkedSharedExpenseId: input.sharedExpenseId,
   });
 }
@@ -294,20 +282,38 @@ export async function settleAllForName(
   );
   if (targets.length === 0) return;
 
-  const net = computeNetBalance(targets.map((t) => t.p));
-  let settlementTransactionId: string | null = null;
-  if (Math.abs(net) >= 1) {
-    const resolvedAccountId = accountId ?? (await getDefaultAccountId(userId));
-    const settlement = await createTransaction({
-      type: net > 0 ? "income" : "expense",
-      amount: Math.abs(net),
-      accountId: resolvedAccountId,
-      note: `分帳一鍵結清（${name}，共 ${targets.length} 筆）`,
-      occurredAt: todayInTaipeiString(),
-    });
-    if (isFail(settlement)) return settlement;
-    settlementTransactionId = settlement.id;
+  // One settlement transaction per category, not one uncategorized lump:
+  // within a category, what I owed them is my spend and what they owed me
+  // is a refund of my spend, so they net (signed expense, see
+  // createSettlementTransaction). The account still moves by exactly the
+  // overall net — it's just split across the categories it belongs to, so
+  // e.g. a movie I owed them for still shows up as 娛樂 spending instead of
+  // vanishing into a netted "income".
+  const resolvedAccountId = accountId ?? (await getDefaultAccountId(userId));
+  const byCategory = new Map<string, { categoryId: string | null; expenseAmount: number; count: number }>();
+  for (const t of targets) {
+    const key = t.row.categoryId ?? "none";
+    const entry = byCategory.get(key) ?? { categoryId: t.row.categoryId, expenseAmount: 0, count: 0 };
+    entry.expenseAmount += t.p.iOwe ? Number(t.p.amount) : -Number(t.p.amount);
+    entry.count++;
+    byCategory.set(key, entry);
   }
+  const txIdByCategory = new Map<string, string>();
+  for (const [key, entry] of byCategory) {
+    if (Math.abs(entry.expenseAmount) < 0.005) continue;
+    const settlement = await bookSettlementExpense(userId, {
+      expenseAmount: entry.expenseAmount,
+      categoryId: entry.categoryId,
+      note: `分帳一鍵結清（${name}，共 ${entry.count} 筆）`,
+      accountId: resolvedAccountId,
+    });
+    if (isFail(settlement)) {
+      for (const id of txIdByCategory.values()) await deleteTransactionUnchecked(userId, id);
+      return settlement;
+    }
+    txIdByCategory.set(key, settlement.id);
+  }
+  const txIdFor = (row: (typeof targets)[number]["row"]) => txIdByCategory.get(row.categoryId ?? "none") ?? null;
 
   const settlementBatchId = crypto.randomUUID();
   const settledAt = new Date().toISOString();
@@ -325,7 +331,9 @@ export async function settleAllForName(
   const planned = Array.from(byRow.values()).map(({ row, indices }) => ({
     row,
     nextParticipants: row.participants.map((p, i) =>
-      indices.has(i) ? { ...p, isSettled: true, settledAt, settlementTransactionId, settlementBatchId } : p,
+      indices.has(i)
+        ? { ...p, isSettled: true, settledAt, settlementTransactionId: txIdFor(row), settlementBatchId }
+        : p,
     ),
   }));
 
@@ -367,7 +375,7 @@ export async function settleAllForName(
       const [firstRevert, ...restReverts] = reverts;
       await db.batch([firstRevert, ...restReverts]);
     }
-    if (settlementTransactionId) await deleteTransactionUnchecked(userId, settlementTransactionId);
+    for (const id of txIdByCategory.values()) await deleteTransactionUnchecked(userId, id);
     revalidateSharedPaths();
     return fail(CONCURRENT_UPDATE_MESSAGE);
   }
@@ -394,10 +402,6 @@ export async function unsettleParticipant(sharedExpenseId: string, participantIn
   const participant = row.participants[participantIndex];
   if (!participant || !participant.isSettled) return;
 
-  if (participant.settlementTransactionId) {
-    await deleteTransactionUnchecked(userId, participant.settlementTransactionId);
-  }
-
   const batchId = participant.settlementBatchId;
 
   // If this was part of a batch, every row's matching participants need the
@@ -407,12 +411,30 @@ export async function unsettleParticipant(sharedExpenseId: string, participantIn
     ? await db.select().from(sharedExpenses).where(eq(sharedExpenses.userId, userId))
     : [row];
 
+  // A batch books one settlement transaction per category (see
+  // settleAllForName), so its participants can point at several — remove
+  // every one of them, not just the tapped participant's.
+  const txIds = new Set<string>();
+  if (participant.settlementTransactionId) txIds.add(participant.settlementTransactionId);
+  if (batchId) {
+    for (const r of allRows) {
+      for (const p of r.participants) {
+        if (p.settlementBatchId === batchId && p.settlementTransactionId) txIds.add(p.settlementTransactionId);
+      }
+    }
+  }
+  for (const id of txIds) await deleteTransactionUnchecked(userId, id);
+
+  // Counted so the UI can tell the user a whole batch came back, not just
+  // the one row they tapped.
+  let reverted = 0;
   for (const r of allRows) {
     let changed = false;
     const nextParticipants = r.participants.map((p) => {
       const matches = batchId ? p.settlementBatchId === batchId : r.id === row.id && p === participant;
       if (!matches) return p;
       changed = true;
+      reverted++;
       return { ...p, isSettled: false, settledAt: null, settlementTransactionId: null, settlementBatchId: null };
     });
     if (changed) {
@@ -424,6 +446,7 @@ export async function unsettleParticipant(sharedExpenseId: string, participantIn
   }
 
   revalidateSharedPaths();
+  return { reverted };
 }
 
 // Deleting a split with any settled participant would erase the audit trail
