@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     const message =
       usage.reason === "rate_limited"
         ? "AI 收據辨識操作太頻繁，請稍後再試"
-        : "本月免費收據辨識額度已用完，訂閱解鎖更多額度";
+        : "本月收據辨識額度已用完，下個月 1 號會重置（免費版可到「升級」解鎖更多額度）";
     return NextResponse.json({ error: message }, { status: 429 });
   }
 
@@ -65,7 +65,9 @@ export async function POST(req: Request) {
 
   const today = format(getTodayInTaipei(), "yyyy-MM-dd");
 
-  const { object } = await generateObject({
+  // Same as quick-add: a model/gateway failure (or an unreadable photo) is
+  // expected, not a bug — give the user something actionable, not a 500.
+  const generated = await generateObject({
     model: "anthropic/claude-haiku-4-5",
     schema: receiptScanSchema,
     messages: [
@@ -85,7 +87,11 @@ export async function POST(req: Request) {
         ],
       },
     ],
-  });
+  }).catch(() => null);
+  if (!generated) {
+    return NextResponse.json({ error: "收據辨識失敗，請換一張清楚的照片再試，或手動記帳" }, { status: 502 });
+  }
+  const { object } = generated;
 
   await recordAiUsage(userId, "receipt_scan");
 

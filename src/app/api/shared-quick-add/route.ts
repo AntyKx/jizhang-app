@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     const message =
       usage.reason === "rate_limited"
         ? "AI 記帳操作太頻繁，請稍後再試"
-        : "本月免費 AI 記帳額度已用完，訂閱解鎖更多額度";
+        : "本月 AI 記帳額度已用完，下個月 1 號會重置（免費版可到「升級」解鎖更多額度）";
     return NextResponse.json({ error: message }, { status: 429 });
   }
 
@@ -59,7 +59,9 @@ export async function POST(req: Request) {
 
   const today = format(getTodayInTaipei(), "yyyy-MM-dd");
 
-  const { object } = await generateObject({
+  // Same as quick-add: a model/gateway failure is expected, not a bug — give
+  // the user something actionable instead of a bare 500.
+  const generated = await generateObject({
     model: "anthropic/claude-haiku-4-5",
     schema: sharedQuickAddSchema,
     prompt: `你是分帳記帳助理，將使用者輸入的一句話解析成一筆「分帳支出」——使用者跟某位朋友或家人分攤的一筆花費。
@@ -70,7 +72,11 @@ export async function POST(req: Request) {
 使用者輸入：「${text}」
 
 請解析出金額、最符合的分類名稱（須完全符合上述清單其中之一，否則為 null）、分帳對象的姓名、方向（使用者付款則對方欠使用者 iOwe=false；對方付款則使用者欠對方 iOwe=true）、項目名稱、日期。`,
-  });
+  }).catch(() => null);
+  if (!generated) {
+    return NextResponse.json({ error: "AI 解析失敗，請稍後再試或手動記帳" }, { status: 502 });
+  }
+  const { object } = generated;
 
   await recordAiUsage(userId, "shared_quick_add");
 

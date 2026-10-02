@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { userSettings } from "@/db/schema";
@@ -115,6 +116,18 @@ export async function POST(req: Request) {
   }
   const entitlements = event.entitlement_ids ?? [];
   const platform = mapStore(event.store ?? "");
+
+  // A one-time (non-renewing) purchase has no auto-renew to turn off, so a
+  // CANCELLATION carrying the core entitlement can only mean a refund (via
+  // Google Play or support) — /terms promises the unlock is revoked then.
+  // Only revoke a Play-granted unlock, never one that came from a separate
+  // web/Stripe purchase on the same account.
+  if (entitlements.includes(CORE_ENTITLEMENT) && event.type === "CANCELLATION") {
+    await db
+      .update(userSettings)
+      .set({ hasPurchasedCore: false })
+      .where(and(eq(userSettings.userId, userId), eq(userSettings.corePurchasePlatform, "play_store")));
+  }
 
   if (entitlements.includes(CORE_ENTITLEMENT) && event.type === "NON_RENEWING_PURCHASE") {
     await upsertSettings(userId, {
