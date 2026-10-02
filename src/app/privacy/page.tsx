@@ -19,9 +19,11 @@ function Clause({ n, title, children }: { n: number; title: string; children: Re
 const subprocessors = [
   { name: "Clerk", use: "使用者帳號登入與身分驗證" },
   { name: "Neon", use: "資料庫代管，儲存您的記帳資料" },
-  { name: "Vercel", use: "應用程式代管、伺服器運算與 AI Gateway 轉發" },
-  { name: "Anthropic", use: "AI 文字記帳與收據辨識之語意解析（透過 Vercel AI Gateway 轉發）" },
-  { name: "Stripe", use: "付費項目之金流處理，目前處於測試模式，尚未正式對使用者收款" },
+  { name: "Vercel", use: "應用程式代管、伺服器運算、每日資料備份儲存（Vercel Blob）與 AI Gateway 轉發" },
+  { name: "Anthropic", use: "AI 文字記帳、收據辨識與統計摘要之語意解析（透過 Vercel AI Gateway 轉發）" },
+  { name: "OpenAI", use: "語音記帳之語音轉文字（透過 Vercel AI Gateway 轉發）" },
+  { name: "Google Play", use: "App 內購買之付款處理（付款資料由 Google 處理，我們無法取得）" },
+  { name: "RevenueCat", use: "App 內購買紀錄之驗證與解鎖狀態同步（僅取得您的帳號識別碼與購買紀錄）" },
 ];
 
 export default function PrivacyPage() {
@@ -33,7 +35,7 @@ export default function PrivacyPage() {
         <p className="text-xs font-medium tracking-wide text-primary uppercase">小熊記帳本</p>
         <h1 className="text-2xl font-semibold">隱私權政策</h1>
         <p className="text-xs text-muted-foreground">
-          生效日期：2026 年 9 月 9 日・資料控管者：個人開發者・聯絡信箱：antyk123@gmail.com
+          生效日期：2026 年 10 月 2 日・資料控管者：個人開發者・聯絡信箱：antyk123@gmail.com
         </p>
       </div>
 
@@ -58,11 +60,11 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong className="text-foreground">AI 輔助功能輸入內容：</strong>
-            您於文字快速記帳輸入之文字內容、於收據辨識功能上傳之收據照片，用於 AI 解析產生記帳建議。
+            您於文字快速記帳輸入之文字內容、於語音記帳錄製之語音、於收據辨識功能上傳之收據照片，用於 AI 解析產生記帳建議。語音與照片僅於解析當下傳送處理，我們不會另行保存原始錄音或照片檔案。
           </li>
           <li>
-            <strong className="text-foreground">付款資訊（如您使用付費功能）：</strong>
-            付款交易由第三方金流服務商處理，我們不會直接接觸或儲存您的信用卡卡號等敏感付款資料。
+            <strong className="text-foreground">購買紀錄（如您使用付費功能）：</strong>
+            付費項目透過 Google Play 帳單系統購買，付款由 Google 處理，我們不會接觸或儲存您的信用卡卡號等付款資料，僅會取得購買之商品、時間與訂單狀態等紀錄，用於解鎖對應功能。
           </li>
           <li>
             <strong className="text-foreground">一般使用與技術紀錄：</strong>
@@ -78,7 +80,9 @@ export default function PrivacyPage() {
       </Clause>
 
       <Clause n={4} title="利用期間">
-        <p>自您註冊帳號起，至您刪除帳號或依本服務「資料與備份」頁面之功能請求刪除所有資料為止。</p>
+        <p>
+          自您註冊帳號起，至您於「帳號設定」頁面刪除帳號，或依本服務「資料與備份」頁面之功能請求刪除所有資料為止。為防止資料意外遺失，系統每日會自動備份您的資料，備份檔最長保留 30 天後自動刪除；您刪除帳號或刪除所有資料時，所有備份檔亦會立即一併刪除。
+        </p>
       </Clause>
 
       <Clause n={5} title="利用地區">

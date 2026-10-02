@@ -19,6 +19,7 @@ import { requireUserId } from "@/lib/auth";
 import { hasCoreAccess } from "@/lib/entitlements";
 import { backupSchema, type Backup } from "@/lib/backup-schema";
 import {
+  deleteAllSnapshots,
   FREE_RETENTION_DAYS,
   PAID_RETENTION_DAYS,
   readSnapshot,
@@ -31,10 +32,8 @@ import { fail } from "@/lib/action-result";
 // `db.batch([...])` — multiple statements sent as one request and executed
 // atomically by Neon. FK order is preserved (children before the parents
 // they reference) even though these all commit together.
-export async function deleteAllUserData() {
-  const userId = await requireUserId();
-
-  await db.batch([
+function deleteLedgerContent(userId: string) {
+  return [
     db.delete(sharedExpenses).where(eq(sharedExpenses.userId, userId)),
     db.delete(transactions).where(eq(transactions.userId, userId)),
     db.delete(recurringRules).where(eq(recurringRules.userId, userId)),
@@ -42,15 +41,46 @@ export async function deleteAllUserData() {
     db.delete(savingsGoals).where(eq(savingsGoals.userId, userId)),
     db.delete(accounts).where(eq(accounts.userId, userId)),
     db.delete(categories).where(eq(categories.userId, userId)),
-    // AI usage history counts as this user's data too — /privacy promises
-    // deletion covers everything, and leaving these behind would also
-    // outlive the Clerk account itself when this runs as part of
-    // delete-account (see account-settings.tsx).
+  ] as const;
+}
+
+// 資料與備份 → 刪除所有資料: wipes the ledger itself (and its cloud
+// snapshots, which are full copies of it) but keeps the account — so the
+// user_settings row survives with its purchase/trial fields intact (only
+// preferences reset). Deleting that row here used to silently revoke a paid
+// unlock and let the next page load start a fresh 7-day trial. AI usage
+// events are metering, not ledger content, and stay too — otherwise this
+// doubled as a way to reset the monthly AI quota.
+export async function deleteAllUserData() {
+  const userId = await requireUserId();
+
+  await db.batch([
+    ...deleteLedgerContent(userId),
+    db
+      .update(userSettings)
+      .set({ baseCurrency: "TWD", monthStartDay: 1, defaultAccountId: null })
+      .where(eq(userSettings.userId, userId)),
+  ]);
+  await deleteAllSnapshots(userId);
+
+  revalidatePath("/", "layout");
+}
+
+// 帳號設定 → 刪除帳號: everything this user has, including settings,
+// purchase records, AI usage history, and cloud snapshots — /privacy
+// promises account deletion covers all of it. Runs before the Clerk user is
+// deleted (see account-settings.tsx), while the request is still
+// authenticated. A Play purchase isn't lost: it stays tied to the Google
+// account and comes back via 恢復購買 on a new sign-up.
+export async function deleteAccountData() {
+  const userId = await requireUserId();
+
+  await db.batch([
+    ...deleteLedgerContent(userId),
     db.delete(aiUsageEvents).where(eq(aiUsageEvents.userId, userId)),
     db.delete(userSettings).where(eq(userSettings.userId, userId)),
   ]);
-
-  revalidatePath("/", "layout");
+  await deleteAllSnapshots(userId);
 }
 
 // Replace-style restore, applied as a single all-or-nothing batch: either

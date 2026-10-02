@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { userSettings } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { getSiteOrigin, stripe } from "@/lib/stripe";
+import { WEB_CHECKOUT_ENABLED } from "@/lib/billing-flags";
 
 async function getOrCreateStripeCustomerId(userId: string): Promise<string> {
   const [row] = await db
@@ -36,6 +37,7 @@ async function getOrCreateStripeCustomerId(userId: string): Promise<string> {
 // bump off hasPurchasedCore alone.
 export async function createAllInOneCheckoutSession() {
   const userId = await requireUserId();
+  if (!WEB_CHECKOUT_ENABLED) redirect("/upgrade");
   const customerId = await getOrCreateStripeCustomerId(userId);
   const origin = await getSiteOrigin();
 

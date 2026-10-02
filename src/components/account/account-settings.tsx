@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { Camera, LogOut, Trash2 } from "lucide-react";
-import { deleteAllUserData } from "@/app/(app)/data-export/actions";
+import { deleteAccountData } from "@/app/(app)/data-export/actions";
 import { updateBaseCurrency, updateDefaultAccountId } from "@/app/(app)/account/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -152,7 +152,7 @@ export function AccountSettings({
       // wipe app data first (still authenticated) then remove the login
       // itself — otherwise deleting the Clerk user first would orphan every
       // row permanently instead of actually cleaning them up.
-      await deleteAllUserData();
+      await deleteAccountData();
       await user.delete();
       router.push("/sign-in");
     } catch {

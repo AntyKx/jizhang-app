@@ -48,7 +48,7 @@ export function DeleteAllDataDialog() {
         <DialogHeader>
           <DialogTitle className="text-destructive">確定要刪除全部資料嗎？</DialogTitle>
           <DialogDescription>
-            這會永久刪除所有帳戶、交易、預算、儲蓄目標、訂閱與分帳本紀錄，無法復原。請在下方輸入「{CONFIRM_PHRASE}」以確認。
+            這會永久刪除所有帳戶、交易、預算、儲蓄目標、訂閱與分帳本紀錄，以及所有雲端每日備份，無法復原（已購買的解鎖會保留）。請在下方輸入「{CONFIRM_PHRASE}」以確認。
           </DialogDescription>
         </DialogHeader>
 

@@ -68,6 +68,18 @@ export async function readSnapshot(userId: string, day: string): Promise<string 
   return await new Response(result.stream).text();
 }
 
+// Removes every nightly snapshot this user has — part of 刪除所有資料 /
+// 刪除帳號, since /privacy promises deletion covers all of their data and a
+// snapshot is a full copy of it. Paginates because list() pages at 1000.
+export async function deleteAllSnapshots(userId: string): Promise<void> {
+  let cursor: string | undefined;
+  do {
+    const page = await list({ prefix: `backups/${userId}/`, cursor });
+    if (page.blobs.length > 0) await del(page.blobs.map((b) => b.url));
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+}
+
 export async function pruneSnapshots(userId: string, cutoffDay: string): Promise<number> {
   const { blobs } = await list({ prefix: `backups/${userId}/` });
   const expired = blobs.filter((b) => {
