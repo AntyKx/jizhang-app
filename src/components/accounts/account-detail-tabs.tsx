@@ -1,9 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { SlidingIndicator } from "@/components/motion/sliding-indicator";
 import { TransactionsList } from "@/components/transactions/transactions-list";
 import type { Account, AccountInfo, Category, ListItem } from "@/lib/transactions/list-types";
+import { AccountYearChart, type AccountMonthPoint } from "@/components/accounts/account-year-chart";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -12,22 +15,27 @@ const tabs = [
 ] as const;
 
 export function AccountDetailTabs({
-  monthLabel,
+  accountId,
+  periodLabel,
+  monthlyBreakdown,
   currentBalance,
   currency,
-  monthIncome,
-  monthExpense,
+  periodIncome,
+  periodExpense,
   listItems,
   categories,
   accounts,
   accountsById,
   frequentSplitNames,
 }: {
-  monthLabel: string;
+  accountId: string;
+  periodLabel: string;
+  // Non-null only in year view.
+  monthlyBreakdown: AccountMonthPoint[] | null;
   currentBalance: string;
   currency: string;
-  monthIncome: number;
-  monthExpense: number;
+  periodIncome: number;
+  periodExpense: number;
   listItems: ListItem[];
   categories: Category[];
   accounts: Account[];
@@ -37,7 +45,7 @@ export function AccountDetailTabs({
   const [active, setActive] = useState<(typeof tabs)[number]["key"]>("overview");
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const net = monthIncome - monthExpense;
+  const net = periodIncome - periodExpense;
 
   return (
     <div className="flex flex-col gap-4">
@@ -70,18 +78,18 @@ export function AccountDetailTabs({
           </div>
 
           <div className="flex flex-col gap-3 rounded-3xl bg-muted/40 p-5">
-            <span className="text-muted-foreground text-sm">{monthLabel}收支</span>
+            <span className="text-muted-foreground text-sm">{periodLabel}收支</span>
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="flex flex-col gap-1">
                 <span className="text-muted-foreground text-xs">收入</span>
                 <span className="font-semibold tabular-nums text-emerald-600">
-                  {monthIncome.toLocaleString("zh-TW")}
+                  {periodIncome.toLocaleString("zh-TW")}
                 </span>
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-muted-foreground text-xs">支出</span>
                 <span className="font-semibold tabular-nums text-destructive">
-                  {monthExpense.toLocaleString("zh-TW")}
+                  {periodExpense.toLocaleString("zh-TW")}
                 </span>
               </div>
               <div className="flex flex-col gap-1">
@@ -93,6 +101,40 @@ export function AccountDetailTabs({
               </div>
             </div>
           </div>
+
+          {monthlyBreakdown && (
+            <>
+              <div className="flex flex-col gap-3 rounded-3xl bg-muted/40 p-5">
+                <span className="text-muted-foreground text-sm">每月收支</span>
+                <AccountYearChart data={monthlyBreakdown} />
+              </div>
+
+              <div className="flex flex-col rounded-3xl bg-muted/40 px-5 py-3">
+                <span className="text-muted-foreground py-2 text-sm">各月明細</span>
+                <div className="flex flex-col divide-y">
+                  {monthlyBreakdown
+                    .filter((m) => !m.isFuture)
+                    .reverse()
+                    .map((m) => (
+                      <Link
+                        key={m.monthKey}
+                        href={`/accounts/${accountId}?date=${m.monthKey}-01`}
+                        className="grid grid-cols-[3rem_1fr_1fr_1rem] items-center gap-2 py-2.5 text-sm"
+                      >
+                        <span className="font-medium">{m.monthLabel.replace("月", " 月")}</span>
+                        <span className="text-right tabular-nums text-muted-foreground">
+                          收 {m.income.toLocaleString("zh-TW")}
+                        </span>
+                        <span className="text-right tabular-nums text-destructive">
+                          支 {m.expense.toLocaleString("zh-TW")}
+                        </span>
+                        <ChevronRight className="size-4 text-muted-foreground" />
+                      </Link>
+                    ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <TransactionsList
@@ -102,6 +144,7 @@ export function AccountDetailTabs({
           accountsById={accountsById}
           initialCursor={null}
           frequentSplitNames={frequentSplitNames}
+          collapsibleMonths={monthlyBreakdown !== null}
         />
       )}
     </div>

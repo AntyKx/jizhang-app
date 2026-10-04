@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { format } from "date-fns";
 import { and, desc, eq, ne, or, gte, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { ChevronLeft } from "lucide-react";
@@ -9,8 +10,9 @@ import { requireUserId } from "@/lib/auth";
 import { listAccounts, listArchivedAccounts } from "@/lib/account";
 import { deriveSplitFields, getFrequentSplitNames } from "@/lib/shared-expenses";
 import { resolveStatsRange } from "@/lib/stats/range";
+import { getTodayInTaipei } from "@/lib/date";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
-import { AccountMonthNav } from "@/components/accounts/account-month-nav";
+import { StatsRangeSwitcher } from "@/components/stats/stats-range-switcher";
 import { AccountDetailTabs } from "@/components/accounts/account-detail-tabs";
 import { accountTypeLabels } from "@/lib/account-type";
 import type { ListItemRow } from "@/lib/transactions/list-types";
@@ -20,14 +22,14 @@ export default async function AccountDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ range?: string; date?: string }>;
 }) {
   const userId = await requireUserId();
   const { id } = await params;
   const sp = await searchParams;
-  // Deliberately ignores any `range` query param — an account's detail view
-  // only ever makes sense browsed month by month (see AccountMonthNav).
-  const range = resolveStatsRange({ date: sp.date });
+  // Month or year only — a week is too fine a slice for reconciling an
+  // account, so any other `range` value falls back to month.
+  const range = resolveStatsRange({ range: sp.range === "year" ? "year" : "month", date: sp.date });
 
   const [account] = await db
     .select()
@@ -114,12 +116,32 @@ export default async function AccountDetailPage({
     [...userAccounts, ...archivedAccounts].map((a) => [a.id, { name: a.name, type: a.type }]),
   );
 
-  const monthIncome = regularRows
+  const periodIncome = regularRows
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + Number(t.amount), 0);
-  const monthExpense = regularRows
+  const periodExpense = regularRows
     .filter((t) => t.type === "expense")
     .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  // Year view only: per-month income/expense for the bar chart and the
+  // drill-down list (each month links back to that month's month view).
+  // Future months of the current year are flagged so the list can skip them
+  // while the chart still shows a full Jan–Dec axis.
+  const todayMonthKey = format(getTodayInTaipei(), "yyyy-MM");
+  const monthlyBreakdown =
+    range.unit === "year"
+      ? Array.from({ length: 12 }, (_, i) => {
+          const monthKey = `${range.startStr.slice(0, 4)}-${String(i + 1).padStart(2, "0")}`;
+          const inMonth = regularRows.filter((t) => t.occurredAt.startsWith(monthKey));
+          return {
+            monthKey,
+            monthLabel: `${i + 1}月`,
+            income: inMonth.filter((t) => t.type === "income").reduce((sum, t) => sum + Number(t.amount), 0),
+            expense: inMonth.filter((t) => t.type === "expense").reduce((sum, t) => sum + Number(t.amount), 0),
+            isFuture: monthKey > todayMonthKey,
+          };
+        })
+      : null;
 
   const listItems: ListItemRow[] = [
     ...regularRows.map((t) => {
@@ -152,14 +174,16 @@ export default async function AccountDetailPage({
         </div>
       </div>
 
-      <AccountMonthNav basePath={`/accounts/${id}`} range={range} />
+      <StatsRangeSwitcher basePath={`/accounts/${id}`} range={range} units={["month", "year"]} />
 
       <AccountDetailTabs
-        monthLabel={range.label}
+        accountId={id}
+        periodLabel={range.label}
+        monthlyBreakdown={monthlyBreakdown}
         currentBalance={account.currentBalance}
         currency={account.currency}
-        monthIncome={monthIncome}
-        monthExpense={monthExpense}
+        periodIncome={periodIncome}
+        periodExpense={periodExpense}
         listItems={listItems}
         categories={userCategories}
         accounts={userAccounts

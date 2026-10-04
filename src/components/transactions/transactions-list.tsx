@@ -5,13 +5,14 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { format, parse } from "date-fns";
-import { Repeat2, Trash2 } from "lucide-react";
+import { ChevronDown, Repeat2, Trash2 } from "lucide-react";
 import { CategoryIconBadge } from "@/components/category-icon";
 import { CategoryPill } from "@/components/transactions/category-pill";
 import { OTHER_COLOR } from "@/components/stats/chart-colors";
 import { BearIllustration } from "@/components/bear-illustration";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { StaggerList } from "@/components/motion/stagger-list";
 import { PaymentMethodIcon } from "@/components/transactions/payment-method-icon";
 import {
@@ -193,6 +194,7 @@ export function TransactionsList({
   initialCursor,
   frequentSplitNames,
   filter,
+  collapsibleMonths = false,
 }: {
   items: ListItem[];
   categories: Category[];
@@ -204,6 +206,10 @@ export function TransactionsList({
   // stays inside the same filtered set the server already applied to
   // `items` — see /transactions's page.tsx.
   filter?: TransactionsFilter;
+  // Year-long lists (an account's year view): each month header becomes a
+  // toggle with that month's subtotal, and only the newest month starts
+  // open. Searching opens every month so matches aren't hidden.
+  collapsibleMonths?: boolean;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -315,10 +321,10 @@ export function TransactionsList({
           <p className="text-muted-foreground text-sm">找不到符合的交易。</p>
         </div>
       ) : (
-        <StaggerList key={query} className="flex flex-col gap-6">
-          {monthGroups.map((group) => (
-            <div key={group.monthKey} className="flex flex-col gap-2">
-              <span className="text-sm font-semibold text-muted-foreground">{monthLabel(group.monthKey)}</span>
+        <StaggerList key={query} className={cn("flex flex-col", collapsibleMonths ? "gap-1" : "gap-6")}>
+          {monthGroups.map((group, index) => {
+            const rows = (
+              <>
               {/* Grouped PER MONTH BUCKET, not once over the whole flat list
                   — structurally guarantees a settlement group can never span
                   two month headers, even if a settlement transaction's date
@@ -366,8 +372,34 @@ export function TransactionsList({
                   ),
                 )}
               </div>
-            </div>
-          ))}
+              </>
+            );
+            if (!collapsibleMonths) {
+              return (
+                <div key={group.monthKey} className="flex flex-col gap-2">
+                  <span className="text-sm font-semibold text-muted-foreground">{monthLabel(group.monthKey)}</span>
+                  {rows}
+                </div>
+              );
+            }
+            const regular = group.items.filter((i) => i.kind === "transaction");
+            const income = regular.filter((i) => i.type === "income").reduce((sum, i) => sum + Number(i.amount), 0);
+            const expense = regular.filter((i) => i.type === "expense").reduce((sum, i) => sum + Number(i.amount), 0);
+            return (
+              <Collapsible key={group.monthKey} defaultOpen={index === 0 || !!query.trim()}>
+                <CollapsibleTrigger className="group justify-between border-b py-2 text-sm hover:text-muted-foreground">
+                  <span className="font-semibold text-foreground">{monthLabel(group.monthKey)}</span>
+                  <span className="flex items-center gap-2 tabular-nums">
+                    {income > 0 && <span className="text-emerald-600">收 {income.toLocaleString("zh-TW")}</span>}
+                    {expense !== 0 && <span className="text-destructive">支 {expense.toLocaleString("zh-TW")}</span>}
+                    <span>{group.items.length} 筆</span>
+                    <ChevronDown className="size-4 transition-transform group-data-[panel-open]:rotate-180" />
+                  </span>
+                </CollapsibleTrigger>
+                <CollapsiblePanel>{rows}</CollapsiblePanel>
+              </Collapsible>
+            );
+          })}
         </StaggerList>
       )}
 

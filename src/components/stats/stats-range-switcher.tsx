@@ -6,7 +6,7 @@ import type { StatsRange, StatsRangeUnit } from "@/lib/stats/range";
 import { cn } from "@/lib/utils";
 import { SlidingIndicator } from "@/components/motion/sliding-indicator";
 
-const units: { value: StatsRangeUnit; label: string }[] = [
+const allUnits: { value: StatsRangeUnit; label: string }[] = [
   { value: "week", label: "週" },
   { value: "month", label: "月" },
   { value: "year", label: "年" },
@@ -15,10 +15,15 @@ const units: { value: StatsRangeUnit; label: string }[] = [
 export function StatsRangeSwitcher({
   basePath,
   range,
+  units: allowedUnits,
 }: {
   basePath: string;
   range: StatsRange;
+  // Subset of units to offer — e.g. an account's detail page drops 週,
+  // since a week is too fine a slice for reconciling an account.
+  units?: StatsRangeUnit[];
 }) {
+  const units = allowedUnits ? allUnits.filter((u) => allowedUnits.includes(u.value)) : allUnits;
   const containerRef = useRef<HTMLDivElement>(null);
 
   return (
