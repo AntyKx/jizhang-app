@@ -56,14 +56,14 @@ export function EditBudgetDialog({ budget, onClose }: { budget: Budget | null; o
 
   return (
     <Dialog open={!!budget} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>編輯{budget?.categoryName ?? "整體"}預算</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-2">
           <Label>預算上限</Label>
-          <AmountKeypadField value={limitAmount} onChange={setLimitAmount} allowDecimal={false} label={`${budget?.categoryName ?? "整體"}預算上限`} />
+          <AmountKeypadField value={limitAmount} onChange={setLimitAmount} allowDecimal={false} inline />
         </div>
 
         <DeleteConfirmFooter

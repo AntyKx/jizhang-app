@@ -26,7 +26,7 @@ export function CreateBudgetDialog({ categories }: { categories: Category[] }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button />}>新增預算</DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>新增本月預算</DialogTitle>
         </DialogHeader>
@@ -53,7 +53,7 @@ export function CreateBudgetDialog({ categories }: { categories: Category[] }) {
           </div>
           <div className="flex flex-col gap-2">
             <Label>預算上限</Label>
-            <AmountKeypadField value={limitAmount} onChange={setLimitAmount} allowDecimal={false} label={`${categories.find((c) => c.id === categoryId)?.name ?? "整體"}預算上限`} />
+            <AmountKeypadField value={limitAmount} onChange={setLimitAmount} allowDecimal={false} inline />
             <input type="hidden" name="limitAmount" value={limitAmount} />
           </div>
           <Button type="submit" disabled={!limitAmount || Number(limitAmount) <= 0}>

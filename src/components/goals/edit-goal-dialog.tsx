@@ -68,7 +68,7 @@ export function EditGoalDialog({ goal, onClose }: { goal: Goal | null; onClose: 
 
   return (
     <Dialog open={!!goal} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>編輯儲蓄目標</DialogTitle>
         </DialogHeader>
@@ -80,7 +80,7 @@ export function EditGoalDialog({ goal, onClose }: { goal: Goal | null; onClose: 
           </div>
           <div className="flex flex-col gap-2">
             <Label>目標金額</Label>
-            <AmountKeypadField value={targetAmount} onChange={setTargetAmount} allowDecimal={false} label="目標金額" />
+            <AmountKeypadField value={targetAmount} onChange={setTargetAmount} allowDecimal={false} inline />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="edit-goal-date">目標日期（選填）</Label>

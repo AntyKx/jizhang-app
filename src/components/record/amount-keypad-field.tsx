@@ -47,6 +47,7 @@ export function AmountKeypadField({
   label,
   confirmLabel = "完成",
   onConfirm,
+  inline = false,
   className,
 }: {
   value: string;
@@ -76,6 +77,12 @@ export function AmountKeypadField({
   // Disabled while the value is empty.
   confirmLabel?: string;
   onConfirm?: () => void;
+  // Expands the keypad in the normal flow right under the display instead
+  // of the bottom overlay panel. For call sites inside a centered Dialog:
+  // the Dialog's translate makes it the overlay's containing block, so the
+  // "fixed" panel ended up filling the Dialog itself and hid every other
+  // field (name, date, category) while typing.
+  inline?: boolean;
 }) {
   const [open, setOpen] = useState(autoOpen);
   const KEYS = allowDecimal ? KEYS_WITH_DECIMAL : KEYS_NO_DECIMAL;
@@ -99,20 +106,84 @@ export function AmountKeypadField({
     onChange(value + key);
   }
 
+  const keys = (
+    <div className="grid grid-cols-3 gap-2">
+      {KEYS.map((key) => (
+        <button
+          key={key}
+          type="button"
+          onClick={() => press(key)}
+          onPointerDown={bounceDown}
+          onPointerUp={bounceUp}
+          onPointerLeave={bounceUp}
+          className={cn(
+            "flex items-center justify-center rounded-2xl bg-muted font-semibold shadow-sm transition-colors active:bg-secondary",
+            // Shorter keys inline, so the Dialog grows as little as possible.
+            inline ? "h-11 text-lg" : "h-14 text-xl",
+            key === "backspace" && "text-muted-foreground",
+            // 0 takes the "." key's old grid spot in no-decimal mode —
+            // span it across both so it doesn't leave a lone empty
+            // cell at the end of the grid.
+            !allowDecimal && key === "0" && "col-span-2",
+          )}
+          aria-label={key === "backspace" ? "刪除" : key === "." ? "小數點" : `數字 ${key}`}
+        >
+          {key === "backspace" ? <Delete className="size-5" /> : key}
+        </button>
+      ))}
+    </div>
+  );
+  const confirmButton = (
+    <Button
+      type="button"
+      disabled={onConfirm ? !value || Number(value) <= 0 : false}
+      onClick={() => {
+        onConfirm?.();
+        setOpen(false);
+      }}
+    >
+      {confirmLabel}
+    </Button>
+  );
+
+  const display = (
+    <button
+      type="button"
+      onClick={() => setOpen(inline ? !open : true)}
+      className={cn(
+        "flex h-16 items-center justify-center rounded-2xl border bg-card text-3xl font-semibold tabular-nums transition-colors",
+        !value && "text-muted-foreground",
+        open && "border-primary ring-2 ring-ring",
+        className,
+      )}
+    >
+      {formatAmount(value)}
+    </button>
+  );
+
+  if (inline) {
+    return (
+      <div className="flex flex-col">
+        {display}
+        <div
+          className={cn(
+            "grid transition-[grid-template-rows] duration-300 ease-out",
+            open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+          )}
+        >
+          <div className="flex min-h-0 flex-col gap-2 overflow-hidden" inert={!open}>
+            <div className="h-1 shrink-0" />
+            {keys}
+            {confirmButton}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className={cn(
-          "flex h-16 items-center justify-center rounded-2xl border bg-card text-3xl font-semibold tabular-nums transition-colors",
-          !value && "text-muted-foreground",
-          open && "border-primary ring-2 ring-ring",
-          className,
-        )}
-      >
-        {formatAmount(value)}
-      </button>
+      {display}
 
       <div
         className={cn(
@@ -148,40 +219,8 @@ export function AmountKeypadField({
             {formatAmount(value)}
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            {KEYS.map((key) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => press(key)}
-                onPointerDown={bounceDown}
-                onPointerUp={bounceUp}
-                onPointerLeave={bounceUp}
-                className={cn(
-                  "flex h-14 items-center justify-center rounded-2xl bg-muted text-xl font-semibold shadow-sm transition-colors active:bg-secondary",
-                  key === "backspace" && "text-muted-foreground",
-                  // 0 takes the "." key's old grid spot in no-decimal mode —
-                  // span it across both so it doesn't leave a lone empty
-                  // cell at the end of the grid.
-                  !allowDecimal && key === "0" && "col-span-2",
-                )}
-                aria-label={key === "backspace" ? "刪除" : key === "." ? "小數點" : `數字 ${key}`}
-              >
-                {key === "backspace" ? <Delete className="size-5" /> : key}
-              </button>
-            ))}
-          </div>
-
-          <Button
-            type="button"
-            disabled={onConfirm ? !value || Number(value) <= 0 : false}
-            onClick={() => {
-              onConfirm?.();
-              setOpen(false);
-            }}
-          >
-            {confirmLabel}
-          </Button>
+          {keys}
+          {confirmButton}
         </div>
       </div>
     </>
