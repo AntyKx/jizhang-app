@@ -6,7 +6,7 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { Camera, LogOut, Trash2 } from "lucide-react";
 import { deleteAccountData } from "@/app/(app)/data-export/actions";
-import { updateBaseCurrency, updateDefaultAccountId } from "@/app/(app)/account/actions";
+import { updateBaseCurrency, updateDefaultAccountId, updateDisplayName } from "@/app/(app)/account/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -101,7 +101,15 @@ export function AccountSettings({
     }
     setSavingName(true);
     try {
-      await user.update({ firstName: trimmed });
+      const result = await updateDisplayName(trimmed);
+      if (isFail(result)) {
+        toast.error(result.error);
+        return;
+      }
+      // Pull the server-side change into the client-side user object so
+      // the header/avatar and this form's "unchanged" check see it.
+      await user.reload();
+      setName(null);
       toast.success("姓名已更新");
     } catch {
       toast.error("姓名更新失敗，請稍後再試");
