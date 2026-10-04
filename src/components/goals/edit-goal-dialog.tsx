@@ -80,7 +80,7 @@ export function EditGoalDialog({ goal, onClose }: { goal: Goal | null; onClose: 
           </div>
           <div className="flex flex-col gap-2">
             <Label>目標金額</Label>
-            <AmountKeypadField value={targetAmount} onChange={setTargetAmount} allowDecimal={false} />
+            <AmountKeypadField value={targetAmount} onChange={setTargetAmount} allowDecimal={false} label="目標金額" />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="edit-goal-date">目標日期（選填）</Label>

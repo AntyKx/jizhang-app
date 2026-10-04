@@ -21,12 +21,17 @@ export function CategoryPickerSheet({
   value,
   onChange,
   placeholder = "選擇分類",
+  emptyLabel = "不指定",
   className,
 }: {
   categories: PickerCategory[];
   value: string;
   onChange: (id: string) => void;
   placeholder?: string;
+  // What the "nothing picked" tile (and the trigger, when value is "")
+  // means at this call site — e.g. a budget with no category is the
+  // overall budget, not an unset field.
+  emptyLabel?: string;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -53,6 +58,8 @@ export function CategoryPickerSheet({
               <CategoryIcon icon={selected.icon ?? null} color={selected.color} className="h-4 w-4 shrink-0" />
               {selected.name}
             </>
+          ) : value === "" && emptyLabel !== "不指定" ? (
+            <span className="text-foreground">{emptyLabel}</span>
           ) : (
             placeholder
           )}
@@ -75,7 +82,7 @@ export function CategoryPickerSheet({
               <span className="flex h-[54px] w-[54px] items-center justify-center rounded-[30%] bg-muted text-base text-muted-foreground">
                 —
               </span>
-              <span className="text-[11.5px] font-medium text-muted-foreground">不指定</span>
+              <span className="text-[11.5px] font-medium text-muted-foreground">{emptyLabel}</span>
             </button>
             {categories.map((c) => (
               <button

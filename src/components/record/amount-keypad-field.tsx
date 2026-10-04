@@ -44,6 +44,9 @@ export function AmountKeypadField({
   maxDecimals = 2,
   allowDecimal = true,
   autoOpen = false,
+  label,
+  confirmLabel = "完成",
+  onConfirm,
   className,
 }: {
   value: string;
@@ -64,6 +67,15 @@ export function AmountKeypadField({
   // sitting inline next to a small button) — merged in last via cn/twMerge
   // so it wins over the default h-16/text-3xl look.
   className?: string;
+  // Context shown above the value inside the panel — the panel covers the
+  // bottom of the screen, so whatever the user was looking at (which goal,
+  // which field) is often hidden behind it.
+  label?: React.ReactNode;
+  // Turns the panel's bottom button into the call site's own submit (e.g.
+  // 存入) instead of a plain close, so there's no 完成-then-tap-again step.
+  // Disabled while the value is empty.
+  confirmLabel?: string;
+  onConfirm?: () => void;
 }) {
   const [open, setOpen] = useState(autoOpen);
   const KEYS = allowDecimal ? KEYS_WITH_DECIMAL : KEYS_NO_DECIMAL;
@@ -126,6 +138,7 @@ export function AmountKeypadField({
               only way to guarantee the number being typed stays visible is
               to show it inside the sheet, not rely on whatever's still
               exposed underneath. */}
+          {label && <div className="text-center text-sm text-muted-foreground">{label}</div>}
           <div
             className={cn(
               "text-center text-3xl font-semibold tabular-nums",
@@ -159,8 +172,15 @@ export function AmountKeypadField({
             ))}
           </div>
 
-          <Button type="button" onClick={() => setOpen(false)}>
-            完成
+          <Button
+            type="button"
+            disabled={onConfirm ? !value || Number(value) <= 0 : false}
+            onClick={() => {
+              onConfirm?.();
+              setOpen(false);
+            }}
+          >
+            {confirmLabel}
           </Button>
         </div>
       </div>

@@ -85,7 +85,14 @@ export function GoalsList({ goals }: { goals: Goal[] }) {
                   })()}
                 </div>
               )}
-              {!g.isCompleted && <ContributeForm goalId={g.id} />}
+              {!g.isCompleted && (
+                <ContributeForm
+                  goalId={g.id}
+                  goalName={g.name}
+                  currentAmount={Number(g.currentAmount)}
+                  targetAmount={Number(g.targetAmount)}
+                />
+              )}
             </div>
           );
         })}

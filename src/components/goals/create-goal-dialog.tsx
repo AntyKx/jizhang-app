@@ -42,7 +42,7 @@ export function CreateGoalDialog() {
           </div>
           <div className="flex flex-col gap-2">
             <Label>目標金額</Label>
-            <AmountKeypadField value={targetAmount} onChange={setTargetAmount} allowDecimal={false} />
+            <AmountKeypadField value={targetAmount} onChange={setTargetAmount} allowDecimal={false} label="目標金額" />
             <input type="hidden" name="targetAmount" value={targetAmount} />
           </div>
           <div className="flex flex-col gap-2">

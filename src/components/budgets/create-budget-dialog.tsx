@@ -10,21 +10,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
 import { createBudget } from "@/app/(app)/budgets/actions";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 
-type Category = { id: string; name: string };
+type Category = { id: string; name: string; icon: string | null; color: string | null };
 
 export function CreateBudgetDialog({ categories }: { categories: Category[] }) {
   const [open, setOpen] = useState(false);
   const [limitAmount, setLimitAmount] = useState("");
+  // "" = overall budget (createBudget treats a missing categoryId as overall).
+  const [categoryId, setCategoryId] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
   return (
@@ -41,32 +37,23 @@ export function CreateBudgetDialog({ categories }: { categories: Category[] }) {
             setOpen(false);
             formRef.current?.reset();
             setLimitAmount("");
+            setCategoryId("");
           }}
           className="flex flex-col gap-4"
         >
           <div className="flex flex-col gap-2">
-            <Label htmlFor="categoryId">分類</Label>
-            <Select
-              name="categoryId"
-              defaultValue="overall"
-              items={{ overall: "整體預算", ...Object.fromEntries(categories.map((c) => [c.id, c.name])) }}
-            >
-              <SelectTrigger id="categoryId">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="overall">整體預算</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>分類</Label>
+            <CategoryPickerSheet
+              categories={categories}
+              value={categoryId}
+              onChange={setCategoryId}
+              emptyLabel="整體預算"
+            />
+            <input type="hidden" name="categoryId" value={categoryId} />
           </div>
           <div className="flex flex-col gap-2">
             <Label>預算上限</Label>
-            <AmountKeypadField value={limitAmount} onChange={setLimitAmount} allowDecimal={false} />
+            <AmountKeypadField value={limitAmount} onChange={setLimitAmount} allowDecimal={false} label={`${categories.find((c) => c.id === categoryId)?.name ?? "整體"}預算上限`} />
             <input type="hidden" name="limitAmount" value={limitAmount} />
           </div>
           <Button type="submit" disabled={!limitAmount || Number(limitAmount) <= 0}>

@@ -27,7 +27,7 @@ export default async function BudgetsPage() {
       .leftJoin(categories, eq(budgets.categoryId, categories.id))
       .where(and(eq(budgets.userId, userId), eq(budgets.month, monthStart))),
     db
-      .select({ id: categories.id, name: categories.name })
+      .select({ id: categories.id, name: categories.name, icon: categories.icon, color: categories.color })
       .from(categories)
       .where(and(eq(categories.type, "expense"), eq(categories.userId, userId)))
       .orderBy(categories.sortOrder),

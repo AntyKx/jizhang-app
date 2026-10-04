@@ -46,7 +46,15 @@ function BottomSheetContent({
             // its content), so it should never regain horizontal panning
             // even if the root's restriction ever changes again.
             "touch-pan-y flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-b-0 bg-card pt-3 shadow-lg outline-none",
-            "[transform:translateY(var(--drawer-swipe-movement-y))] transition-transform duration-300 ease-out data-swiping:transition-none",
+            // The swipe offset transform only applies WHILE swiping — left
+            // on permanently (even as translateY(0)) it keeps the whole
+            // sheet in a composited transform layer, and mobile browsers
+            // intermittently draw a text input's caret at a stale position
+            // inside such a layer when the keyboard resizes/pans the
+            // viewport (user saw the caret float outside the 備註 field
+            // while typing). Enter/exit slide uses the separate `translate`
+            // property (translate-y-full), so it's unaffected.
+            "transition-transform duration-300 ease-out data-swiping:[transform:translateY(var(--drawer-swipe-movement-y))] data-swiping:transition-none",
             "data-ending-style:translate-y-full data-starting-style:translate-y-full",
             className
           )}
