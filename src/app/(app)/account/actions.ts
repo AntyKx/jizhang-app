@@ -66,4 +66,9 @@ export async function updateDisplayName(name: string) {
   } catch {
     return fail("姓名更新失敗，請稍後再試");
   }
+
+  // The /record greeting reads the name server-side (currentUser() in
+  // home-summary-section.tsx); without this the client router cache kept
+  // serving the old greeting after navigating back home.
+  revalidatePath("/", "layout");
 }
