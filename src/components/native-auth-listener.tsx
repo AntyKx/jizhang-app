@@ -7,15 +7,24 @@ import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { toast } from "sonner";
 
+// Two shapes arrive here: the verified App Link
+// https://bearledger.app/native-auth-return#ticket=… (ticket in the fragment)
+// and the bearledger://auth-callback?ticket=… custom-scheme fallback.
 function extractTicket(url: string): string | null {
   try {
-    return new URL(url).searchParams.get("ticket");
+    const parsed = new URL(url);
+    if (parsed.protocol === "https:") {
+      if (parsed.hostname !== "bearledger.app" || parsed.pathname !== "/native-auth-return") return null;
+      return new URLSearchParams(parsed.hash.slice(1)).get("ticket");
+    }
+    if (parsed.protocol === "bearledger:") return parsed.searchParams.get("ticket");
+    return null;
   } catch {
     return null;
   }
 }
 
-// Catches the bearledger://auth-callback deep link that src/app/native-auth-callback
+// Catches the auth-return deep link that src/app/native-auth-callback
 // redirects to once a Chrome-Custom-Tabs sign-in (Google OAuth, or any sign-in that
 // went through that handoff — see MainActivity's shouldOverrideUrlLoading override)
 // has minted a ticket. Completes the session inside this WebView with Clerk's

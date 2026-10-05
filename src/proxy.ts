@@ -6,6 +6,11 @@ const isPublicRoute = createRouteMatcher([
   "/api/version",
   "/terms",
   "/privacy",
+  // Android App Link verification (assetlinks.json) and the App Link's own
+  // browser fallback page — fetched by Google's verifier / opened in a
+  // Custom Tab on bearledger.app, neither of which has a Clerk session.
+  "/.well-known/(.*)",
+  "/native-auth-return",
   "/api/webhooks/stripe",
   // Called by RevenueCat, which has no Clerk session — "public" to this
   // middleware only. The route itself is not open: it requires a valid

@@ -27,6 +27,16 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="bearledger" android:host="auth-callback" />
             </intent-filter>
+            <!-- Verified App Link for the same handoff (preferred over the
+                 custom scheme above, which any app could also claim) — see
+                 public/.well-known/assetlinks.json and src/app/native-auth-return,
+                 which falls back to bearledger:// when the browser keeps it. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="bearledger.app" android:path="/native-auth-return" />
+            </intent-filter>
         </activity>
 
         <provider

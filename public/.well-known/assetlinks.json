@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.anty.jizhang",
+      "sha256_cert_fingerprints": [
+        "0B:12:46:C3:DE:C3:2E:38:8A:11:86:E7:62:4C:4D:6B:32:E2:11:EA:F7:CC:2E:E0:6E:70:9A:96:D9:24:7B:67",
+        "F5:91:D3:09:E7:19:55:86:08:50:BD:83:4D:E6:96:0B:57:9B:F7:52:F1:AB:2F:4B:82:91:78:9C:9A:75:6B:3A"
+      ]
+    }
+  }
+]
