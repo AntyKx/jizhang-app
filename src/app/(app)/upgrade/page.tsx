@@ -7,14 +7,38 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { BackHistoryLink } from "@/components/back-history-link";
 import { CoreUnlockCta } from "@/components/upgrade/core-unlock-cta";
 import { cn } from "@/lib/utils";
+import { Check, Minus } from "lucide-react";
 import { createAllInOneCheckoutSession, createBillingPortalSession } from "./actions";
 
 const featureFromLabel: Record<string, string> = {
   "stats-advanced": "進階統計",
   "stats-budgets-goals": "預算與目標統計",
   "data-export": "資料匯出",
-  shared: "分帳本",
+  shared: "新增分帳",
 };
+
+// What the free tier vs the NT$120 unlock actually gets — keep in sync with
+// the real gates: src/lib/entitlements.ts (AI quotas), accounts/actions.ts
+// (account limit), shared/actions.ts + transactions/actions.ts (split
+// creation), the requireCoreAccess pages, and lib/backup-snapshots.ts.
+const comparisonRows: { label: string; free: string | boolean; unlocked: string | boolean }[] = [
+  { label: "記帳、日曆、預算、儲蓄目標", free: true, unlocked: true },
+  { label: "統計總覽、日常分析", free: true, unlocked: true },
+  { label: "帳戶數量", free: "1 個", unlocked: "不限" },
+  { label: "進階統計、預算與目標統計", free: false, unlocked: true },
+  { label: "新增與編輯分帳", free: "僅查看、結清", unlocked: true },
+  { label: "匯出 CSV／Excel／月報", free: false, unlocked: true },
+  { label: "AI 記帳（文字／語音）", free: "每月 20 次", unlocked: "每月 120 次" },
+  { label: "收據辨識", free: "每月 5 張", unlocked: "每月 30 張" },
+  { label: "AI 生成分類圖示", free: false, unlocked: true },
+  { label: "雲端備份可還原", free: "近 7 天", unlocked: "近 30 天" },
+];
+
+function ComparisonCell({ value }: { value: string | boolean }) {
+  if (value === true) return <Check className="mx-auto size-4 text-emerald-600" strokeWidth={2.5} aria-label="有" />;
+  if (value === false) return <Minus className="mx-auto size-4 text-muted-foreground/60" strokeWidth={2} aria-label="無" />;
+  return <span>{value}</span>;
+}
 
 export default async function UpgradePage({
   searchParams,
@@ -63,9 +87,32 @@ export default async function UpgradePage({
         <section className="flex flex-col gap-3 py-4 first:pt-0">
           <h2 className="text-sm font-semibold text-muted-foreground">全部解鎖</h2>
           <p className="text-sm text-muted-foreground">
-            一次性付費，永久解鎖多帳戶、進階統計、資料匯出、分帳本，並包含 AI 記帳與收據辨識的每月額度。
+            一次性付費，不用訂閱，永久解鎖全部功能。
           </p>
           <p className="text-2xl font-semibold tabular-nums">NT$120</p>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-xs text-muted-foreground">
+                <th className="py-2 text-left font-normal">功能</th>
+                <th className="w-24 py-2 text-center font-normal">免費</th>
+                <th className="w-24 py-2 text-center font-semibold text-foreground">解鎖</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {comparisonRows.map((row) => (
+                <tr key={row.label}>
+                  <td className="py-2 pr-2">{row.label}</td>
+                  <td className="py-2 text-center text-xs text-muted-foreground tabular-nums">
+                    <ComparisonCell value={row.free} />
+                  </td>
+                  <td className="py-2 text-center text-xs font-medium tabular-nums">
+                    <ComparisonCell value={row.unlocked} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-xs text-muted-foreground">新帳號有 7 天全功能試用；試用結束後資料都會保留。</p>
           {unlocked ? (
             <div className="rounded-lg bg-muted px-3 py-2 text-center text-sm font-medium text-muted-foreground">
               已解鎖

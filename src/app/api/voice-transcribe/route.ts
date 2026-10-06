@@ -14,15 +14,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "missing audio" }, { status: 400 });
   }
 
-  // Counted against the same "quick_add" bucket as the text parse it feeds
-  // into right after (see api/quick-add/route.ts) — a voice entry costs two
-  // model calls (transcribe + parse), so it burns free quota twice as fast
-  // as typing. That's a deliberate starting point, not an oversight: tune
-  // later against real usage the same way the other quota numbers were set.
-  const usage = await getAiUsageStatus(userId, "quick_add");
-  if (!usage.allowed) {
+  // A voice entry is transcribe + the text parse it feeds into
+  // (api/quick-add/route.ts). Only that parse spends the user's 記帳 quota,
+  // so voice and typing cost the same — the transcription itself is logged
+  // under its own "voice_transcribe" kind, which still counts toward the
+  // hourly rate limit and has its own monthly cap (so this endpoint can't be
+  // called on its own without bound). Requiring quick_add quota up front
+  // keeps a user who's out of it from transcribing audio they then can't use.
+  const [usage, voiceUsage] = await Promise.all([
+    getAiUsageStatus(userId, "quick_add"),
+    getAiUsageStatus(userId, "voice_transcribe"),
+  ]);
+  const blocked = !usage.allowed ? usage : !voiceUsage.allowed ? voiceUsage : null;
+  if (blocked) {
     const message =
-      usage.reason === "rate_limited"
+      blocked.reason === "rate_limited"
         ? "AI 記帳操作太頻繁，請稍後再試"
         : "本月 AI 記帳額度已用完，下個月 1 號會重置（免費版可到「升級」解鎖更多額度）";
     return NextResponse.json({ error: message }, { status: 429 });
@@ -63,7 +69,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "沒有聽到聲音，再說一次看看" }, { status: 422 });
   }
 
-  await recordAiUsage(userId, "quick_add");
+  await recordAiUsage(userId, "voice_transcribe");
 
   return NextResponse.json({ text });
 }

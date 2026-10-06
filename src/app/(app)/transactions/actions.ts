@@ -6,6 +6,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { accounts, categories, sharedExpenses, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
+import { hasCoreAccess } from "@/lib/entitlements";
 import { ownedCategoryId } from "@/lib/category";
 import { getExchangeRateToTwd } from "@/lib/fx";
 import { deriveSplitFields } from "@/lib/shared-expenses";
@@ -40,6 +41,8 @@ const splitParticipantInputSchema = z.object({
   name: z.string().min(1).max(30),
   amount: z.coerce.number().positive(),
 });
+
+const SPLIT_LOCKED_MESSAGE = "分帳需要先解鎖核心功能";
 
 const createTransactionSchema = z.object({
   categoryId: z.string().uuid().optional(),
@@ -138,6 +141,9 @@ export async function createTransaction(input: {
   // the transaction, balance update, and split-ledger copy can never
   // partially fail.
   const hasSplit = parsed.type === "expense" && parsed.splitParticipants && parsed.splitParticipants.length > 0;
+  // Starting a split is a core-unlock feature — checked here, not just
+  // hidden in SplitExpenseField, since this action is client-callable.
+  if (hasSplit && !(await hasCoreAccess(userId))) return fail(SPLIT_LOCKED_MESSAGE);
   if (hasSplit) {
     await db.batch([
       insertTransaction,
@@ -345,6 +351,9 @@ export async function updateTransaction(input: {
     .where(and(eq(accounts.id, parsed.accountId), eq(accounts.userId, userId)));
 
   const wantsSplit = parsed.type === "expense" && !!parsed.splitParticipants?.length;
+  // Only a brand-new split is gated: editing or removing one that already
+  // exists stays free, so a lapsed trial never strands existing data.
+  if (wantsSplit && !linkedShared && !(await hasCoreAccess(userId))) return fail(SPLIT_LOCKED_MESSAGE);
 
   // Everything runs as one atomic batch so the transaction edit, the balance
   // adjustments on both accounts, and the split-ledger sync can never

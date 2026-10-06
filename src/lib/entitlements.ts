@@ -41,7 +41,13 @@ const CORE_QUICK_ADD_CAP_PER_MONTH = 120;
 const CORE_RECEIPT_SCAN_CAP_PER_MONTH = 30;
 const SUBSCRIBED_SOFT_CAP_PER_MONTH = 1000;
 
-export type AiUsageKind = "quick_add" | "receipt_scan" | "shared_quick_add" | "monthly_summary" | "icon_generation";
+export type AiUsageKind =
+  | "quick_add"
+  | "receipt_scan"
+  | "shared_quick_add"
+  | "monthly_summary"
+  | "icon_generation"
+  | "voice_transcribe";
 
 // Gates the /dev-tools entitlement-testing panel to a single hardcoded
 // account (via env var, not committed as a literal ID) — everyone else gets

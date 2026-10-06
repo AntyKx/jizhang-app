@@ -96,6 +96,9 @@ export async function createSplitExpense(input: {
   participants: { name: string; amount: number; iOwe: boolean }[];
 }) {
   const userId = await requireUserId();
+  // Creating/editing split records is core-unlock; settling, un-settling
+  // and deleting existing ones are deliberately left ungated so a lapsed
+  // trial never strands data the user already entered.
   await requireCoreAccess(userId, "shared");
   const parsed = splitExpenseInputSchema.parse(input);
 
@@ -155,7 +158,6 @@ export async function updateSplitExpense(input: {
 
 export async function settleParticipant(sharedExpenseId: string, participantIndex: number, accountId?: string) {
   const userId = await requireUserId();
-  await requireCoreAccess(userId, "shared");
 
   const [row] = await db
     .select()
@@ -222,7 +224,6 @@ export async function settleParticipant(sharedExpenseId: string, participantInde
 // exists to collapse back into one display row.
 export async function settleAllParticipantsInEvent(sharedExpenseId: string, accountId?: string) {
   const userId = await requireUserId();
-  await requireCoreAccess(userId, "shared");
 
   const [row] = await db
     .select()
@@ -264,7 +265,6 @@ export async function settleAllForName(
   accountId?: string,
 ) {
   const userId = await requireUserId();
-  await requireCoreAccess(userId, "shared");
 
   const conditions = [eq(sharedExpenses.userId, userId)];
   if (range?.from) conditions.push(gte(sharedExpenses.occurredAt, range.from));
@@ -392,7 +392,6 @@ export async function settleAllForName(
 // whole batch together.
 export async function unsettleParticipant(sharedExpenseId: string, participantIndex: number) {
   const userId = await requireUserId();
-  await requireCoreAccess(userId, "shared");
 
   const [row] = await db
     .select()
@@ -456,7 +455,6 @@ export async function unsettleParticipant(sharedExpenseId: string, participantIn
 // (see transactions/actions.ts), which cascades to this row.
 export async function deleteSplitExpense(sharedExpenseId: string) {
   const userId = await requireUserId();
-  await requireCoreAccess(userId, "shared");
 
   const [existing] = await db
     .select({ participants: sharedExpenses.participants })

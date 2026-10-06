@@ -13,7 +13,7 @@ const links = [
   { href: "/subscriptions", Icon: RefreshCw, label: "訂閱 / 定期收支", desc: "管理訂閱與現金流預測" },
   { href: "/transactions", Icon: ReceiptText, label: "所有交易", desc: "完整交易紀錄列表" },
   { href: "/data-export", Icon: DatabaseBackup, label: "資料與備份", desc: "匯出 CSV／Excel、備份與還原、刪除資料" },
-  { href: "/upgrade", Icon: Sparkles, label: "升級", desc: "解鎖核心功能、訂閱 AI 記帳" },
+  { href: "/upgrade", Icon: Sparkles, label: "升級", desc: "NT$120 一次買斷，解鎖全部功能" },
   { href: "/terms", Icon: FileText, label: "服務條款", desc: "使用本服務前應閱讀的條款" },
   { href: "/privacy", Icon: ShieldCheck, label: "隱私權政策", desc: "個人資料蒐集與使用方式" },
 ];

@@ -169,12 +169,13 @@ export default function GuidePage() {
           summary="個人資料、解鎖付費功能"
         >
           <p>更多 →「帳號設定」可以換大頭貼、姓名、基準幣別、記帳預設帳戶，或登出、刪除帳號。</p>
-          <p>更多 →「升級」有兩種付費方式：</p>
+          <p>更多 →「升級」可以用 <strong>NT$120 一次買斷</strong>，永久解鎖全部功能，不用訂閱：</p>
           <ul>
-            <li><strong>一次性解鎖</strong>：付一次錢永久解鎖多帳戶、進階統計、資料匯出、分帳本這些核心功能。</li>
-            <li><strong>AI 訂閱</strong>：按月訂閱，解鎖 AI 記帳與收據辨識的較高使用額度，可以隨時在升級頁取消。</li>
+            <li>多帳戶、進階統計、預算與目標統計、匯出 CSV／Excel／月報。</li>
+            <li>新增與編輯分帳（含 AI 分帳記帳）。</li>
+            <li>更高的 AI 每月額度：AI 記帳 120 次、收據辨識 30 張。</li>
           </ul>
-          <img src="/guide/upgrade.png" alt="升級頁的兩種付費方案" className="w-full rounded-xl border" />
+          <p>新帳號有 7 天全功能免費試用。試用結束後，已經記錄的資料都還在，分帳紀錄也一樣可以查看與結清。</p>
         </GuideSection>
       </div>
 

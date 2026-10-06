@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { Lock } from "lucide-react";
+import { useCoreUnlocked } from "@/components/core-access-context";
 import { computeNetBalance } from "@/lib/shared-balance";
 import type { SharedMonthlyPoint } from "@/lib/shared-trend";
 import type { FlatSplitItem } from "@/lib/shared-expenses";
@@ -34,6 +37,7 @@ export function SharedLedgerDashboard({
   dateTo?: string;
   monthlyTrend: SharedMonthlyPoint[];
 }) {
+  const unlocked = useCoreUnlocked();
   const [viewMode, setViewMode] = useState<ViewMode>("event");
 
   const unsettled = items.filter((i) => !i.isSettled);
@@ -94,7 +98,18 @@ export function SharedLedgerDashboard({
         dateTo={dateTo}
       />
 
-      <SharedQuickAddFlow categories={categories} frequentSplitNames={frequentSplitNames} />
+      {unlocked ? (
+        <SharedQuickAddFlow categories={categories} frequentSplitNames={frequentSplitNames} />
+      ) : (
+        <Link
+          href="/upgrade?from=shared"
+          className="flex items-center gap-3 rounded-2xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground hover:bg-muted"
+        >
+          <Lock className="size-4 shrink-0" strokeWidth={2} />
+          <span className="flex-1">新增與編輯分帳需要解鎖。已記錄的分帳仍可查看、結清與刪除。</span>
+          <span className="shrink-0 font-medium text-primary">解鎖</span>
+        </Link>
+      )}
 
       <div className="flex rounded-full bg-muted p-1">
         {(
@@ -121,7 +136,7 @@ export function SharedLedgerDashboard({
         <div className="flex flex-col items-center gap-2 py-8 text-center">
           <BearIllustration name="multi-account" size={96} />
           <p className="text-sm text-muted-foreground">
-            {isFiltered ? "這個區間沒有分帳支出。" : "還沒有分帳支出，新增第一筆吧！"}
+            {isFiltered ? "這個區間沒有分帳支出。" : unlocked ? "還沒有分帳支出，新增第一筆吧！" : "還沒有分帳支出。"}
           </p>
         </div>
       ) : viewMode === "event" ? (

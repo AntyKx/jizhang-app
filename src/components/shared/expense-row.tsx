@@ -11,6 +11,7 @@ import { isFail } from "@/lib/action-result";
 import { EditSplitExpenseDialog } from "@/components/shared/edit-expense-dialog";
 import { SettleAccountControl } from "@/components/shared/settle-account-control";
 import { SwipeToDelete } from "@/components/transactions/swipe-to-delete";
+import { useCoreUnlocked } from "@/components/core-access-context";
 import { CategoryIconBadge } from "@/components/category-icon";
 import { OTHER_COLOR } from "@/components/stats/chart-colors";
 import type { FlatSplitItem } from "@/lib/shared-expenses";
@@ -36,6 +37,7 @@ export function SharedExpenseRow({
   showCategory?: boolean;
 }) {
   const router = useRouter();
+  const unlocked = useCoreUnlocked();
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
 
@@ -93,7 +95,9 @@ export function SharedExpenseRow({
             : [{ label: "刪除", icon: <Trash2 className="size-4" />, onClick: handleDelete, className: "bg-destructive text-white" }]
         }
         disabled={item.isSettled || isLinked}
-        onTap={item.isSettled || isLinked ? undefined : () => setEditing(true)}
+        // Editing is core-unlock (updateSplitExpense); swipe-to-delete and
+        // settling stay available either way.
+        onTap={item.isSettled || isLinked || !unlocked ? undefined : () => setEditing(true)}
       >
         <div className="flex items-center justify-between gap-4 px-4 py-3">
           <div className="flex min-w-0 flex-col gap-0.5">

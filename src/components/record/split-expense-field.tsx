@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Handshake, X } from "lucide-react";
+import Link from "next/link";
+import { Handshake, Lock, X } from "lucide-react";
+import { useCoreUnlocked } from "@/components/core-access-context";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -101,6 +103,7 @@ export function SplitExpenseField({
   pendingNewNames?: string[];
   onConfirmNewName?: (name: string) => void;
 }) {
+  const unlocked = useCoreUnlocked();
   const [method, setMethod] = useState<"equal" | "custom">("equal");
   const [nameInput, setNameInput] = useState("");
 
@@ -140,6 +143,28 @@ export function SplitExpenseField({
   const myShare = Math.max(total - splitTotal, 0);
   const unusedSuggestions = suggestions.filter((s) => !participants.some((p) => p.name === s));
   const isTheirs = allowTheirsDirection && direction === "theirs";
+
+  // Starting a new split is a core-unlock feature (createTransaction /
+  // updateTransaction refuse it server-side too). A split that already
+  // exists — opened in the edit dialog after the trial ended — stays
+  // editable here, matching the server, which only gates new ones.
+  if (!unlocked && !enabled) {
+    return (
+      <Link
+        href="/upgrade?from=shared"
+        className="flex items-center justify-between gap-2 rounded-2xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground hover:bg-muted"
+      >
+        <span className="flex items-center gap-1.5">
+          <Handshake className="size-4 shrink-0" strokeWidth={1.75} />
+          分帳
+        </span>
+        <span className="flex items-center gap-1 text-xs">
+          <Lock className="size-3.5" strokeWidth={2} />
+          解鎖後可用
+        </span>
+      </Link>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2">

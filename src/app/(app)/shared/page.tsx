@@ -2,7 +2,6 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, sharedExpenses } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
-import { requireCoreAccess } from "@/lib/entitlements";
 import { listAccounts } from "@/lib/account";
 import { getMonthlySharedExpenseTrend } from "@/lib/shared-trend";
 import { flattenSharedExpenseRows } from "@/lib/shared-expenses";
@@ -14,7 +13,10 @@ export default async function SharedLedgerPage({
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
   const userId = await requireUserId();
-  await requireCoreAccess(userId, "shared");
+  // Not gated: viewing, settling and deleting existing split records stay
+  // free, so a lapsed trial never hides who still owes whom. Only creating
+  // and editing are core-unlock (see shared/actions.ts and the dashboard's
+  // locked state).
   const { from, to } = await searchParams;
 
   const dateConditions = [];
