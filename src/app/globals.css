@@ -162,16 +162,22 @@
        not just Y — see the html rule's comment for why X was the missing
        half of the "can still drag the edge into view" bug. */
     overscroll-behavior: none;
+    /* No overflow-x here — only on html below. overflow-x: hidden on body
+       as well (it used to be on both) turns body into its own scroll
+       container (overflow-y computes to auto), one with nothing to scroll;
+       combined with overscroll-behavior: none above, a touch drag landing
+       on body could neither scroll it nor chain out to the document, so
+       pages simply wouldn't scroll by finger in the Android app's WebView
+       (verified on an emulator: programmatic scrolling still worked,
+       touch scrolling didn't, and dropping either rule fixed it). */
+  }
+  html {
+    @apply font-sans;
     /* Unconditional guarantee against a left-right drag, independent of
        whatever's causing it (a still-possible pinch-zoom, a future stray
        wide element) — no legitimate layout in this app is ever meant to
        exceed the viewport's width, so clipping it here is never wrong,
-       only ever a safety net. Paired on both html and body for the same
-       reason overscroll-behavior-y is above. */
-    overflow-x: hidden;
-  }
-  html {
-    @apply font-sans;
+       only ever a safety net. */
     overflow-x: hidden;
     /* App-like touch behavior, not a webpage's — kills double-tap-to-zoom,
        pinch-zoom, and the ~300ms tap delay, while normal vertical
