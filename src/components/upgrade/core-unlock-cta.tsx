@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Capacitor } from "@capacitor/core";
-import { Purchases, PURCHASES_ERROR_CODE } from "@revenuecat/purchases-capacitor";
+import { PRODUCT_CATEGORY, Purchases, PURCHASES_ERROR_CODE } from "@revenuecat/purchases-capacitor";
 import { Button } from "@/components/ui/button";
 import { getPurchasesReady } from "@/components/native-purchases-init";
 import { PLAY_STORE_URL, WEB_CHECKOUT_ENABLED } from "@/lib/billing-flags";
@@ -61,7 +61,13 @@ export function CoreUnlockCta({ purchaseCoreAction }: { purchaseCoreAction: () =
     setPending("purchase");
     try {
       await getPurchasesReady();
-      const { products } = await Purchases.getProducts({ productIdentifiers: [productId] });
+      // getProducts looks up SUBSCRIPTION products unless told otherwise —
+      // core_unlock is a one-time product, so without this the lookup always
+      // came back empty ("找不到商品資訊") and nobody could buy.
+      const { products } = await Purchases.getProducts({
+        productIdentifiers: [productId],
+        type: PRODUCT_CATEGORY.NON_SUBSCRIPTION,
+      });
       const product = products[0];
       if (!product) {
         toast.error("找不到商品資訊，請稍後再試");
