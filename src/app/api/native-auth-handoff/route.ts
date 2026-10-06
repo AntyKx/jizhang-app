@@ -14,7 +14,7 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 const NATIVE_AUTH_RETURN_URL = "https://bearledger.app/native-auth-return";
 
 export async function GET(req: Request) {
-  const { userId } = await auth();
+  const { userId, sessionId } = await auth();
   if (!userId) {
     return NextResponse.redirect(new URL("/native-google-sign-in", req.url));
   }
@@ -25,6 +25,14 @@ export async function GET(req: Request) {
     // Same window as /api/native-auth-ticket — see that route's comment.
     expiresInSeconds: 180,
   });
+
+  // The app gets its own session from the ticket; the one Chrome holds was
+  // only ever a stepping stone. Leaving it signed in made the next Google
+  // sign-in from this device start out "already signed in" (and stuck on
+  // whichever account was used last), so end it here.
+  if (sessionId) {
+    await client.sessions.revokeSession(sessionId).catch(() => {});
+  }
 
   const res = NextResponse.redirect(`${NATIVE_AUTH_RETURN_URL}#ticket=${encodeURIComponent(signInToken.token)}`, 303);
   res.headers.set("Cache-Control", "no-store");

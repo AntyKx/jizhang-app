@@ -27,9 +27,14 @@ export default function NativeGoogleSignInPage() {
     try {
       // Chrome may still hold a session from an earlier sign-in (possibly a
       // different account) — clear it so the user picks the account now.
+      // Signed out in place (callback form, no navigation): redirecting back
+      // to this same page was a client-side nav that didn't remount it, so
+      // `started` stayed true and the Google sign-in never began — every
+      // second Google sign-in on a device stalled here.
+      // /api/native-auth-handoff now also revokes the Chrome session, so
+      // this is only a fallback.
       if (isSignedIn) {
-        await signOut({ redirectUrl: "/native-google-sign-in" });
-        return;
+        await signOut(() => {});
       }
       const { error } = await signIn.sso({
         strategy: "oauth_google",
