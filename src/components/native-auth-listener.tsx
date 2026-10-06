@@ -24,6 +24,25 @@ function extractTicket(url: string): string | null {
   }
 }
 
+// Tickets already handled in this app process. App.getLaunchUrl() keeps
+// returning the deep link that cold-started the app for the life of the
+// process, so every full page load after that (e.g. a Clerk handshake
+// reload) would re-read the same, already-used ticket — bouncing a signed-in
+// user to /record, or, if Clerk hadn't loaded yet, trying the spent ticket
+// and showing the failure toast. sessionStorage survives those reloads.
+const HANDLED_TICKETS_KEY = "native-auth-handled-tickets";
+
+function markTicketHandled(ticket: string): boolean {
+  try {
+    const handled: string[] = JSON.parse(sessionStorage.getItem(HANDLED_TICKETS_KEY) ?? "[]");
+    if (handled.includes(ticket)) return false;
+    sessionStorage.setItem(HANDLED_TICKETS_KEY, JSON.stringify([...handled.slice(-4), ticket]));
+    return true;
+  } catch {
+    return true;
+  }
+}
+
 // Catches the auth-return deep link that src/app/native-auth-callback
 // redirects to once a Chrome-Custom-Tabs sign-in (Google OAuth, or any sign-in that
 // went through that handoff — see MainActivity's shouldOverrideUrlLoading override)
@@ -31,7 +50,7 @@ function extractTicket(url: string): string | null {
 // "ticket" strategy so the app doesn't need its own cookie in that browser context.
 export function NativeAuthListener() {
   const { signIn } = useSignIn();
-  const { isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const router = useRouter();
   // Read through refs inside the listeners below so registration only needs
   // to happen once on mount, not every render signIn's identity changes.
@@ -39,6 +58,10 @@ export function NativeAuthListener() {
   const signInRef = useRef(signIn);
   const routerRef = useRef(router);
   const isSignedInRef = useRef(isSignedIn);
+  // A ticket that arrives before Clerk has loaded (cold start) waits here
+  // until it has — a ticket sign-in attempted on an unloaded Clerk fails.
+  const pendingTicketRef = useRef<string | null>(null);
+  const consumeRef = useRef<((ticket: string) => void) | null>(null);
   useEffect(() => {
     signInRef.current = signIn;
     routerRef.current = router;
@@ -46,9 +69,17 @@ export function NativeAuthListener() {
   });
 
   useEffect(() => {
+    if (!isLoaded || !pendingTicketRef.current || !consumeRef.current) return;
+    const ticket = pendingTicketRef.current;
+    pendingTicketRef.current = null;
+    consumeRef.current(ticket);
+  }, [isLoaded]);
+
+  useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
     async function consumeTicket(ticket: string) {
+      if (!markTicketHandled(ticket)) return;
       const currentSignIn = signInRef.current;
       const currentRouter = routerRef.current;
 
@@ -82,6 +113,16 @@ export function NativeAuthListener() {
       }
     }
 
+    // Defers to the isLoaded effect above while Clerk is still loading.
+    function handleTicket(ticket: string) {
+      if (isSignedInRef.current === undefined) {
+        pendingTicketRef.current = ticket;
+        return;
+      }
+      void consumeTicket(ticket);
+    }
+    consumeRef.current = (ticket) => void consumeTicket(ticket);
+
     let cancelled = false;
 
     // Cold start — the gap the previous version of this file had: Android
@@ -93,13 +134,13 @@ export function NativeAuthListener() {
     App.getLaunchUrl().then((launch) => {
       if (cancelled || !launch) return;
       const ticket = extractTicket(launch.url);
-      if (ticket) consumeTicket(ticket);
+      if (ticket) handleTicket(ticket);
     });
 
     let removeListener: (() => void) | undefined;
     App.addListener("appUrlOpen", ({ url }) => {
       const ticket = extractTicket(url);
-      if (ticket) consumeTicket(ticket);
+      if (ticket) handleTicket(ticket);
     }).then((handle) => {
       if (cancelled) {
         handle.remove();

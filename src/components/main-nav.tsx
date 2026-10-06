@@ -18,7 +18,10 @@ const links = [
 export function MainNav() {
   const pathname = usePathname();
   const containerRef = useRef<HTMLDivElement>(null);
-  const active = links.find((link) => pathname.startsWith(link.href))?.href ?? links[0].href;
+  // Every page that isn't one of the four main tabs (帳號設定, 升級, 分類,
+  // 預算, 分帳, 所有交易, …) is reached from 更多, so that's the tab to light
+  // up — falling back to 首頁 made those pages look like part of the home tab.
+  const active = links.find((link) => pathname.startsWith(link.href))?.href ?? "/more";
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur supports-backdrop-filter:bg-card/80">
