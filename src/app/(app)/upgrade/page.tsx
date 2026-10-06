@@ -22,16 +22,16 @@ const featureFromLabel: Record<string, string> = {
 // (account limit), shared/actions.ts + transactions/actions.ts (split
 // creation), the requireCoreAccess pages, and lib/backup-snapshots.ts.
 const comparisonRows: { label: string; free: string | boolean; unlocked: string | boolean }[] = [
-  { label: "記帳、日曆、預算、儲蓄目標", free: true, unlocked: true },
+  { label: "記帳、日曆、預算、目標", free: true, unlocked: true },
   { label: "統計總覽、日常分析", free: true, unlocked: true },
   { label: "帳戶數量", free: "1 個", unlocked: "不限" },
-  { label: "進階統計、預算與目標統計", free: false, unlocked: true },
-  { label: "新增與編輯分帳", free: "僅查看、結清", unlocked: true },
+  { label: "進階統計、預算目標統計", free: false, unlocked: true },
+  { label: "新增／編輯分帳", free: "僅查看結清", unlocked: true },
   { label: "匯出 CSV／Excel／月報", free: false, unlocked: true },
-  { label: "AI 記帳（文字／語音）", free: "每月 20 次", unlocked: "每月 120 次" },
+  { label: "AI 文字／語音記帳", free: "每月 20 次", unlocked: "每月 120 次" },
   { label: "收據辨識", free: "每月 5 張", unlocked: "每月 30 張" },
   { label: "AI 生成分類圖示", free: false, unlocked: true },
-  { label: "雲端備份可還原", free: "近 7 天", unlocked: "近 30 天" },
+  { label: "雲端備份還原", free: "近 7 天", unlocked: "近 30 天" },
 ];
 
 function ComparisonCell({ value }: { value: string | boolean }) {
@@ -94,25 +94,29 @@ export default async function UpgradePage({
             <thead>
               <tr className="border-b text-xs text-muted-foreground">
                 <th className="py-2 text-left font-normal">功能</th>
-                <th className="w-24 py-2 text-center font-normal">免費</th>
-                <th className="w-24 py-2 text-center font-semibold text-foreground">解鎖</th>
+                <th className="w-20 py-2 text-center font-normal">免費</th>
+                <th className="w-20 py-2 text-center font-semibold text-foreground">解鎖</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {comparisonRows.map((row) => (
                 <tr key={row.label}>
-                  <td className="py-2 pr-2">{row.label}</td>
-                  <td className="py-2 text-center text-xs text-muted-foreground tabular-nums">
+                  <td className="py-2 pr-2 text-pretty">{row.label}</td>
+                  <td className="whitespace-nowrap py-2 text-center text-xs text-muted-foreground tabular-nums">
                     <ComparisonCell value={row.free} />
                   </td>
-                  <td className="py-2 text-center text-xs font-medium tabular-nums">
+                  <td className="whitespace-nowrap py-2 text-center text-xs font-medium tabular-nums">
                     <ComparisonCell value={row.unlocked} />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="text-xs text-muted-foreground">新帳號有 7 天全功能試用；試用結束後資料都會保留。</p>
+          <p className="text-xs text-muted-foreground">
+            新帳號有 7 天全功能試用。
+            <br />
+            試用結束後，已記錄的資料都會保留。
+          </p>
           {unlocked ? (
             <div className="rounded-lg bg-muted px-3 py-2 text-center text-sm font-medium text-muted-foreground">
               已解鎖
