@@ -35,8 +35,21 @@ public class MainActivity extends BridgeActivity {
     // handled by the bearledger:// deep link registered in AndroidManifest.xml
     // (see src/app/native-auth-callback and MainActivity's @capacitor/app
     // appUrlOpen listener on the JS side).
-    private static boolean isOAuthHandoffHost(String host) {
-        return "accounts.google.com".equals(host) || "clerk.bearledger.app".equals(host);
+    //
+    // The one exception is Clerk's session handshake
+    // (clerk.bearledger.app/v1/client/handshake): Next.js middleware redirects
+    // a page load there whenever the WebView has a stale session cookie (e.g.
+    // a cold start after the short-lived session token expired), and it
+    // bounces straight back to the app's own domain. Handing that off to a
+    // Custom Tab threw the user out of the app into a browser tab showing the
+    // sign-in page — it has to complete inside the WebView, where the cookies
+    // it refreshes actually live.
+    private static boolean isOAuthHandoff(Uri url) {
+        String host = url.getHost();
+        if ("accounts.google.com".equals(host)) return true;
+        if (!"clerk.bearledger.app".equals(host)) return false;
+        String path = url.getPath();
+        return path == null || !path.startsWith("/v1/client/handshake");
     }
 
     @Override
@@ -67,7 +80,7 @@ public class MainActivity extends BridgeActivity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri url = request.getUrl();
-                if (request.isForMainFrame() && isOAuthHandoffHost(url.getHost())) {
+                if (request.isForMainFrame() && isOAuthHandoff(url)) {
                     // Devices without Chrome (or any other Custom-Tabs-capable
                     // browser) — stripped-down ROMs, bare emulators — throw here
                     // instead of launching. Falling back to the WebView would just
