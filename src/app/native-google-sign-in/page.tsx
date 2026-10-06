@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 // the client that created the sign-in, so a sign-in created in the WebView
 // and completed in Chrome is rejected ("authorization_invalid"). This page
 // starts a fresh Google sign-in right here in Chrome; once it completes,
-// /native-auth-callback hands the session back to the app with a ticket.
+// /api/native-auth-handoff hands the session back to the app with a ticket.
 export default function NativeGoogleSignInPage() {
   const { signIn } = useSignIn();
   const { isLoaded, isSignedIn } = useAuth();
@@ -33,7 +33,7 @@ export default function NativeGoogleSignInPage() {
       }
       const { error } = await signIn.sso({
         strategy: "oauth_google",
-        redirectUrl: "/native-auth-callback",
+        redirectUrl: "/api/native-auth-handoff",
         redirectCallbackUrl: "/native-google-sign-in/sso-callback",
       });
       if (error) setFailed(true);
