@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useSignIn } from "@clerk/nextjs";
+import { useAuth, useSignIn } from "@clerk/nextjs";
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { toast } from "sonner";
@@ -31,15 +31,18 @@ function extractTicket(url: string): string | null {
 // "ticket" strategy so the app doesn't need its own cookie in that browser context.
 export function NativeAuthListener() {
   const { signIn } = useSignIn();
+  const { isSignedIn } = useAuth();
   const router = useRouter();
   // Read through refs inside the listeners below so registration only needs
   // to happen once on mount, not every render signIn's identity changes.
   // Synced in an effect (not during render) per the rules of hooks.
   const signInRef = useRef(signIn);
   const routerRef = useRef(router);
+  const isSignedInRef = useRef(isSignedIn);
   useEffect(() => {
     signInRef.current = signIn;
     routerRef.current = router;
+    isSignedInRef.current = isSignedIn;
   });
 
   useEffect(() => {
@@ -48,6 +51,14 @@ export function NativeAuthListener() {
     async function consumeTicket(ticket: string) {
       const currentSignIn = signInRef.current;
       const currentRouter = routerRef.current;
+
+      // A session already in this WebView means there's nothing to carry
+      // over — a second sign-in on top of it is rejected by Clerk and would
+      // wrongly show the failure toast (see native-auth-callback/page.tsx).
+      if (isSignedInRef.current) {
+        currentRouter.replace("/record");
+        return;
+      }
 
       function fail() {
         toast.error("登入逾時或發生錯誤，請重新登入");

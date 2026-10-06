@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
 
 // Lands here (inside Chrome Custom Tabs, not the app's WebView) right after
 // Google/email sign-in finishes — see MainActivity's shouldOverrideUrlLoading
@@ -17,6 +18,18 @@ export default function NativeAuthCallbackPage() {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    // Inside the app's own WebView (email/password sign-in never leaves it),
+    // the session already lives right here — there's nothing to hand back.
+    // Minting a ticket anyway made the listener try to sign in a second time
+    // on top of the live session, which Clerk rejects, so every in-app
+    // email/password sign-in ended on "登入逾時或發生錯誤" and bounced back to
+    // /sign-in. The ticket handoff is only for Chrome Custom Tabs (Google
+    // OAuth), where Capacitor isn't present.
+    if (Capacitor.isNativePlatform()) {
+      window.location.replace("/record");
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       try {
