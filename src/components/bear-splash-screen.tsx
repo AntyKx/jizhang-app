@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 // Single branded scene (small-bear-on-desk + wordmark) — replaced the
@@ -60,7 +60,9 @@ export function BearSplashScreen() {
   const isAuthPage =
     pathname?.startsWith("/sign-in") ||
     pathname?.startsWith("/sign-up") ||
-    pathname?.startsWith("/native-auth-callback");
+    pathname?.startsWith("/native-auth-callback") ||
+    pathname?.startsWith("/native-auth-return") ||
+    pathname?.startsWith("/native-google-sign-in");
   // /sign-in and /sign-up are their own full page load (root layout mounts
   // fresh) separate from the app content that follows once auth succeeds —
   // skipping it there means the one real playback happens on the way into
@@ -77,9 +79,19 @@ export function BearSplashScreen() {
   // only ever change things after the first paint has already matched.
   const shouldRender = !isAuthPage;
   const [phase, setPhase] = useState<Phase>("enter");
+  const mountedOnAuthPage = useRef(!shouldRender);
 
   useEffect(() => {
     if (!shouldRender) return;
+    // Mounted on an auth page, then client-navigated into the app — the
+    // Android app does exactly this after sign-in (native-auth-listener's
+    // router.replace("/record")). Without this, the splash rendered on
+    // /record with its timers never started and covered the app forever.
+    // Skip the ceremony entirely: the user just signed in, not opened the app.
+    if (mountedOnAuthPage.current) {
+      const raf = requestAnimationFrame(() => setPhase("gone"));
+      return () => cancelAnimationFrame(raf);
+    }
     if (!claimSplashTurn()) {
       // Already played once in this tab — skip straight to hidden instead
       // of replaying the full ~2s ceremony. The first frame (rendered
@@ -103,13 +115,9 @@ export function BearSplashScreen() {
       clearTimeout(exitTimer);
       clearTimeout(goneTimer);
     };
-    // Deliberately run-once-on-mount, not reactive to `shouldRender`/pathname
-    // changing later — if this instance ever survived a client-side nav off
-    // /sign-in (it normally doesn't; see the file-level comment on why this
-    // only mounts once per real page load), re-running the whole
-    // enter/hold/exit cycle mid-session would be wrong, not a fix.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Reactive to `shouldRender` only so a client-side nav off an auth page
+    // is handled (see mountedOnAuthPage) — it never replays the ceremony.
+  }, [shouldRender]);
 
   if (!shouldRender || phase === "gone") return null;
 

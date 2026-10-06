@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { ReturnToAppButton } from "@/components/return-to-app-button";
 
 // Verified Android App Link target (https://bearledger.app/native-auth-return,
 // see public/.well-known/assetlinks.json and AndroidManifest.xml's autoVerify
@@ -16,6 +17,7 @@ import { Loader2 } from "lucide-react";
 // the server or its request logs.
 export default function NativeAuthReturnPage() {
   const [failed, setFailed] = useState(false);
+  const [appUrl, setAppUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const ticket = new URLSearchParams(window.location.hash.slice(1)).get("ticket");
@@ -24,7 +26,11 @@ export default function NativeAuthReturnPage() {
       queueMicrotask(() => setFailed(true));
       return;
     }
-    window.location.replace(`bearledger://auth-callback?ticket=${encodeURIComponent(ticket)}`);
+    const url = `bearledger://auth-callback?ticket=${encodeURIComponent(ticket)}`;
+    // Chrome blocks opening another app without a user tap, so the automatic
+    // attempt can silently do nothing — the button below always works.
+    queueMicrotask(() => setAppUrl(url));
+    window.location.replace(url);
   }, []);
 
   return (
@@ -40,6 +46,7 @@ export default function NativeAuthReturnPage() {
         <>
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
           <p className="text-sm text-muted-foreground">登入中，正在返回小熊記帳本…</p>
+          {appUrl && <ReturnToAppButton href={appUrl} />}
         </>
       )}
     </div>

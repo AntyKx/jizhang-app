@@ -11,6 +11,9 @@ const isPublicRoute = createRouteMatcher([
   // Custom Tab on bearledger.app, neither of which has a Clerk session.
   "/.well-known/(.*)",
   "/native-auth-return",
+  // Google sign-in started from the Android app, run entirely in Chrome
+  // Custom Tabs (see MainActivity) — no session exists there yet.
+  "/native-google-sign-in(.*)",
   "/api/webhooks/stripe",
   // Called by RevenueCat, which has no Clerk session — "public" to this
   // middleware only. The route itself is not open: it requires a valid

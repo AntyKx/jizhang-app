@@ -27,29 +27,25 @@ public class MainActivity extends BridgeActivity {
     private PermissionRequest pendingMediaRequest;
 
     // Google refuses to render its own sign-in/consent screen inside anything it
-    // detects as an embedded WebView (the "disallowed_useragent" policy), and
-    // Clerk's OAuth redirect hops through its own Frontend API host (a different
-    // origin than the app's) on the way there — both need to happen in a real
-    // browser context, not this WebView. Chrome Custom Tabs gives that real
-    // browser context while still feeling part of the app; the trip back in is
-    // handled by the bearledger:// deep link registered in AndroidManifest.xml
-    // (see src/app/native-auth-callback and MainActivity's @capacitor/app
-    // appUrlOpen listener on the JS side).
+    // detects as an embedded WebView (the "disallowed_useragent" policy), so
+    // Google sign-in has to run in a real browser — Chrome Custom Tabs, which
+    // still feels part of the app. But only handing the Google step itself off
+    // doesn't work: Clerk ties the OAuth callback to the client that created
+    // the sign-in, and that client's cookies live in this WebView, so the
+    // callback landing in Chrome failed with "authorization_invalid". Instead,
+    // any attempt to navigate to Google opens /native-google-sign-in in the
+    // Custom Tab, which runs the whole Google sign-in there from scratch; the
+    // session then comes back via a ticket (src/app/native-auth-callback →
+    // App Link / bearledger:// → src/components/native-auth-listener.tsx).
     //
-    // The one exception is Clerk's session handshake
-    // (clerk.bearledger.app/v1/client/handshake): Next.js middleware redirects
-    // a page load there whenever the WebView has a stale session cookie (e.g.
-    // a cold start after the short-lived session token expired), and it
-    // bounces straight back to the app's own domain. Handing that off to a
-    // Custom Tab threw the user out of the app into a browser tab showing the
-    // sign-in page — it has to complete inside the WebView, where the cookies
-    // it refreshes actually live.
-    private static boolean isOAuthHandoff(Uri url) {
-        String host = url.getHost();
-        if ("accounts.google.com".equals(host)) return true;
-        if (!"clerk.bearledger.app".equals(host)) return false;
-        String path = url.getPath();
-        return path == null || !path.startsWith("/v1/client/handshake");
+    // Everything else — including Clerk's session handshake on
+    // clerk.bearledger.app, which must refresh this WebView's own cookies —
+    // stays in the WebView (see allowNavigation in capacitor.config.ts).
+    private static final Uri NATIVE_GOOGLE_SIGN_IN_URL =
+            Uri.parse("https://jizhang.bearledger.app/native-google-sign-in");
+
+    private static boolean isGoogleOAuth(Uri url) {
+        return "accounts.google.com".equals(url.getHost());
     }
 
     @Override
@@ -80,14 +76,14 @@ public class MainActivity extends BridgeActivity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri url = request.getUrl();
-                if (request.isForMainFrame() && isOAuthHandoff(url)) {
+                if (request.isForMainFrame() && isGoogleOAuth(url)) {
                     // Devices without Chrome (or any other Custom-Tabs-capable
                     // browser) — stripped-down ROMs, bare emulators — throw here
                     // instead of launching. Falling back to the WebView would just
                     // hit Google's "disallowed_useragent" wall, so there's no real
                     // recovery beyond telling the user what to install.
                     try {
-                        new CustomTabsIntent.Builder().build().launchUrl(MainActivity.this, url);
+                        new CustomTabsIntent.Builder().build().launchUrl(MainActivity.this, NATIVE_GOOGLE_SIGN_IN_URL);
                     } catch (ActivityNotFoundException e) {
                         Toast.makeText(MainActivity.this, "請先安裝或啟用 Chrome 瀏覽器才能完成登入", Toast.LENGTH_LONG).show();
                     }

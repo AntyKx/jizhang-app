@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
+import { ReturnToAppButton } from "@/components/return-to-app-button";
 
 // Lands here (inside Chrome Custom Tabs, not the app's WebView) right after
 // Google/email sign-in finishes — see MainActivity's shouldOverrideUrlLoading
@@ -16,6 +17,7 @@ const NATIVE_AUTH_RETURN_URL = "https://bearledger.app/native-auth-return";
 
 export default function NativeAuthCallbackPage() {
   const [failed, setFailed] = useState(false);
+  const [appUrl, setAppUrl] = useState<string | null>(null);
 
   useEffect(() => {
     // Inside the app's own WebView (email/password sign-in never leaves it),
@@ -37,6 +39,11 @@ export default function NativeAuthCallbackPage() {
         if (!res.ok) throw new Error("ticket request failed");
         const { token } = (await res.json()) as { token: string };
         if (cancelled) return;
+        // Chrome only lets a page open another app from a real user tap, so
+        // the automatic hand-off below can be silently blocked. This button
+        // is the guaranteed path: a tap on a bearledger:// link always
+        // reaches the app.
+        setAppUrl(`bearledger://auth-callback?ticket=${encodeURIComponent(token)}`);
         // Different origin from this page on purpose — Chrome is far more
         // willing to hand a cross-origin navigation to a verified App Link
         // than a same-origin one. That page falls back to bearledger:// if
@@ -64,6 +71,7 @@ export default function NativeAuthCallbackPage() {
         <>
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
           <p className="text-sm text-muted-foreground">登入中，正在返回小熊記帳本…</p>
+          {appUrl && <ReturnToAppButton href={appUrl} />}
         </>
       )}
     </div>
