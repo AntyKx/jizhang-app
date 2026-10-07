@@ -28,6 +28,7 @@ import { SplitExpenseField, computeSplitOverflow, type SplitParticipantDraft } f
 import { compressImageToBase64 } from "@/lib/compress-image";
 import { todayInTaipeiString } from "@/lib/date";
 import { cn } from "@/lib/utils";
+import { AiParsedNote } from "@/components/record/ai-parsed-note";
 
 type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
 type Account = { id: string; name: string; type: AccountType; currency: string };
@@ -217,6 +218,9 @@ export function ReceiptScanQuickAdd({
           <span className="text-sm">拍照或選擇收據照片</span>
         </button>
       )}
+      {!previewUrl && (
+        <p className="text-center text-xs text-muted-foreground">照片會傳給 AI 服務辨識，辨識完不會保存原始照片</p>
+      )}
 
       {previewUrl && (
         <div className="relative overflow-hidden rounded-2xl border bg-card">
@@ -247,10 +251,12 @@ export function ReceiptScanQuickAdd({
 
       {draft && !parsing && (
         <div className="flex flex-col gap-3 rounded-2xl border bg-card p-4">
-          {parseFailed && (
+          {parseFailed ? (
             <p className="rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
               ⚠️ 沒解析成功，請對照照片手動補金額和分類
             </p>
+          ) : (
+            <AiParsedNote />
           )}
 
           <div className="grid grid-cols-2 gap-3">

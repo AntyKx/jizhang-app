@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Mic, Square } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 type RecordState = "idle" | "recording" | "processing";
@@ -37,6 +39,18 @@ const LEADING_BUFFER_CHUNKS = 1;
 // bail out client-side instead of sending it.
 const MIN_CHUNKS_TO_SEND = 3;
 
+// One-time, per-device notice before the very first recording that the
+// audio goes to a third-party AI service (matches the privacy policy).
+const VOICE_NOTICE_KEY = "jizhang:voice-ai-notice-seen";
+
+function hasSeenVoiceNotice() {
+  try {
+    return window.localStorage.getItem(VOICE_NOTICE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 function pickSupportedMimeType(): string | undefined {
   if (typeof MediaRecorder === "undefined") return undefined;
   return MIME_CANDIDATES.find((type) => MediaRecorder.isTypeSupported(type));
@@ -60,6 +74,7 @@ function blobToBase64(blob: Blob): Promise<string> {
 // (stop early, or force-stop if the auto-detect gets it wrong).
 export function VoiceRecordButton({ onTranscribed }: { onTranscribed: (text: string) => void }) {
   const [state, setState] = useState<RecordState>("idle");
+  const [noticeOpen, setNoticeOpen] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const mimeTypeRef = useRef<string | undefined>(undefined);
@@ -217,26 +232,57 @@ export function VoiceRecordButton({ onTranscribed }: { onTranscribed: (text: str
     }
   }
 
+  function handleMicClick() {
+    if (state === "recording") return stopRecording();
+    if (!hasSeenVoiceNotice()) return setNoticeOpen(true);
+    void startRecording();
+  }
+
+  function acceptNotice() {
+    try {
+      window.localStorage.setItem(VOICE_NOTICE_KEY, "1");
+    } catch {
+      // Storage blocked — the notice just shows again next time.
+    }
+    setNoticeOpen(false);
+    // Still inside the tap's user gesture, so the mic permission prompt
+    // is allowed to appear.
+    void startRecording();
+  }
+
   return (
-    <button
-      type="button"
-      onClick={state === "recording" ? stopRecording : startRecording}
-      disabled={state === "processing"}
-      aria-label={state === "recording" ? "停止錄音" : "語音記帳"}
-      className={cn(
-        "flex size-7 shrink-0 items-center justify-center rounded-full transition-colors",
-        state === "recording"
-          ? "bg-destructive text-white animate-pulse"
-          : "text-muted-foreground hover:bg-background hover:text-foreground",
-      )}
-    >
-      {state === "processing" ? (
-        <Loader2 className="size-3.5 animate-spin" />
-      ) : state === "recording" ? (
-        <Square className="size-3 fill-current" />
-      ) : (
-        <Mic className="size-3.5" strokeWidth={1.75} />
-      )}
-    </button>
+    <>
+      <Dialog open={noticeOpen} onOpenChange={setNoticeOpen}>
+        <DialogContent>
+          <DialogTitle>語音記帳</DialogTitle>
+          <DialogDescription>
+            錄音會傳給 AI 服務轉成文字並解析，辨識完不會保存原始錄音。
+          </DialogDescription>
+          <DialogFooter>
+            <Button onClick={acceptNotice}>知道了，開始錄音</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <button
+        type="button"
+        onClick={handleMicClick}
+        disabled={state === "processing"}
+        aria-label={state === "recording" ? "停止錄音" : "語音記帳"}
+        className={cn(
+          "flex size-7 shrink-0 items-center justify-center rounded-full transition-colors",
+          state === "recording"
+            ? "bg-destructive text-white animate-pulse"
+            : "text-muted-foreground hover:bg-background hover:text-foreground",
+        )}
+      >
+        {state === "processing" ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : state === "recording" ? (
+          <Square className="size-3 fill-current" />
+        ) : (
+          <Mic className="size-3.5" strokeWidth={1.75} />
+        )}
+      </button>
+    </>
   );
 }

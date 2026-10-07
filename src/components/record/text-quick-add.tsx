@@ -32,6 +32,7 @@ import {
 } from "@/components/record/split-expense-field";
 import { todayInTaipeiString } from "@/lib/date";
 import { cn } from "@/lib/utils";
+import { AiParsedNote } from "@/components/record/ai-parsed-note";
 
 type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
 type Account = { id: string; name: string; type: AccountType; currency: string };
@@ -318,10 +319,12 @@ export function TextQuickAdd({
 
       {draft && (
         <div className="flex flex-col gap-3 rounded-2xl border bg-card p-4">
-          {parseFailed && (
+          {parseFailed ? (
             <p className="rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
               ⚠️ 沒解析成功，原文已保留在備註，請手動補金額和分類
             </p>
+          ) : (
+            <AiParsedNote />
           )}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
