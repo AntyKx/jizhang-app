@@ -30,11 +30,13 @@ export function QuickAddBar({
   return (
     <form onSubmit={handleSubmit} className="flex items-center gap-2 border-b py-2">
       <Sparkles className="size-3.5 shrink-0 text-primary" />
+      {/* text-base (16px), not smaller: iOS Safari zooms the whole page in
+          when focusing an input under 16px and never zooms back out. */}
       <Input
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder={placeholder}
-        className="h-auto flex-1 border-none bg-transparent px-0 py-0 text-[13px] shadow-none focus-visible:border-transparent focus-visible:ring-0"
+        className="h-auto flex-1 border-none bg-transparent px-0 py-0 text-base shadow-none focus-visible:border-transparent focus-visible:ring-0"
       />
       <VoiceRecordButton onTranscribed={(text) => onSubmit(text)} />
       {onScanReceipt && (
