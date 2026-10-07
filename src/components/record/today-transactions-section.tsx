@@ -13,6 +13,10 @@ import { BearIllustration } from "@/components/bear-illustration";
 import { Reveal } from "@/components/motion/reveal";
 import { StaggerList } from "@/components/motion/stagger-list";
 import type { QuickAddAccount, QuickAddCategory } from "@/lib/quick-add-context";
+import { getOnboardingState } from "@/lib/onboarding";
+import { FirstRecordPrompt } from "@/components/onboarding/first-record-prompt";
+import { OneTimeHint } from "@/components/onboarding/gesture-hint";
+import { ArrowLeft } from "lucide-react";
 
 // Independent Suspense island on /record — deliberately fetches its own
 // full transaction row list rather than reusing anything from
@@ -82,6 +86,14 @@ export async function TodayTransactionsSection({
   });
 
   if (todayTransactions.length === 0) {
+    const { hasAnyTransaction } = await getOnboardingState(userId);
+    if (!hasAnyTransaction) {
+      return (
+        <Reveal>
+          <FirstRecordPrompt />
+        </Reveal>
+      );
+    }
     return (
       <Reveal className="flex flex-col items-center gap-3 py-8 text-center">
         <BearIllustration name="record" size={64} />
@@ -129,6 +141,9 @@ export async function TodayTransactionsSection({
           ),
         )}
       </StaggerList>
+      <OneTimeHint id="today-row" icon={<ArrowLeft className="size-4" />}>
+        左滑複製或刪除，長按換分類
+      </OneTimeHint>
     </div>
   );
 }

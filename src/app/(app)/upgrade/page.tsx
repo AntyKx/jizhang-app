@@ -28,9 +28,8 @@ const comparisonRows: { label: string; free: string | boolean; unlocked: string 
   { label: "進階統計、預算目標統計", free: false, unlocked: true },
   { label: "新增／編輯分帳", free: "僅查看結清", unlocked: true },
   { label: "匯出 CSV／Excel／月報", free: false, unlocked: true },
-  { label: "AI 文字／語音記帳", free: "每月 20 次", unlocked: "每月 120 次" },
+  { label: "一句話記帳（文字／語音）", free: "每月 20 次", unlocked: "每月 120 次" },
   { label: "收據辨識", free: "每月 5 張", unlocked: "每月 30 張" },
-  { label: "AI 生成分類圖示", free: false, unlocked: true },
   { label: "雲端備份還原", free: "近 7 天", unlocked: "近 30 天" },
 ];
 
@@ -140,7 +139,7 @@ export default async function UpgradePage({
         {isSubscribed && (
           <section className="flex flex-col gap-3 py-4">
             <h2 className="text-sm font-semibold text-muted-foreground">AI 訂閱</h2>
-            <p className="text-sm text-muted-foreground">每月訂閱，解鎖 AI 記帳與收據辨識的高額度使用。</p>
+            <p className="text-sm text-muted-foreground">每月訂閱，解鎖一句話記帳與收據辨識的高額度使用。</p>
             <p className="text-2xl font-semibold tabular-nums">
               NT$30<span className="text-sm font-normal text-muted-foreground">/月</span>
             </p>

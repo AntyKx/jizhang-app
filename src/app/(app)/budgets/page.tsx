@@ -9,6 +9,7 @@ import { BudgetMonthSummary } from "@/components/budgets/budget-month-summary";
 import { BearIllustration } from "@/components/bear-illustration";
 import { BackLink } from "@/components/back-link";
 import { getTodayInTaipei } from "@/lib/date";
+import { GuideHelpLink } from "@/components/guide/guide-help-link";
 
 export default async function BudgetsPage() {
   const userId = await requireUserId();
@@ -78,7 +79,10 @@ export default async function BudgetsPage() {
     <div className="flex flex-col gap-6">
       <BackLink href="/more" label="更多功能" />
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">預算</h1>
+        <div className="flex items-center gap-1">
+          <h1 className="text-2xl font-semibold">預算</h1>
+          <GuideHelpLink section="budgets" label="預算" />
+        </div>
         <CreateBudgetDialog categories={expenseCategories} />
       </div>
 

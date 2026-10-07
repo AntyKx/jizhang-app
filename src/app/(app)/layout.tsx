@@ -5,6 +5,8 @@ import { CoreAccessProvider } from "@/components/core-access-context";
 import { requireUserId } from "@/lib/auth";
 import { hasCoreAccess } from "@/lib/entitlements";
 import { getQuickAddContext } from "@/lib/quick-add-context";
+import { getOnboardingState } from "@/lib/onboarding";
+import { WelcomeGate } from "@/components/onboarding/welcome-gate";
 
 export default async function AppLayout({
   children,
@@ -12,9 +14,10 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const userId = await requireUserId();
-  const [unlocked, quickAddContext] = await Promise.all([
+  const [unlocked, quickAddContext, onboarding] = await Promise.all([
     hasCoreAccess(userId),
     getQuickAddContext(userId),
+    getOnboardingState(userId),
   ]);
 
   return (
@@ -31,6 +34,7 @@ export default async function AppLayout({
         sharedLocked={!unlocked}
       />
       <MainNav />
+      {onboarding.needsWelcome && <WelcomeGate />}
     </div>
     </CoreAccessProvider>
   );

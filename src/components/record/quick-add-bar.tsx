@@ -52,7 +52,7 @@ export function QuickAddBar({
         size="icon-sm"
         className="shrink-0 rounded-full"
         disabled={!value.trim()}
-        aria-label="送出，AI 解析"
+        aria-label="送出"
       >
         <Send className="size-3.5" />
       </Button>

@@ -13,7 +13,7 @@ type Mode = "general" | "ai";
 
 const choices: { mode: Mode; label: string; desc: string; Icon: typeof SquarePen }[] = [
   { mode: "general", label: "一般記帳", desc: "分類格 → 金額輸入（含分帳）", Icon: SquarePen },
-  { mode: "ai", label: "AI 記帳", desc: "打字或語音一句話", Icon: Sparkles },
+  { mode: "ai", label: "一句話記帳", desc: "打字或用說的", Icon: Sparkles },
 ];
 
 // Renders on every page except the home page (mounted alongside MainNav in
@@ -141,7 +141,7 @@ export function GlobalQuickAddFab({
 
       <BottomSheet open={mode === "ai"} onOpenChange={(open) => !open && setMode(null)}>
         <BottomSheetContent>
-          <BottomSheetTitle className="sr-only">AI 記帳</BottomSheetTitle>
+          <BottomSheetTitle className="sr-only">一句話記帳</BottomSheetTitle>
           <PersonalAiQuickAddFlow
             categories={categories}
             accounts={accounts}

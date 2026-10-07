@@ -93,6 +93,10 @@ export const userSettings = pgTable("user_settings", {
   // by re-triggering row creation. Null for anyone who already has
   // hasPurchasedCore, since it'd be irrelevant.
   trialEndsAt: timestamp("trial_ends_at"),
+  // Set when the first-login welcome setup is finished or skipped. Rows
+  // that existed before onboarding shipped were backfilled, so only
+  // genuinely new users ever see it (see WelcomeGate).
+  onboardedAt: timestamp("onboarded_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

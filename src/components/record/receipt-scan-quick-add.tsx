@@ -97,7 +97,7 @@ export function ReceiptScanQuickAdd({
       if (!res.ok) {
         if (res.status === 429) {
           const body = (await res.json().catch(() => null)) as { error?: string } | null;
-          throw new Error(body?.error ?? "AI 記帳額度已用完");
+          throw new Error(body?.error ?? "收據辨識次數已用完");
         }
         throw new Error("解析失敗");
       }
@@ -121,7 +121,7 @@ export function ReceiptScanQuickAdd({
       toast.error(
         err instanceof Error && err.message !== "解析失敗"
           ? err.message
-          : "AI 看不太懂這張收據，幫你保留照片，手動補一下金額跟分類吧",
+          : "看不太懂這張收據，幫你保留照片，手動補一下金額跟分類吧",
       );
       setParseFailed(true);
       setCategoryId("");
@@ -249,7 +249,7 @@ export function ReceiptScanQuickAdd({
         <div className="flex flex-col gap-3 rounded-2xl border bg-card p-4">
           {parseFailed && (
             <p className="rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
-              ⚠️ AI 沒解析成功，請對照照片手動補金額和分類
+              ⚠️ 沒解析成功，請對照照片手動補金額和分類
             </p>
           )}
 

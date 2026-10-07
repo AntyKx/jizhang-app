@@ -41,6 +41,7 @@ export function QuickAddSection({
         // widget without going native.
         initialShowText={searchParams.get("action") === "quickadd"}
         initialShowScan={searchParams.get("action") === "scan"}
+        listenForTry
       />
 
       <div className="flex flex-col gap-4">

@@ -66,7 +66,7 @@ export function SharedTextQuickAdd({
       if (!res.ok) {
         if (res.status === 429) {
           const body = (await res.json().catch(() => null)) as { error?: string } | null;
-          throw new Error(body?.error ?? "AI 記帳額度已用完");
+          throw new Error(body?.error ?? "一句話記帳次數已用完");
         }
         throw new Error("解析失敗");
       }
@@ -85,7 +85,7 @@ export function SharedTextQuickAdd({
       toast.error(
         err instanceof Error && err.message !== "解析失敗"
           ? err.message
-          : "AI 看不太懂，幫你保留文字，手動補一下金額吧",
+          : "看不太懂這句話，幫你保留文字，手動補一下金額吧",
       );
       setParseFailed(true);
       setCategoryId("");
@@ -147,7 +147,7 @@ export function SharedTextQuickAdd({
           autoFocus
         />
         <Button type="button" onClick={() => handleParse()} disabled={parsing || !text.trim()}>
-          {parsing ? "解析中…" : "AI 解析"}
+          {parsing ? "解析中…" : "解析"}
         </Button>
       </div>
 
@@ -155,7 +155,7 @@ export function SharedTextQuickAdd({
         <div className="flex flex-col gap-3 rounded-2xl border bg-card p-4">
           {parseFailed && (
             <p className="rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
-              ⚠️ AI 沒解析成功，原文已保留在項目名稱，請手動補金額與分帳對象
+              ⚠️ 沒解析成功，原文已保留在項目名稱，請手動補金額與分帳對象
             </p>
           )}
 

@@ -78,8 +78,8 @@ export async function POST(req: Request) {
   if (!usage.allowed) {
     const message =
       usage.reason === "rate_limited"
-        ? "AI 記帳操作太頻繁，請稍後再試"
-        : "本月 AI 記帳額度已用完，下個月 1 號會重置（免費版可到「升級」解鎖更多額度）";
+        ? "一句話記帳操作太頻繁，請稍後再試"
+        : "本月一句話記帳次數已用完，下個月 1 號會重置（免費版可到「升級」解鎖更多額度）";
     return NextResponse.json({ error: message }, { status: 429 });
   }
 
@@ -116,7 +116,7 @@ export async function POST(req: Request) {
 只是提到「跟誰一起」但沒有分攤金額語意（例如「晚餐1000，跟老婆一起吃」）則 isSharedExpense=false，其餘分帳欄位為 null。`,
     }));
   } catch {
-    return NextResponse.json({ error: "AI 解析失敗，請稍後再試或手動記帳" }, { status: 502 });
+    return NextResponse.json({ error: "解析失敗，請稍後再試或手動記帳" }, { status: 502 });
   }
 
   await recordAiUsage(userId, "quick_add");

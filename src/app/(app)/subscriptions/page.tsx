@@ -11,6 +11,7 @@ import { CountUpNumber } from "@/components/motion/count-up-number";
 import { BearIllustration } from "@/components/bear-illustration";
 import { BackLink } from "@/components/back-link";
 import { getTodayInTaipei } from "@/lib/date";
+import { GuideHelpLink } from "@/components/guide/guide-help-link";
 
 function expandOccurrences(
   start: string,
@@ -97,7 +98,10 @@ export default async function SubscriptionsPage() {
     <div className="flex flex-col gap-6">
       <BackLink href="/more" label="更多功能" />
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">訂閱 / 定期收支</h1>
+        <div className="flex items-center gap-1">
+          <h1 className="text-2xl font-semibold">訂閱 / 定期收支</h1>
+          <GuideHelpLink section="subscriptions" label="訂閱" />
+        </div>
         <CreateRuleDialog categories={allCategories} accounts={pickableAccounts} />
       </div>
 

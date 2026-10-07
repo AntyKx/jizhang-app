@@ -114,7 +114,7 @@ export function TextQuickAdd({
       if (!res.ok) {
         if (res.status === 429) {
           const body = (await res.json().catch(() => null)) as { error?: string } | null;
-          throw new Error(body?.error ?? "AI 記帳額度已用完");
+          throw new Error(body?.error ?? "一句話記帳次數已用完");
         }
         throw new Error("解析失敗");
       }
@@ -172,7 +172,7 @@ export function TextQuickAdd({
       toast.error(
         err instanceof Error && err.message !== "解析失敗"
           ? err.message
-          : "AI 看不太懂，幫你保留文字，手動補一下金額跟分類吧",
+          : "看不太懂這句話，幫你保留文字，手動補一下金額跟分類吧",
       );
       setParseFailed(true);
       setCategoryId("");
@@ -312,7 +312,7 @@ export function TextQuickAdd({
           onClick={() => handleParse()}
           disabled={parsing || !text.trim()}
         >
-          {parsing ? "解析中…" : "AI 解析"}
+          {parsing ? "解析中…" : "解析"}
         </Button>
       </div>
 
@@ -320,7 +320,7 @@ export function TextQuickAdd({
         <div className="flex flex-col gap-3 rounded-2xl border bg-card p-4">
           {parseFailed && (
             <p className="rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
-              ⚠️ AI 沒解析成功，原文已保留在備註，請手動補金額和分類
+              ⚠️ 沒解析成功，原文已保留在備註，請手動補金額和分類
             </p>
           )}
           <div className="grid grid-cols-2 gap-3">

@@ -5,6 +5,8 @@ import { requireUserId } from "@/lib/auth";
 import { CreateCategoryDialog } from "@/components/categories/create-category-dialog";
 import { CategorySortableGrid } from "@/components/categories/category-sortable-grid";
 import { CategoriesDoneButton } from "@/components/categories/categories-done-button";
+import { OneTimeHint } from "@/components/onboarding/gesture-hint";
+import { Hand } from "lucide-react";
 
 export default async function CategoriesPage() {
   const userId = await requireUserId();
@@ -33,9 +35,9 @@ export default async function CategoriesPage() {
           <CategoriesDoneButton />
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        點圖示可編輯、點右上角 ✕ 可刪除、長按拖曳可排序
-      </p>
+      <OneTimeHint id="category-drag" icon={<Hand className="size-4" />} className="mt-0">
+        點圖示編輯，長按拖曳調整順序
+      </OneTimeHint>
 
       <div className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-muted-foreground">支出分類</h2>

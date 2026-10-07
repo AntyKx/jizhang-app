@@ -17,6 +17,7 @@ import { BearIllustration } from "@/components/bear-illustration";
 import { BackLink } from "@/components/back-link";
 import type { AccountType } from "@/lib/account-type";
 import { cn } from "@/lib/utils";
+import { GuideHelpLink } from "@/components/guide/guide-help-link";
 
 type Category = { id: string; name: string; icon: string | null; color: string | null };
 type Account = { id: string; name: string; type: AccountType };
@@ -85,7 +86,10 @@ export function SharedLedgerDashboard({
   return (
     <div className="flex flex-col gap-6">
       <BackLink href="/more" label="更多功能" />
-      <h1 className="text-2xl font-semibold">分帳</h1>
+      <div className="flex items-center gap-1">
+        <h1 className="text-2xl font-semibold">分帳</h1>
+        <GuideHelpLink section="split" label="分帳" />
+      </div>
 
       <DateRangeFilter from={dateFrom} to={dateTo} />
 

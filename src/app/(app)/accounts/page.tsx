@@ -13,6 +13,8 @@ import { NetWorthSummary } from "@/components/accounts/net-worth-summary";
 import { getExchangeRateToTwd } from "@/lib/fx";
 import { todayInTaipeiString } from "@/lib/date";
 import type { AccountType } from "@/lib/account-type";
+import { OneTimeHint } from "@/components/onboarding/gesture-hint";
+import { ArrowLeft } from "lucide-react";
 
 export default async function AccountsPage() {
   const userId = await requireUserId();
@@ -127,6 +129,11 @@ export default async function AccountsPage() {
             statementDay: a.statementDay,
           }))}
         />
+      )}
+      {accounts.length > 0 && (
+        <OneTimeHint id="account-swipe" icon={<ArrowLeft className="size-4" />} className="-mt-2">
+          左滑編輯或封存，長按拖曳排序
+        </OneTimeHint>
       )}
 
       {transfers.length > 0 && <TransferHistory transfers={transfers} accountsById={accountsById} />}

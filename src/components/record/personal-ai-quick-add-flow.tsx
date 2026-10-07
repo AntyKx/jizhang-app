@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet, BottomSheetContent, BottomSheetTitle } from "@/components/ui/bottom-sheet";
 import { TextQuickAdd } from "@/components/record/text-quick-add";
 import { ReceiptScanQuickAdd } from "@/components/record/receipt-scan-quick-add";
 import { QuickAddBar } from "@/components/record/quick-add-bar";
+import { QUICK_ADD_TRY_EVENT } from "@/components/onboarding/first-record-prompt";
 import type { QuickAddAccount, QuickAddCategory } from "@/lib/quick-add-context";
 
-// "AI 記帳" — the text/voice/receipt-scan pill plus its two draft-editing
+// "一句話記帳" — the text/voice/receipt-scan pill plus its two draft-editing
 // sheets. Used inline on the home page by quick-add-section.tsx
 // (`initialShowText`/`initialShowScan` seed from the home page's own
 // app-shortcut query param) and also opened from the global quick-add FAB
@@ -22,6 +23,7 @@ export function PersonalAiQuickAddFlow({
   frequentSplitNames,
   initialShowText = false,
   initialShowScan = false,
+  listenForTry = false,
   onClose,
 }: {
   categories: QuickAddCategory[];
@@ -31,12 +33,27 @@ export function PersonalAiQuickAddFlow({
   frequentSplitNames: string[];
   initialShowText?: boolean;
   initialShowScan?: boolean;
+  // Home page only: lets the first-record prompt's example chips open the
+  // quick-add sheet pre-filled (see FirstRecordPrompt).
+  listenForTry?: boolean;
   onClose?: () => void;
 }) {
   const router = useRouter();
   const [showText, setShowText] = useState(initialShowText);
   const [showReceiptScan, setShowReceiptScan] = useState(initialShowScan);
   const [quickText, setQuickText] = useState("");
+
+  useEffect(() => {
+    if (!listenForTry) return;
+    function onTry(e: Event) {
+      const text = (e as CustomEvent<string>).detail;
+      if (!text) return;
+      setQuickText(text);
+      setShowText(true);
+    }
+    window.addEventListener(QUICK_ADD_TRY_EVENT, onTry);
+    return () => window.removeEventListener(QUICK_ADD_TRY_EVENT, onTry);
+  }, [listenForTry]);
 
   return (
     <>

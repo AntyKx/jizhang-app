@@ -29,8 +29,8 @@ export async function POST(req: Request) {
   if (blocked) {
     const message =
       blocked.reason === "rate_limited"
-        ? "AI 記帳操作太頻繁，請稍後再試"
-        : "本月 AI 記帳額度已用完，下個月 1 號會重置（免費版可到「升級」解鎖更多額度）";
+        ? "一句話記帳操作太頻繁，請稍後再試"
+        : "本月一句話記帳次數已用完，下個月 1 號會重置（免費版可到「升級」解鎖更多額度）";
     return NextResponse.json({ error: message }, { status: 429 });
   }
 

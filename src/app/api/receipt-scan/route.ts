@@ -48,7 +48,7 @@ export async function POST(req: Request) {
   if (!usage.allowed) {
     const message =
       usage.reason === "rate_limited"
-        ? "AI 收據辨識操作太頻繁，請稍後再試"
+        ? "收據辨識操作太頻繁，請稍後再試"
         : "本月收據辨識額度已用完，下個月 1 號會重置（免費版可到「升級」解鎖更多額度）";
     return NextResponse.json({ error: message }, { status: 429 });
   }
