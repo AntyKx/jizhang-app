@@ -48,7 +48,7 @@ function deleteLedgerContent(userId: string) {
 // snapshots, which are full copies of it) but keeps the account — so the
 // user_settings row survives with its purchase/trial fields intact (only
 // preferences reset). Deleting that row here used to silently revoke a paid
-// unlock and let the next page load start a fresh 7-day trial. AI usage
+// unlock and let the next page load start a fresh trial. AI usage
 // events are metering, not ledger content, and stay too — otherwise this
 // doubled as a way to reset the monthly AI quota.
 export async function deleteAllUserData() {

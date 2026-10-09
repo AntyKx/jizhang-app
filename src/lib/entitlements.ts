@@ -5,11 +5,11 @@ import { startOfMonth } from "date-fns";
 import { db } from "@/db";
 import { aiUsageEvents, userSettings } from "@/db/schema";
 import { getTodayInTaipei } from "@/lib/date";
+import { TRIAL_DAYS } from "@/lib/trial";
 
 // One-time, non-renewing — granted once per account the first time
 // hasCoreAccess ever runs for it (new signups) or retroactively backfilled
 // for pre-existing free accounts (see hasCoreAccess below).
-const TRIAL_DAYS = 7;
 
 function newTrialEndsAt(): Date {
   return new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
@@ -25,6 +25,12 @@ export function isTrialActive(trialEndsAt: Date | null | undefined): boolean {
 export function trialDaysRemaining(trialEndsAt: Date | null | undefined): number {
   if (!isTrialActive(trialEndsAt)) return 0;
   return Math.max(1, Math.ceil((trialEndsAt!.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+}
+
+// Whole-or-fractional days since the trial ended (negative while it's
+// still running) — for the home page's "試用已結束" card window.
+export function daysSinceTrialEnded(trialEndsAt: Date): number {
+  return (Date.now() - trialEndsAt.getTime()) / (24 * 60 * 60 * 1000);
 }
 
 // Free-tier limits — starting values, expected to be tuned after launch
@@ -87,7 +93,7 @@ export async function hasCoreAccess(userId: string): Promise<boolean> {
 // Read-only variant of hasCoreAccess for background jobs (the nightly backup
 // cron): never starts or backfills a trial. hasCoreAccess's side effects are
 // meant to fire when a user actually opens the app — calling it from the
-// cron started every dormant account's one-time 7-day trial overnight,
+// cron started every dormant account's one-time trial overnight,
 // without the user ever seeing it.
 export async function peekCoreAccess(userId: string): Promise<boolean> {
   const [row] = await db

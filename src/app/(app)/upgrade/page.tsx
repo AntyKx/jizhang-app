@@ -9,6 +9,7 @@ import { CoreUnlockCta } from "@/components/upgrade/core-unlock-cta";
 import { cn } from "@/lib/utils";
 import { Check, Minus } from "lucide-react";
 import { createAllInOneCheckoutSession, createBillingPortalSession } from "./actions";
+import { TRIAL_DAYS } from "@/lib/trial";
 
 const featureFromLabel: Record<string, string> = {
   "stats-advanced": "進階統計",
@@ -112,7 +113,7 @@ export default async function UpgradePage({
             </tbody>
           </table>
           <p className="text-xs text-muted-foreground">
-            新帳號有 7 天全功能試用。
+            新帳號有 {TRIAL_DAYS} 天全功能試用。
             <br />
             試用結束後，已記錄的資料都會保留。
           </p>

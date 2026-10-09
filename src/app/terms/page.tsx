@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BackLink } from "@/components/back-link";
+import { TRIAL_DAYS } from "@/lib/trial";
 
 export const metadata = {
   title: "服務條款 - 小熊記帳本",
@@ -25,7 +26,7 @@ export default function TermsPage() {
         <p className="text-xs font-medium tracking-wide text-primary uppercase">小熊記帳本</p>
         <h1 className="text-2xl font-semibold">服務條款</h1>
         <p className="text-xs text-muted-foreground">
-          生效日期：2026 年 10 月 2 日・資料控管者：個人開發者・聯絡信箱：antyk123@gmail.com
+          生效日期：2026 年 10 月 9 日・資料控管者：個人開發者・聯絡信箱：antyk123@gmail.com
         </p>
       </div>
 
@@ -57,7 +58,7 @@ export default function TermsPage() {
       <Clause n={4} title="付費項目">
         <p>
           <strong className="text-foreground">免費試用：</strong>
-          新帳號首次使用時可免費試用全部功能 7 天，試用期滿不會自動扣款，未購買者將回復為免費版功能範圍。
+          新帳號首次使用時可免費試用全部功能 {TRIAL_DAYS} 天，試用期滿不會自動扣款，未購買者將回復為免費版功能範圍。
         </p>
         <p>
           <strong className="text-foreground">一次性解鎖：</strong>

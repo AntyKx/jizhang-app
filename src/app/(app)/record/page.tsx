@@ -5,6 +5,7 @@ import { getQuickAddContext } from "@/lib/quick-add-context";
 import { QuickAddSection } from "@/components/record/quick-add-section";
 import { HomeSummarySection } from "@/components/record/home-summary-section";
 import { DueSubscriptionsSection } from "@/components/record/due-subscriptions-section";
+import { TrialReminderSection } from "@/components/record/trial-reminder-section";
 import { TodayTransactionsSection } from "@/components/record/today-transactions-section";
 import { Reveal } from "@/components/motion/reveal";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -42,6 +43,10 @@ export default async function RecordPage() {
           empty div, which the surrounding flex gap-6 still puts a full gap
           on both sides of, showing up as a large dead gap between the
           banner and the AI quick-add row whenever nothing's due. */}
+      <Suspense fallback={null}>
+        <TrialReminderSection userId={userId} />
+      </Suspense>
+
       <Suspense fallback={null}>
         <DueSubscriptionsSection userId={userId} />
       </Suspense>

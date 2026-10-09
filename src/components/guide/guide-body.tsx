@@ -18,6 +18,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { GuideSection } from "@/components/guide/guide-section";
+import { TRIAL_DAYS } from "@/lib/trial";
 
 const iconProps = { className: "size-4.5", strokeWidth: 1.75 } as const;
 
@@ -126,7 +127,7 @@ export function GuideBody() {
       </GuideSection>
 
       <GuideSection id="account" icon={<UserCog {...iconProps} />} title="帳號與升級" summary="一次買斷，不用訂閱" bear="secure-login" href="/upgrade" hrefLabel="查看升級方案">
-        <p>新帳號有 7 天全功能試用。升級一次買斷，解鎖多帳戶、進階統計、匯出和分帳。</p>
+        <p>新帳號有 {TRIAL_DAYS} 天全功能試用。升級一次買斷，解鎖多帳戶、進階統計、匯出和分帳。</p>
       </GuideSection>
     </div>
   );

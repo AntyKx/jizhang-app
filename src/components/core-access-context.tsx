@@ -3,7 +3,7 @@
 import { createContext, useContext } from "react";
 
 // Whether the signed-in user currently has core access (purchased, or inside
-// the 7-day trial) — resolved once per request by the (app) layout via
+// the one-time trial) — resolved once per request by the (app) layout via
 // hasCoreAccess and handed down here, so client components deep in a form
 // (e.g. SplitExpenseField, shared-ledger rows) can show their locked state
 // without every caller threading a prop through. UI hint only: every gated
