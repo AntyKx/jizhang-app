@@ -25,10 +25,7 @@ import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { accountTypeLabels, type AccountType } from "@/lib/account-type";
 import { currencyAllowsDecimal, supportedCurrencies } from "@/lib/currency";
 import { cn } from "@/lib/utils";
-
-const statementDayItems = Object.fromEntries(
-  Array.from({ length: 31 }, (_, i) => [String(i + 1), `${i + 1} 日`]),
-);
+import { StatementDayPicker } from "@/components/accounts/statement-day-picker";
 
 export function CreateAccountDialog({ defaultCurrency = "TWD" }: { defaultCurrency?: string }) {
   const [open, setOpen] = useState(false);
@@ -42,7 +39,7 @@ export function CreateAccountDialog({ defaultCurrency = "TWD" }: { defaultCurren
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button />}>新增帳戶</DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-2rem)]">
         <DialogHeader>
           <DialogTitle>新增帳戶</DialogTitle>
         </DialogHeader>
@@ -98,22 +95,7 @@ export function CreateAccountDialog({ defaultCurrency = "TWD" }: { defaultCurren
           {type === "credit_card" && (
             <div className="flex flex-col gap-2">
               <Label htmlFor="statementDay">結帳日</Label>
-              <Select
-                value={statementDay}
-                onValueChange={(v) => setStatementDay(v ?? undefined)}
-                items={statementDayItems}
-              >
-                <SelectTrigger id="statementDay">
-                  <SelectValue placeholder="選擇結帳日" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(statementDayItems).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <StatementDayPicker id="statementDay" value={statementDay} onChange={setStatementDay} />
             </div>
           )}
           <div className="flex flex-col gap-2">

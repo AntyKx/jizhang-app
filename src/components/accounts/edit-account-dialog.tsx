@@ -19,6 +19,7 @@ import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { accountTypeLabels, type AccountType } from "@/lib/account-type";
 import { currencyAllowsDecimal } from "@/lib/currency";
 import { cn } from "@/lib/utils";
+import { StatementDayPicker } from "@/components/accounts/statement-day-picker";
 
 type Account = {
   id: string;
@@ -29,10 +30,6 @@ type Account = {
   currency: string;
   statementDay: number | null;
 };
-
-const statementDayItems = Object.fromEntries(
-  Array.from({ length: 31 }, (_, i) => [String(i + 1), `${i + 1} 日`]),
-);
 
 export function EditAccountDialog({
   account,
@@ -89,7 +86,7 @@ export function EditAccountDialog({
 
   return (
     <Dialog open={!!account} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] sm:max-w-md">
         <DialogHeader>
           <DialogTitle>編輯帳戶</DialogTitle>
         </DialogHeader>
@@ -128,22 +125,7 @@ export function EditAccountDialog({
           {type === "credit_card" && (
             <div className="flex flex-col gap-2">
               <Label htmlFor="edit-account-statement-day">結帳日</Label>
-              <Select
-                value={statementDay}
-                onValueChange={(v) => setStatementDay(v ?? undefined)}
-                items={statementDayItems}
-              >
-                <SelectTrigger id="edit-account-statement-day">
-                  <SelectValue placeholder="選擇結帳日" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(statementDayItems).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <StatementDayPicker id="edit-account-statement-day" value={statementDay} onChange={setStatementDay} />
             </div>
           )}
 
