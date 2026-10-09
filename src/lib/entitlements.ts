@@ -113,6 +113,14 @@ export async function requireCoreAccessApi(userId: string): Promise<NextResponse
   return NextResponse.json({ error: "此功能需要先解鎖核心功能" }, { status: 403 });
 }
 
+// Per-kind monthly cap for a user's current plan. Shared with the /admin
+// AI page so the "near quota" view can't drift from what's enforced.
+export function monthlyAiLimit(kind: AiUsageKind, plan: { aiSubscribed: boolean; coreAccess: boolean }): number {
+  if (plan.aiSubscribed) return SUBSCRIBED_SOFT_CAP_PER_MONTH;
+  if (plan.coreAccess) return kind === "receipt_scan" ? CORE_RECEIPT_SCAN_CAP_PER_MONTH : CORE_QUICK_ADD_CAP_PER_MONTH;
+  return kind === "receipt_scan" ? FREE_RECEIPT_SCAN_PER_MONTH : FREE_QUICK_ADD_PER_MONTH;
+}
+
 type AiUsageStatus = { allowed: true } | { allowed: false; reason: "rate_limited" | "quota_exceeded" };
 
 // AI-cost endpoints (quick-add/receipt-scan/shared-quick-add) must check
@@ -149,16 +157,10 @@ export async function getAiUsageStatus(userId: string, kind: AiUsageKind): Promi
       ),
     );
 
-  const monthlyLimit =
-    settings?.aiSubscriptionStatus === "active"
-      ? SUBSCRIBED_SOFT_CAP_PER_MONTH
-      : settings?.hasPurchasedCore || isTrialActive(settings?.trialEndsAt)
-        ? kind === "receipt_scan"
-          ? CORE_RECEIPT_SCAN_CAP_PER_MONTH
-          : CORE_QUICK_ADD_CAP_PER_MONTH
-        : kind === "receipt_scan"
-          ? FREE_RECEIPT_SCAN_PER_MONTH
-          : FREE_QUICK_ADD_PER_MONTH;
+  const monthlyLimit = monthlyAiLimit(kind, {
+    aiSubscribed: settings?.aiSubscriptionStatus === "active",
+    coreAccess: Boolean(settings?.hasPurchasedCore) || isTrialActive(settings?.trialEndsAt),
+  });
 
   if (monthCount >= monthlyLimit) {
     return { allowed: false, reason: "quota_exceeded" };
