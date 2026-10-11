@@ -64,11 +64,13 @@ export function OneTimeHint({
   icon,
   children,
   className,
+  onDismiss,
 }: {
   id: string;
   icon: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  onDismiss?: () => void;
 }) {
   const dismissed = useSyncExternalStore(
     subscribeHints,
@@ -84,6 +86,7 @@ export function OneTimeHint({
       // Storage blocked — the hint just comes back next visit.
     }
     hintListeners.forEach((l) => l());
+    onDismiss?.();
   }
 
   return (

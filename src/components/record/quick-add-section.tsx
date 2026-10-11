@@ -2,7 +2,9 @@
 
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, LayoutGrid } from "lucide-react";
+import { ChevronRight, LayoutGrid, Mic } from "lucide-react";
+import { OneTimeHint } from "@/components/onboarding/gesture-hint";
+import { track } from "@/lib/analytics/track";
 import { QuickAddCategoryFlow } from "@/components/record/quick-add-category-flow";
 import { PersonalAiQuickAddFlow } from "@/components/record/personal-ai-quick-add-flow";
 import type { QuickAddAccount, QuickAddCategory } from "@/lib/quick-add-context";
@@ -20,11 +22,15 @@ export function QuickAddSection({
   accounts,
   frequentSplitNames,
   sharedLocked,
+  showAiTip = false,
 }: {
   categories: QuickAddCategory[];
   accounts: QuickAddAccount[];
   frequentSplitNames: string[];
   sharedLocked: boolean;
+  // Records by hand but has never used one-line quick-add — point at the
+  // bar above the category grid once (see getOnboardingState).
+  showAiTip?: boolean;
 }) {
   const searchParams = useSearchParams();
 
@@ -43,6 +49,16 @@ export function QuickAddSection({
         initialShowScan={searchParams.get("action") === "scan"}
         listenForTry
       />
+      {showAiTip && (
+        <OneTimeHint
+          id="quickadd-discover"
+          icon={<Mic className="size-4" />}
+          className="-mt-4"
+          onDismiss={() => track("quickadd_tip_dismissed")}
+        >
+          不用點分類，直接打「午餐 120」或按麥克風用說的，就記好了
+        </OneTimeHint>
+      )}
 
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">

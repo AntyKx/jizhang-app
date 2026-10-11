@@ -329,6 +329,19 @@ export const savingsGoals = pgTable("savings_goals", {
 // quick-add) — powers both the monthly free-quota count and the abuse-guard
 // rate limit in src/lib/entitlements.ts. Rows are never written for failed
 // AI calls (see recordAiUsage).
+// Lightweight product-analytics events (e.g. "voice_tap",
+// "voice_permission_denied") — kept separate from ai_usage_events on
+// purpose: that table feeds AI quota/rate-limit counts, and these must
+// never eat into anyone's quota. Read by /admin only.
+export const uiEvents = pgTable("ui_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("ui_events_name_created_idx").on(table.name, table.createdAt),
+]);
+
 export const aiUsageEvents = pgTable("ai_usage_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: text("user_id").notNull(),

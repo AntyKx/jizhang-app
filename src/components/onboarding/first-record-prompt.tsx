@@ -1,6 +1,8 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { Mic, Sparkles } from "lucide-react";
+import { VOICE_TRY_EVENT } from "@/components/record/voice-record-button";
+import { track } from "@/lib/analytics/track";
 import { BearIllustration } from "@/components/bear-illustration";
 
 export const FIRST_RECORD_EXAMPLES = ["午餐 95", "捷運 30", "咖啡 65"];
@@ -15,6 +17,7 @@ export const QUICK_ADD_TRY_EVENT = "jizhang:quick-add-try";
 // quick-add doing the work.
 export function FirstRecordPrompt({ onTry }: { onTry?: (example: string) => void }) {
   function tryExample(example: string) {
+    track("first_record_chip");
     if (onTry) onTry(example);
     else window.dispatchEvent(new CustomEvent(QUICK_ADD_TRY_EVENT, { detail: example }));
   }
@@ -38,8 +41,19 @@ export function FirstRecordPrompt({ onTry }: { onTry?: (example: string) => void
             {example}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => {
+            track("first_record_voice_chip");
+            window.dispatchEvent(new Event(VOICE_TRY_EVENT));
+          }}
+          className="flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-2 text-sm text-primary-foreground transition-colors active:bg-primary/80"
+        >
+          <Mic className="size-3.5" strokeWidth={2} />
+          用說的試試
+        </button>
       </div>
-      <span className="text-xs text-muted-foreground">也可以用說的，或拍收據</span>
+      <span className="text-xs text-muted-foreground">也可以點相機拍收據</span>
     </div>
   );
 }

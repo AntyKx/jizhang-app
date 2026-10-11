@@ -9,11 +9,13 @@ import { VoiceRecordButton } from "@/components/record/voice-record-button";
 export function QuickAddBar({
   onSubmit,
   onScanReceipt,
-  placeholder = "午餐麥當勞 185 元，刷信用卡",
+  placeholder = "打一句話，或按麥克風用說的",
+  listenForVoiceTry = false,
 }: {
   onSubmit: (text: string) => void;
   onScanReceipt?: () => void;
   placeholder?: string;
+  listenForVoiceTry?: boolean;
 }) {
   const [value, setValue] = useState("");
 
@@ -38,7 +40,7 @@ export function QuickAddBar({
         placeholder={placeholder}
         className="h-auto flex-1 border-none bg-transparent px-0 py-0 text-base shadow-none focus-visible:border-transparent focus-visible:ring-0"
       />
-      <VoiceRecordButton onTranscribed={(text) => onSubmit(text)} />
+      <VoiceRecordButton onTranscribed={(text) => onSubmit(text)} listenForVoiceTry={listenForVoiceTry} />
       {onScanReceipt && (
         <button
           type="button"

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { startOfMonth, subDays } from "date-fns";
-import { gte, sql } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { aiUsageEvents } from "@/db/schema";
+import { aiUsageEvents, uiEvents } from "@/db/schema";
+import { UI_EVENT_LABELS, type UiEventName } from "@/lib/analytics/ui-event-names";
 import { getAdminData, getDailyActivity } from "@/lib/admin/data";
 import { AI_GROUPS, AI_GROUP_KEYS, aiGroupOf, type AiDay } from "@/lib/admin/ai-groups";
 import { monthlyAiLimit, type AiUsageKind } from "@/lib/entitlements";
@@ -22,7 +23,8 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 export default async function AdminAiPage() {
-  const [{ users }, daily, monthRows] = await Promise.all([
+  const since30 = subDays(getTodayInTaipei(), DAYS - 1);
+  const [{ users }, daily, monthRows, eventRows, voiceOk] = await Promise.all([
     getAdminData(),
     getDailyActivity(DAYS),
     db
@@ -30,7 +32,31 @@ export default async function AdminAiPage() {
       .from(aiUsageEvents)
       .where(gte(aiUsageEvents.createdAt, startOfMonth(getTodayInTaipei())))
       .groupBy(aiUsageEvents.userId, aiUsageEvents.kind),
+    db
+      .select({ name: uiEvents.name, n: sql<number>`count(*)::int`, users: sql<number>`count(distinct ${uiEvents.userId})::int` })
+      .from(uiEvents)
+      .where(gte(uiEvents.createdAt, since30))
+      .groupBy(uiEvents.name),
+    db
+      .select({ n: sql<number>`count(*)::int`, users: sql<number>`count(distinct ${aiUsageEvents.userId})::int` })
+      .from(aiUsageEvents)
+      .where(and(eq(aiUsageEvents.kind, "voice_transcribe"), gte(aiUsageEvents.createdAt, since30))),
   ]);
+  const ev = new Map(eventRows.map((r) => [r.name, r]));
+  const evN = (name: UiEventName) => ev.get(name) ?? { n: 0, users: 0 };
+  const voiceFunnel = [
+    { label: "按下麥克風", ...evN("voice_tap") },
+    { label: "辨識成功", n: voiceOk[0]?.n ?? 0, users: voiceOk[0]?.users ?? 0 },
+  ];
+  const voiceProblems: UiEventName[] = [
+    "voice_notice_shown",
+    "voice_notice_accepted",
+    "voice_permission_denied",
+    "voice_unsupported",
+    "voice_too_short",
+    "voice_failed",
+  ];
+  const otherEvents: UiEventName[] = ["first_record_chip", "first_record_voice_chip", "quickadd_tip_dismissed"];
 
   const today = getTodayInTaipei();
   const days = Array.from({ length: DAYS }, (_, i) => formatDateInTaipei(subDays(today, DAYS - 1 - i)));
@@ -90,6 +116,25 @@ export default async function AdminAiPage() {
         </dl>
       </Panel>
 
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel title="語音使用狀況（近 30 天）">
+          <p className="mb-3 text-xs text-muted-foreground">從 2026-10-11 開始記錄。看「按下」和「成功」的落差，再看下面卡在哪一步。</p>
+          <div className="mb-4 grid grid-cols-2 gap-3">
+            {voiceFunnel.map((f) => (
+              <div key={f.label} className="flex flex-col rounded-xl bg-muted/50 px-3 py-2">
+                <span className="text-xs text-muted-foreground">{f.label}</span>
+                <span className="text-lg font-semibold tabular-nums">{f.n} 次</span>
+                <span className="text-xs text-muted-foreground">{f.users} 人</span>
+              </div>
+            ))}
+          </div>
+          <EventTable names={voiceProblems} get={evN} />
+        </Panel>
+        <Panel title="引導點擊（近 30 天）">
+          <EventTable names={otherEvents} get={evN} />
+        </Panel>
+      </div>
+
       <Panel title="本月各使用者用量">
         {usage.length === 0 ? (
           <p className="text-sm text-muted-foreground">本月還沒有人使用</p>
@@ -121,5 +166,29 @@ export default async function AdminAiPage() {
         )}
       </Panel>
     </>
+  );
+}
+
+function EventTable({
+  names,
+  get,
+}: {
+  names: UiEventName[];
+  get: (name: UiEventName) => { n: number; users: number };
+}) {
+  return (
+    <ul className="flex flex-col divide-y text-sm">
+      {names.map((name) => {
+        const { n, users } = get(name);
+        return (
+          <li key={name} className="flex items-center justify-between py-2">
+            <span>{UI_EVENT_LABELS[name]}</span>
+            <span className="tabular-nums text-muted-foreground">
+              <span className="font-medium text-foreground">{n}</span> 次・{users} 人
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

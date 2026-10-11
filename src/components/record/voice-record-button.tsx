@@ -1,11 +1,17 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics/track";
+
+// Dispatched by the first-record prompt's 「用說的試試」 chip; only the home
+// page's mic (listenForVoiceTry) responds. Dispatched synchronously from the
+// chip's click, so it still counts as a user gesture for the mic prompt.
+export const VOICE_TRY_EVENT = "jizhang:voice-try";
 
 type RecordState = "idle" | "recording" | "processing";
 
@@ -72,7 +78,15 @@ function blobToBase64(blob: Blob): Promise<string> {
 // — same idea as the native keyboard's dictation mic, no second tap needed
 // for the normal case. The button stays tappable as a manual override
 // (stop early, or force-stop if the auto-detect gets it wrong).
-export function VoiceRecordButton({ onTranscribed }: { onTranscribed: (text: string) => void }) {
+export function VoiceRecordButton({
+  onTranscribed,
+  listenForVoiceTry = false,
+  className,
+}: {
+  onTranscribed: (text: string) => void;
+  listenForVoiceTry?: boolean;
+  className?: string;
+}) {
   const [state, setState] = useState<RecordState>("idle");
   const [noticeOpen, setNoticeOpen] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -105,6 +119,7 @@ export function VoiceRecordButton({ onTranscribed }: { onTranscribed: (text: str
       const chunks = trimmed.length >= MIN_CHUNKS_TO_SEND ? trimmed : chunksRef.current;
 
       if (chunks.length < MIN_CHUNKS_TO_SEND) {
+        track("voice_too_short");
         toast.error("錄音太短，再說一次看看");
         return;
       }
@@ -123,6 +138,7 @@ export function VoiceRecordButton({ onTranscribed }: { onTranscribed: (text: str
       const { text } = (await res.json()) as { text: string };
       onTranscribed(text);
     } catch (err) {
+      track("voice_failed");
       toast.error(err instanceof Error ? err.message : "語音辨識失敗");
     } finally {
       setState("idle");
@@ -205,6 +221,7 @@ export function VoiceRecordButton({ onTranscribed }: { onTranscribed: (text: str
 
   async function startRecording() {
     if (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      track("voice_unsupported");
       toast.error("這個瀏覽器不支援錄音");
       return;
     }
@@ -228,15 +245,32 @@ export function VoiceRecordButton({ onTranscribed }: { onTranscribed: (text: str
       setState("recording");
       watchForSilence(stream);
     } catch {
+      track("voice_permission_denied");
       toast.error("無法取得麥克風權限");
     }
   }
 
   function handleMicClick() {
     if (state === "recording") return stopRecording();
-    if (!hasSeenVoiceNotice()) return setNoticeOpen(true);
+    if (state !== "idle") return;
+    track("voice_tap");
+    if (!hasSeenVoiceNotice()) {
+      track("voice_notice_shown");
+      return setNoticeOpen(true);
+    }
     void startRecording();
   }
+
+  const micClickRef = useRef(handleMicClick);
+  useEffect(() => {
+    micClickRef.current = handleMicClick;
+  });
+  useEffect(() => {
+    if (!listenForVoiceTry) return;
+    const onTry = () => micClickRef.current();
+    window.addEventListener(VOICE_TRY_EVENT, onTry);
+    return () => window.removeEventListener(VOICE_TRY_EVENT, onTry);
+  }, [listenForVoiceTry]);
 
   function acceptNotice() {
     try {
@@ -245,6 +279,7 @@ export function VoiceRecordButton({ onTranscribed }: { onTranscribed: (text: str
       // Storage blocked — the notice just shows again next time.
     }
     setNoticeOpen(false);
+    track("voice_notice_accepted");
     // Still inside the tap's user gesture, so the mic permission prompt
     // is allowed to appear.
     void startRecording();
@@ -269,18 +304,19 @@ export function VoiceRecordButton({ onTranscribed }: { onTranscribed: (text: str
         disabled={state === "processing"}
         aria-label={state === "recording" ? "停止錄音" : "語音記帳"}
         className={cn(
-          "flex size-7 shrink-0 items-center justify-center rounded-full transition-colors",
+          "flex size-8 shrink-0 items-center justify-center rounded-full transition-colors",
           state === "recording"
             ? "bg-destructive text-white animate-pulse"
-            : "text-muted-foreground hover:bg-background hover:text-foreground",
+            : "bg-primary/10 text-primary hover:bg-primary/20 active:bg-primary/25",
+          className,
         )}
       >
         {state === "processing" ? (
-          <Loader2 className="size-3.5 animate-spin" />
+          <Loader2 className="size-4 animate-spin" />
         ) : state === "recording" ? (
           <Square className="size-3 fill-current" />
         ) : (
-          <Mic className="size-3.5" strokeWidth={1.75} />
+          <Mic className="size-4" strokeWidth={2} />
         )}
       </button>
     </>

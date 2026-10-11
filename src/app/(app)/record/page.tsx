@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { requireUserId } from "@/lib/auth";
 import { hasCoreAccess } from "@/lib/entitlements";
 import { getQuickAddContext } from "@/lib/quick-add-context";
+import { getOnboardingState } from "@/lib/onboarding";
 import { QuickAddSection } from "@/components/record/quick-add-section";
 import { HomeSummarySection } from "@/components/record/home-summary-section";
 import { DueSubscriptionsSection } from "@/components/record/due-subscriptions-section";
@@ -21,9 +22,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 // actually use, and was never the slow part to begin with.
 export default async function RecordPage() {
   const userId = await requireUserId();
-  const [quickAddContext, unlocked] = await Promise.all([
+  const [quickAddContext, unlocked, onboarding] = await Promise.all([
     getQuickAddContext(userId),
     hasCoreAccess(userId),
+    getOnboardingState(userId),
   ]);
 
   return (
@@ -57,6 +59,7 @@ export default async function RecordPage() {
           accounts={quickAddContext.accounts}
           frequentSplitNames={quickAddContext.frequentSplitNames}
           sharedLocked={!unlocked}
+          showAiTip={onboarding.neverUsedAi}
         />
       </Reveal>
 

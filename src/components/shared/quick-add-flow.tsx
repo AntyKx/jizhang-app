@@ -46,7 +46,7 @@ export function SharedQuickAddFlow({
 
   return (
     <QuickAddBar
-      placeholder="晚餐 1200 元，我付的"
+      placeholder="打「晚餐 1200 我付的」，或用說的"
       onSubmit={(text) => {
         setQuickText(text);
         setShowText(true);

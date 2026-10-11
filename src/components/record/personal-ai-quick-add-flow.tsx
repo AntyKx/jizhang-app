@@ -63,6 +63,7 @@ export function PersonalAiQuickAddFlow({
           setShowText(true);
         }}
         onScanReceipt={() => setShowReceiptScan(true)}
+        listenForVoiceTry={listenForTry}
       />
 
       <BottomSheet open={showText} onOpenChange={setShowText}>
