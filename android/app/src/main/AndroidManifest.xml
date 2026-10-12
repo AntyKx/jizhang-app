@@ -57,6 +57,11 @@
          manifest permission of its own: it's a plain <input type="file">,
          resolved through Android's own camera/gallery picker intents. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Chromium's WebView refuses to open any audio input without this one
+         too ("Requires MODIFY_AUDIO_SETTINGS and RECORD_AUDIO") — even with
+         RECORD_AUDIO granted, getUserMedia gets no device. Install-time
+         permission, no prompt. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>
