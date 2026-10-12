@@ -1,60 +1,72 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { Hourglass, X } from "lucide-react";
+import { ChevronRight, Hourglass, X } from "lucide-react";
 
 const listeners = new Set<() => void>();
 
-function readDismissed(key: string) {
+function read(key: string): string | null {
   try {
-    return window.localStorage.getItem(key) === "1";
+    return window.localStorage.getItem(key);
   } catch {
-    return false;
+    return null;
   }
 }
 
-// Home-page nudge near the end of the trial (≤3 days left) and once more
-// right after it ends. Dismissal is per device: while the trial is still
-// running the key is per day, so it comes back tomorrow; the "ended" card's
-// key is per trial, so it's gone for good once closed. Hidden during SSR so
-// it can't flash for someone who already dismissed it.
+function write(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Storage blocked — it may show again next visit, which is fine.
+  }
+}
+
+const DISMISSED = "dismissed";
+
+// A heads-up on the trial's last day, and once more after it ends. Each one
+// is shown on a single day only: the first view stores that Taipei date, and
+// it stays hidden on any later day (or once closed). Informational, not a
+// sales card — the way to the upgrade page is a quiet text link. Per
+// device; hidden during SSR so it can't flash for someone who's seen it.
 export function TrialReminderCard({
   variant,
-  daysLeft,
-  dismissKey,
+  storageKey,
+  today,
   stats,
 }: {
   variant: "ending" | "ended";
-  daysLeft: number;
-  dismissKey: string;
+  storageKey: string;
+  today: string;
   stats: { label: string; value: number }[];
 }) {
-  const dismissed = useSyncExternalStore(
+  const stored = useSyncExternalStore(
     (cb) => {
       listeners.add(cb);
       return () => {
         listeners.delete(cb);
       };
     },
-    () => readDismissed(dismissKey),
-    () => true,
+    () => read(storageKey),
+    () => DISMISSED,
   );
-  if (dismissed) return null;
+  const firstView = stored === null;
+
+  useEffect(() => {
+    if (firstView) write(storageKey, today);
+  }, [firstView, storageKey, today]);
+
+  if (!(firstView || stored === today)) return null;
 
   function dismiss() {
-    try {
-      window.localStorage.setItem(dismissKey, "1");
-    } catch {
-      // Storage blocked — it just shows again next visit.
-    }
+    write(storageKey, DISMISSED);
     listeners.forEach((l) => l());
   }
 
   const shown = stats.filter((s) => s.value > 0);
 
   return (
-    <div className="relative flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+    <div className="relative flex flex-col gap-3 rounded-2xl bg-muted/50 p-4">
       <button
         type="button"
         onClick={dismiss}
@@ -65,10 +77,8 @@ export function TrialReminderCard({
       </button>
 
       <div className="flex items-center gap-2 pr-8">
-        <Hourglass className="size-4 shrink-0 text-amber-700" strokeWidth={2} />
-        <span className="text-sm font-semibold text-amber-800">
-          {variant === "ending" ? `試用還剩 ${daysLeft} 天` : "試用已結束"}
-        </span>
+        <Hourglass className="size-4 shrink-0 text-muted-foreground" strokeWidth={2} />
+        <span className="text-sm font-semibold">{variant === "ending" ? "試用快結束了" : "試用已經結束"}</span>
       </div>
 
       {shown.length > 0 && (
@@ -87,15 +97,13 @@ export function TrialReminderCard({
 
       <p className="text-sm text-pretty text-muted-foreground">
         {variant === "ending"
-          ? "到期後多帳戶、進階統計、小熊月報分析、匯出、新增分帳會鎖起來，記過的資料都會保留。"
-          : "多帳戶、進階統計、小熊月報分析、匯出、新增分帳已經鎖起來了，記過的資料都還在。"}
+          ? "結束後會回到免費版，記帳、日曆、預算都能照常用，記過的資料也都會保留。"
+          : "現在是免費版，記帳、日曆、預算都能照常用，記過的資料也都在。"}
       </p>
 
-      <Link
-        href="/upgrade"
-        className="flex h-10 items-center justify-center rounded-xl bg-primary text-sm font-medium text-primary-foreground active:bg-primary/80"
-      >
-        NT$120 一次買斷，永久解鎖
+      <Link href="/upgrade" className="flex items-center gap-0.5 self-end text-xs text-muted-foreground">
+        看看免費版和解鎖的差別
+        <ChevronRight className="size-3.5" />
       </Link>
     </div>
   );

@@ -6,12 +6,14 @@ import { TRIAL_DAYS } from "@/lib/trial";
 import { todayInTaipeiString } from "@/lib/date";
 import { TrialReminderCard } from "@/components/record/trial-reminder-card";
 
-const REMIND_DAYS_BEFORE = 3;
+// Last day of the trial, and the first days after it ends — each shown on
+// one day only (see TrialReminderCard), so it's two notices in total.
+const REMIND_DAYS_BEFORE = 1;
 const SHOW_DAYS_AFTER = 3;
 const DAY_MS = 86_400_000;
 
 // Own Suspense island on /record. Renders nothing for paid users, for
-// trials with more than 3 days left, and once the trial ended over 3 days
+// trials with more than a day left, and once the trial ended over 3 days
 // ago — so it costs one tiny settings read for almost everyone.
 export async function TrialReminderSection({ userId }: { userId: string }) {
   const [settings] = await db
@@ -22,9 +24,8 @@ export async function TrialReminderSection({ userId }: { userId: string }) {
   if (!settings || settings.hasPurchasedCore || !trialEndsAt) return null;
 
   const active = isTrialActive(trialEndsAt);
-  const daysLeft = trialDaysRemaining(trialEndsAt);
   const endedFor = daysSinceTrialEnded(trialEndsAt);
-  if (active ? daysLeft > REMIND_DAYS_BEFORE : endedFor > SHOW_DAYS_AFTER) return null;
+  if (active ? trialDaysRemaining(trialEndsAt) > REMIND_DAYS_BEFORE : endedFor > SHOW_DAYS_AFTER) return null;
 
   // What they did with the trial — the things they'd be giving up.
   const since = new Date(trialEndsAt.getTime() - TRIAL_DAYS * DAY_MS);
@@ -46,12 +47,8 @@ export async function TrialReminderSection({ userId }: { userId: string }) {
   return (
     <TrialReminderCard
       variant={active ? "ending" : "ended"}
-      daysLeft={daysLeft}
-      dismissKey={
-        active
-          ? `jizhang:trial-reminder:${todayInTaipeiString()}`
-          : `jizhang:trial-ended:${trialEndsAt.toISOString()}`
-      }
+      storageKey={`jizhang:trial-${active ? "ending" : "ended"}:${trialEndsAt.toISOString()}`}
+      today={todayInTaipeiString()}
       stats={[
         { label: "筆記帳", value: tx?.n ?? 0 },
         { label: "次一句話記帳", value: ai?.n ?? 0 },

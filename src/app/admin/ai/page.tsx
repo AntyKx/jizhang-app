@@ -59,7 +59,7 @@ export default async function AdminAiPage() {
   const otherEvents: UiEventName[] = ["first_record_chip", "first_record_voice_chip", "quickadd_tip_dismissed"];
   const upsellEvents: UiEventName[] = [
     "monthly_report_seen",
-    "monthly_report_unlock_tap",
+    "trial_report_seen",
     "locked_preview_unlock_tap",
     "account_limit_seen",
     "account_limit_unlock_tap",

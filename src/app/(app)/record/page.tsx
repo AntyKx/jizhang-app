@@ -27,11 +27,15 @@ export default async function RecordPage({
   searchParams: Promise<{ previewReport?: string }>;
 }) {
   const userId = await requireUserId();
-  // Admin-only: ?previewReport=1 (or =locked) shows 小熊月報 outside its
-  // day-of-month window, for checking the card before it goes out.
+  // Admin-only: ?previewReport=1 (or =locked / =trial) shows the home report
+  // card outside its normal window, for checking it before it goes out.
   const { previewReport } = await searchParams;
   const reportPreview =
-    previewReport && isDevAdmin(userId) ? (previewReport === "locked" ? "locked" : "unlocked") : undefined;
+    previewReport && isDevAdmin(userId)
+      ? previewReport === "locked" || previewReport === "trial"
+        ? previewReport
+        : "unlocked"
+      : undefined;
   const [quickAddContext, unlocked, onboarding] = await Promise.all([
     getQuickAddContext(userId),
     hasCoreAccess(userId),

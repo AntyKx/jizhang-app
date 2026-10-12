@@ -10,16 +10,21 @@ export type PeriodFacts = {
   txCount: number;
   income: number;
   expense: number;
-  prevIncome: number;
-  prevExpense: number;
+  // Null for a period with no natural "previous one" (the trial report).
+  prevIncome: number | null;
+  prevExpense: number | null;
   topCategories: [string, number][];
   anomalies: Awaited<ReturnType<typeof detectSpendingAnomalies>>;
 };
 
-// The numbers both AI summaries (/stats on demand, 小熊月報 on the home
-// page) are written from. Cheap — no model call — so the home card also
-// uses it for the free-tier numbers it shows without AI.
-export async function getPeriodFacts(userId: string, range: StatsRange): Promise<PeriodFacts> {
+// Any date window. A full StatsRange (week/month/year) also gets compared
+// with the period before it; a bare window (the trial so far) doesn't.
+export type ReportRange = Pick<StatsRange, "startStr" | "endStr" | "end" | "label"> & Partial<StatsRange>;
+
+// The numbers the AI summaries (/stats on demand, 小熊月報 and the trial
+// report on the home page) are written from. Cheap — no model call — so the
+// home card also uses it for the numbers it shows without AI.
+export async function getPeriodFacts(userId: string, range: ReportRange): Promise<PeriodFacts> {
   const [periodTx, prevTotals, anomalies] = await Promise.all([
     db
       .select({
@@ -37,7 +42,7 @@ export async function getPeriodFacts(userId: string, range: StatsRange): Promise
           lte(transactions.occurredAt, range.endStr),
         ),
       ),
-    getPreviousPeriodTotals(userId, range),
+    range.unit ? getPreviousPeriodTotals(userId, range as StatsRange) : null,
     detectSpendingAnomalies(userId, range.end),
   ]);
 
@@ -56,8 +61,8 @@ export async function getPeriodFacts(userId: string, range: StatsRange): Promise
     txCount: periodTx.length,
     income,
     expense,
-    prevIncome: prevTotals.income,
-    prevExpense: prevTotals.expense,
+    prevIncome: prevTotals?.income ?? null,
+    prevExpense: prevTotals?.expense ?? null,
     topCategories: [...categoryTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5),
     anomalies,
   };
@@ -67,13 +72,14 @@ export async function getPeriodFacts(userId: string, range: StatsRange): Promise
 // response. Callers are also responsible for the quota check and for
 // recordAiUsage — this only writes the text.
 export async function generatePeriodSummary(rangeLabel: string, facts: PeriodFacts): Promise<string> {
+  const prevLine =
+    facts.prevIncome === null ? "" : `\n上一期收入：${facts.prevIncome}，上一期支出：${facts.prevExpense}`;
   const { text } = await generateText({
     model: "anthropic/claude-haiku-4-5",
     prompt: `你是理財顧問，根據以下數據，用繁體中文寫一段 3-5 句話的記帳摘要，語氣自然、具體指出重點與建議，不要條列，不要客套開場白。
 
 分析區間：${rangeLabel}
-本期收入：${facts.income}，本期支出：${facts.expense}
-上一期收入：${facts.prevIncome}，上一期支出：${facts.prevExpense}
+本期收入：${facts.income}，本期支出：${facts.expense}${prevLine}
 本期支出前五大分類：${facts.topCategories.map(([name, amt]) => `${name} ${amt}`).join("、") || "無"}
 異常偏高的分類：${
       facts.anomalies.length > 0

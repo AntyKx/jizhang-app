@@ -351,16 +351,17 @@ export const aiUsageEvents = pgTable("ai_usage_events", {
   index("ai_usage_events_user_created_idx").on(table.userId, table.createdAt),
 ]);
 
-// 小熊月報: the AI paragraph for one finished month, generated once (the
-// first time a paid/trial user opens the home card) and then reused, so
-// revisiting the card never spends AI quota twice. `month` is the 1st of
-// that month.
+// 小熊月報 / 試用報告: the AI paragraph for one period, generated once (the
+// first time the home card shows it) and then reused, so revisiting the
+// card never spends AI quota twice. kind "month": `month` is the 1st of that
+// month; kind "trial": `month` is the trial's first day.
 export const monthlyReports = pgTable("monthly_reports", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: text("user_id").notNull(),
+  kind: text("kind").notNull().default("month"),
   month: date("month").notNull(),
   summary: text("summary").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
-  unique("monthly_reports_user_month_key").on(table.userId, table.month),
+  unique("monthly_reports_user_kind_month_key").on(table.userId, table.kind, table.month),
 ]);

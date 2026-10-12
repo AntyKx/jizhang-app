@@ -1,17 +1,24 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { monthlyReports } from "@/db/schema";
-import { getAiUsageStatus, hasCoreAccess, recordAiUsage } from "@/lib/entitlements";
+import { getAiUsageStatus, hasCoreAccess, isDevAdmin, recordAiUsage } from "@/lib/entitlements";
 import { generatePeriodSummary, getPeriodFacts } from "@/lib/period-summary";
-import { lastMonthRange, MONTHLY_REPORT_MIN_TX } from "@/lib/monthly-report";
+import {
+  currentTrialReportRange,
+  getCachedReport,
+  lastMonthRange,
+  MONTHLY_REPORT_MIN_TX,
+  previewTrialReportRange,
+  type ReportKind,
+} from "@/lib/monthly-report";
 
-// 小熊月報's AI paragraph for last month. The month is always derived here,
-// never taken from the request, so the endpoint can only ever produce the
-// one report the home card is showing. Generated once per user per month
-// and cached in monthly_reports; repeat calls are free.
-export async function POST() {
+// The AI paragraph for the home report card: 小熊月報 (last month) or the
+// trial report (the trial so far). The period is always derived here, never
+// taken from the request, so the endpoint can only produce the one report
+// the card is showing. Generated once and cached in monthly_reports;
+// repeat calls are free.
+export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -20,12 +27,22 @@ export async function POST() {
     return NextResponse.json({ error: "locked" }, { status: 403 });
   }
 
-  const range = lastMonthRange();
-  const [cached] = await db
-    .select({ summary: monthlyReports.summary })
-    .from(monthlyReports)
-    .where(and(eq(monthlyReports.userId, userId), eq(monthlyReports.month, range.startStr)));
-  if (cached) return NextResponse.json({ summary: cached.summary });
+  const body = (await request.json().catch(() => ({}))) as { kind?: string; preview?: boolean };
+  const kind: ReportKind = body.kind === "trial" ? "trial" : "month";
+  // Admin preview of the trial card (/record?previewReport=trial): a made-up
+  // window, so it's generated fresh and never cached.
+  const preview = kind === "trial" && body.preview === true && isDevAdmin(userId);
+  const range = preview
+    ? previewTrialReportRange()
+    : kind === "trial"
+      ? await currentTrialReportRange(userId)
+      : lastMonthRange();
+  if (!range) {
+    return NextResponse.json({ error: "not_available" }, { status: 422 });
+  }
+
+  const cached = preview ? null : await getCachedReport(userId, kind, range.startStr);
+  if (cached) return NextResponse.json({ summary: cached });
 
   const facts = await getPeriodFacts(userId, range);
   if (facts.txCount < MONTHLY_REPORT_MIN_TX) {
@@ -46,10 +63,12 @@ export async function POST() {
 
   // Two tabs racing: the unique key keeps one row, and both callers still
   // get a sensible paragraph back.
-  await db
-    .insert(monthlyReports)
-    .values({ userId, month: range.startStr, summary: text })
-    .onConflictDoNothing();
+  if (!preview) {
+    await db
+      .insert(monthlyReports)
+      .values({ userId, kind, month: range.startStr, summary: text })
+      .onConflictDoNothing();
+  }
   await recordAiUsage(userId, "monthly_summary");
 
   return NextResponse.json({ summary: text });

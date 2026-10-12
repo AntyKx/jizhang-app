@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ChevronRight, Lock, X } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import { BearIllustration } from "@/components/bear-illustration";
 import { track } from "@/lib/analytics/track";
 
@@ -16,33 +16,36 @@ function readDismissed(key: string) {
   }
 }
 
-// Stands in for the AI paragraph on the locked card. Blurred, but kept
-// truthful in case anyone squints: it describes what the report contains.
-const LOCKED_TEASER =
-  "小熊看過你上個月的每一筆記帳，整理出錢主要花在哪裡、跟前一個月比起來有什麼變化，還有下個月可以留意的小建議。";
-
-// 小熊月報 home card — see MonthlyReportSection. Dismissal is per month and
-// per device; hidden during SSR so it can't flash for someone who closed it.
+// Home report card — 小熊月報 or the one-off 試用報告, see
+// MonthlyReportSection. Content only: no price, no buy button. A free user's
+// 月報 gets the numbers plus one quiet line about the AI paragraph.
+// Dismissal is per report and per device; hidden during SSR so it can't
+// flash for someone who closed it.
 export function MonthlyReportCard({
-  monthKey,
-  monthLabel,
+  kind,
+  preview = false,
+  dismissKey,
+  title,
+  subtitle,
   expense,
-  prevExpense,
+  changePct,
   topCategory,
   unlocked,
   initialSummary,
   statsHref,
 }: {
-  monthKey: string;
-  monthLabel: string;
+  kind: "month" | "trial";
+  preview?: boolean;
+  dismissKey: string;
+  title: string;
+  subtitle: string;
   expense: number;
-  prevExpense: number;
+  changePct: number | null;
   topCategory: string | null;
   unlocked: boolean;
   initialSummary: string | null;
   statsHref: string;
 }) {
-  const dismissKey = `jizhang:monthly-report:${monthKey}`;
   const dismissed = useSyncExternalStore(
     (cb) => {
       listeners.add(cb);
@@ -60,18 +63,26 @@ export function MonthlyReportCard({
   const needsFetch = visible && unlocked && !summary;
 
   useEffect(() => {
-    if (visible) track("monthly_report_seen");
-  }, [visible]);
+    if (visible) track(kind === "trial" ? "trial_report_seen" : "monthly_report_seen");
+  }, [visible, kind]);
 
   useEffect(() => {
     if (!needsFetch) return;
     let cancelled = false;
-    fetch("/api/monthly-report", { method: "POST" })
+    fetch("/api/monthly-report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, preview }),
+    })
       .then(async (res) => {
         const body = (await res.json().catch(() => ({}))) as { summary?: string; error?: string };
         if (cancelled) return;
         if (res.ok && body.summary) setSummary(body.summary);
-        else setError(body.error && res.status !== 422 && res.status !== 403 ? body.error : "小熊暫時寫不出來，晚點再來看看。");
+        // 429/502 carry a user-facing message; anything else gets the generic one.
+        else
+          setError(
+            (res.status === 429 || res.status === 502) && body.error ? body.error : "小熊暫時寫不出來，晚點再來看看。",
+          );
       })
       .catch(() => {
         if (!cancelled) setError("網路好像不太穩，晚點再來看看。");
@@ -79,7 +90,7 @@ export function MonthlyReportCard({
     return () => {
       cancelled = true;
     };
-  }, [needsFetch]);
+  }, [needsFetch, kind, preview]);
 
   if (dismissed) return null;
 
@@ -91,8 +102,6 @@ export function MonthlyReportCard({
     }
     listeners.forEach((l) => l());
   }
-
-  const change = prevExpense > 0 ? Math.round(((expense - prevExpense) / prevExpense) * 100) : null;
 
   return (
     <div className="relative flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4">
@@ -108,8 +117,8 @@ export function MonthlyReportCard({
       <div className="flex items-center gap-3 pr-8">
         <BearIllustration name="ai-analysis" size={44} />
         <div className="flex flex-col">
-          <span className="text-sm font-semibold">{monthLabel}小熊月報</span>
-          <span className="text-xs text-muted-foreground">上個月的帳，小熊幫你整理好了</span>
+          <span className="text-sm font-semibold">{title}</span>
+          <span className="text-xs text-muted-foreground">{subtitle}</span>
         </div>
       </div>
 
@@ -117,9 +126,9 @@ export function MonthlyReportCard({
         <div className="flex flex-1 flex-col rounded-xl bg-background/70 px-3 py-2">
           <span className="text-xs text-muted-foreground">總支出</span>
           <span className="text-base font-semibold tabular-nums">NT$ {Math.round(expense).toLocaleString("zh-TW")}</span>
-          {change !== null && (
+          {changePct !== null && (
             <span className="text-xs text-muted-foreground tabular-nums">
-              比前一個月{change === 0 ? "持平" : change > 0 ? `多 ${change}%` : `少 ${-change}%`}
+              比前一個月{changePct === 0 ? "持平" : changePct > 0 ? `多 ${changePct}%` : `少 ${-changePct}%`}
             </span>
           )}
         </div>
@@ -146,19 +155,7 @@ export function MonthlyReportCard({
           )}
         </div>
       ) : (
-        <div className="relative overflow-hidden rounded-xl bg-background/70">
-          <p aria-hidden className="px-3 py-2.5 text-sm leading-relaxed blur-[5px] select-none">
-            {LOCKED_TEASER}
-          </p>
-          <Link
-            href="/upgrade?from=monthly-report"
-            onClick={() => track("monthly_report_unlock_tap")}
-            className="absolute inset-0 flex items-center justify-center gap-1.5 text-sm font-medium text-primary"
-          >
-            <Lock className="size-4" />
-            解鎖看小熊幫你寫的分析
-          </Link>
-        </div>
+        <p className="text-xs text-muted-foreground">解鎖後，小熊每個月會幫你寫一段分析。</p>
       )}
 
       <Link href={statsHref} className="flex items-center justify-end gap-0.5 text-xs text-muted-foreground">
