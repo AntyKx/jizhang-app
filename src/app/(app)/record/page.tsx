@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { requireUserId } from "@/lib/auth";
-import { hasCoreAccess } from "@/lib/entitlements";
+import { hasCoreAccess, isDevAdmin } from "@/lib/entitlements";
 import { getQuickAddContext } from "@/lib/quick-add-context";
 import { getOnboardingState } from "@/lib/onboarding";
 import { QuickAddSection } from "@/components/record/quick-add-section";
@@ -21,8 +21,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 // second DB round trip), so it renders synchronously instead of behind its
 // own boundary — it's the part of the home page a user opens it to
 // actually use, and was never the slow part to begin with.
-export default async function RecordPage() {
+export default async function RecordPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ previewReport?: string }>;
+}) {
   const userId = await requireUserId();
+  // Admin-only: ?previewReport=1 (or =locked) shows 小熊月報 outside its
+  // day-of-month window, for checking the card before it goes out.
+  const { previewReport } = await searchParams;
+  const reportPreview =
+    previewReport && isDevAdmin(userId) ? (previewReport === "locked" ? "locked" : "unlocked") : undefined;
   const [quickAddContext, unlocked, onboarding] = await Promise.all([
     getQuickAddContext(userId),
     hasCoreAccess(userId),
@@ -51,7 +60,7 @@ export default async function RecordPage() {
       </Suspense>
 
       <Suspense fallback={null}>
-        <MonthlyReportSection userId={userId} />
+        <MonthlyReportSection userId={userId} preview={reportPreview} />
       </Suspense>
 
       <Suspense fallback={null}>

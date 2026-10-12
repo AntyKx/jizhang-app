@@ -12,11 +12,19 @@ import { MonthlyReportCard } from "@/components/record/monthly-report-card";
 // numbers; the AI paragraph is the unlocked part (the card fetches and
 // caches it on first view, see /api/monthly-report). Outside that window it
 // returns before touching the DB.
-export async function MonthlyReportSection({ userId }: { userId: string }) {
-  if (getTodayInTaipei().getDate() > MONTHLY_REPORT_SHOW_UNTIL_DAY) return null;
+export async function MonthlyReportSection({
+  userId,
+  preview,
+}: {
+  userId: string;
+  // Admin preview (see /record): ignores the day window and dismissal, and
+  // "locked" forces the free-tier card.
+  preview?: "unlocked" | "locked";
+}) {
+  if (!preview && getTodayInTaipei().getDate() > MONTHLY_REPORT_SHOW_UNTIL_DAY) return null;
 
   const range = lastMonthRange();
-  const [facts, unlocked, [cached]] = await Promise.all([
+  const [facts, hasAccess, [cached]] = await Promise.all([
     getPeriodFacts(userId, range),
     hasCoreAccess(userId),
     db
@@ -25,10 +33,11 @@ export async function MonthlyReportSection({ userId }: { userId: string }) {
       .where(and(eq(monthlyReports.userId, userId), eq(monthlyReports.month, range.startStr))),
   ]);
   if (facts.txCount < MONTHLY_REPORT_MIN_TX) return null;
+  const unlocked = preview === "locked" ? false : hasAccess;
 
   return (
     <MonthlyReportCard
-      monthKey={range.startStr}
+      monthKey={preview ? `preview-${preview}` : range.startStr}
       monthLabel={`${range.start.getMonth() + 1} 月`}
       expense={facts.expense}
       prevExpense={facts.prevExpense}
