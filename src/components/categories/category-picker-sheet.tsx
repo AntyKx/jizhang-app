@@ -13,8 +13,8 @@ export type PickerCategory = { id: string; name: string; icon?: string | null; c
 // dropdown renders every category as a single-column list, which gets very
 // tall and covers the rest of the form once a user has 10+ categories (real
 // user feedback, screenshot showed the list swallowing the whole edit
-// dialog). This opens the same bear-icon grid the record screen already
-// uses instead, in a bottom sheet — many columns, no endless scrolling, and
+// dialog). This opens the same category-icon grid (Lucide line icons)
+// the record screen already uses instead, in a bottom sheet — many columns, no endless scrolling, and
 // visually consistent with the rest of the app's category pickers.
 export function CategoryPickerSheet({
   categories,
