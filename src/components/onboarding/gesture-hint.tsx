@@ -12,15 +12,19 @@ export function GestureHint({
   children,
   onDismiss,
   className,
+  caretClassName = "left-8",
 }: {
   icon: React.ReactNode;
   children: React.ReactNode;
   onDismiss: () => void;
   className?: string;
+  // Where the caret sits, so it can point at a control that isn't at the
+  // left edge (e.g. the mic button in the quick-add bar).
+  caretClassName?: string;
 }) {
   return (
     <div role="note" className={cn("relative mt-2 animate-in fade-in slide-in-from-top-1 duration-300", className)}>
-      <span className="absolute -top-1.5 left-8 size-3 rotate-45 rounded-[2px] bg-foreground" aria-hidden />
+      <span className={cn("absolute -top-1.5 size-3 rotate-45 rounded-[2px] bg-foreground", caretClassName)} aria-hidden />
       <div className="relative flex items-center gap-2.5 rounded-2xl bg-foreground py-2.5 pl-3 pr-2 text-sm text-background shadow-lg">
         <span className="shrink-0 opacity-90">{icon}</span>
         <span className="min-w-0 flex-1 text-pretty">{children}</span>
@@ -54,6 +58,26 @@ function subscribeHints(onChange: () => void) {
   };
 }
 
+// Whether a one-time hint/badge was already dismissed on this device. Hidden
+// during SSR (server snapshot = dismissed) so it can't flash for users who
+// already dismissed it.
+export function useHintDismissed(id: string) {
+  return useSyncExternalStore(
+    subscribeHints,
+    () => readDismissed(id),
+    () => true,
+  );
+}
+
+export function dismissHint(id: string) {
+  try {
+    window.localStorage.setItem(HINT_STORAGE_PREFIX + id, "1");
+  } catch {
+    // Storage blocked — the hint just comes back next visit.
+  }
+  hintListeners.forEach((l) => l());
+}
+
 // GestureHint that shows until dismissed once on this device. Remembered in
 // localStorage rather than the DB: re-seeing a tip after reinstalling is
 // harmless, and it keeps every hint free of a server round trip. Hidden
@@ -64,33 +88,26 @@ export function OneTimeHint({
   icon,
   children,
   className,
+  caretClassName,
   onDismiss,
 }: {
   id: string;
   icon: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  caretClassName?: string;
   onDismiss?: () => void;
 }) {
-  const dismissed = useSyncExternalStore(
-    subscribeHints,
-    () => readDismissed(id),
-    () => true,
-  );
+  const dismissed = useHintDismissed(id);
   if (dismissed) return null;
 
   function dismiss() {
-    try {
-      window.localStorage.setItem(HINT_STORAGE_PREFIX + id, "1");
-    } catch {
-      // Storage blocked — the hint just comes back next visit.
-    }
-    hintListeners.forEach((l) => l());
+    dismissHint(id);
     onDismiss?.();
   }
 
   return (
-    <GestureHint icon={icon} onDismiss={dismiss} className={className}>
+    <GestureHint icon={icon} onDismiss={dismiss} className={className} caretClassName={caretClassName}>
       {children}
     </GestureHint>
   );

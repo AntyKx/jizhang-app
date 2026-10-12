@@ -7,6 +7,7 @@ import { OneTimeHint } from "@/components/onboarding/gesture-hint";
 import { track } from "@/lib/analytics/track";
 import { QuickAddCategoryFlow } from "@/components/record/quick-add-category-flow";
 import { PersonalAiQuickAddFlow } from "@/components/record/personal-ai-quick-add-flow";
+import { VoiceFixedHint } from "@/components/record/voice-fixed-hint";
 import type { QuickAddAccount, QuickAddCategory } from "@/lib/quick-add-context";
 
 // The AI bar + category grid — split out of the old monolithic RecordScreen
@@ -23,6 +24,8 @@ export function QuickAddSection({
   frequentSplitNames,
   sharedLocked,
   showAiTip = false,
+  showVoiceFixedTip = false,
+  previewVoiceFixedTip = false,
 }: {
   categories: QuickAddCategory[];
   accounts: QuickAddAccount[];
@@ -31,6 +34,11 @@ export function QuickAddSection({
   // Records by hand but has never used one-line quick-add — point at the
   // bar above the category grid once (see getOnboardingState).
   showAiTip?: boolean;
+  // Has never had a recording transcribed — VoiceFixedHint then decides on
+  // the device whether this is an Android app that couldn't record before.
+  showVoiceFixedTip?: boolean;
+  // Admin-only ?previewTip=voice: show it on any device.
+  previewVoiceFixedTip?: boolean;
 }) {
   const searchParams = useSearchParams();
 
@@ -49,7 +57,14 @@ export function QuickAddSection({
         initialShowScan={searchParams.get("action") === "scan"}
         listenForTry
       />
-      {showAiTip && (
+      {/* At most one tip under the bar: the first-AI-use tip already points
+          at the mic, so the voice one waits until that's out of the way. */}
+      {previewVoiceFixedTip ? (
+        <VoiceFixedHint preview />
+      ) : (
+        !showAiTip && showVoiceFixedTip && <VoiceFixedHint />
+      )}
+      {showAiTip && !previewVoiceFixedTip && (
         <OneTimeHint
           id="quickadd-discover"
           icon={<Mic className="size-4" />}

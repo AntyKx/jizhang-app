@@ -16,6 +16,8 @@ export const UI_EVENT_LABELS = {
   locked_preview_unlock_tap: "鎖定統計點「解鎖」",
   account_limit_seen: "新增第 2 個帳戶被擋",
   account_limit_unlock_tap: "帳戶上限點「解鎖」",
+  voice_fixed_tip_dismissed: "關閉「語音修好了」提示",
+  batch_scan_open: "打開連續掃描發票",
 } as const;
 
 export type UiEventName = keyof typeof UI_EVENT_LABELS;

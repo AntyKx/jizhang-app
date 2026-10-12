@@ -24,12 +24,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default async function RecordPage({
   searchParams,
 }: {
-  searchParams: Promise<{ previewReport?: string }>;
+  searchParams: Promise<{ previewReport?: string; previewTip?: string }>;
 }) {
   const userId = await requireUserId();
   // Admin-only: ?previewReport=1 (or =locked / =trial) shows the home report
   // card outside its normal window, for checking it before it goes out.
-  const { previewReport } = await searchParams;
+  // ?previewTip=voice likewise shows the 「語音記帳修好了」 tip on any device.
+  const { previewReport, previewTip } = await searchParams;
+  const previewVoiceFixedTip = previewTip === "voice" && isDevAdmin(userId);
   const reportPreview =
     previewReport && isDevAdmin(userId)
       ? previewReport === "locked" || previewReport === "trial"
@@ -78,6 +80,8 @@ export default async function RecordPage({
           frequentSplitNames={quickAddContext.frequentSplitNames}
           sharedLocked={!unlocked}
           showAiTip={onboarding.neverUsedAi}
+          showVoiceFixedTip={onboarding.neverUsedVoice}
+          previewVoiceFixedTip={previewVoiceFixedTip}
         />
       </Reveal>
 

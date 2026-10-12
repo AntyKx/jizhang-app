@@ -31,6 +31,11 @@ import { cn } from "@/lib/utils";
 import { AiParsedNote } from "@/components/record/ai-parsed-note";
 import { readInvoiceFromFile } from "@/lib/einvoice/find-qr";
 import { InvoiceBatchScan } from "@/components/record/invoice-batch-scan";
+import { dismissHint, useHintDismissed } from "@/components/onboarding/gesture-hint";
+import { track } from "@/lib/analytics/track";
+
+// 「新」 badge on 連續掃描發票 until it's opened once on this device.
+const BATCH_SCAN_NEW_BADGE = "batch-scan-new";
 
 type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
 type Account = { id: string; name: string; type: AccountType; currency: string };
@@ -81,6 +86,7 @@ export function ReceiptScanQuickAdd({
   const [invoiceNumber, setInvoiceNumber] = useState<string | null>(null);
   const [alreadyRecordedOn, setAlreadyRecordedOn] = useState<string | null>(null);
   const [batchMode, setBatchMode] = useState(false);
+  const batchScanSeen = useHintDismissed(BATCH_SCAN_NEW_BADGE);
 
   // Revoke the object URL when it's replaced or the component unmounts, so
   // repeated scans in one session don't leak blob URLs.
@@ -254,14 +260,25 @@ export function ReceiptScanQuickAdd({
       {!previewUrl && (
         <button
           type="button"
-          onClick={() => setBatchMode(true)}
+          onClick={() => {
+            dismissHint(BATCH_SCAN_NEW_BADGE);
+            track("batch_scan_open");
+            setBatchMode(true);
+          }}
           className="flex items-center gap-3 rounded-2xl bg-muted/50 p-4 text-left transition-colors hover:bg-muted"
         >
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
             <ScanLine className="size-5" />
           </span>
           <span className="flex flex-col">
-            <span className="text-sm font-medium">連續掃描發票</span>
+            <span className="flex items-center gap-1.5 text-sm font-medium">
+              連續掃描發票
+              {!batchScanSeen && (
+                <span className="rounded-full bg-primary px-1.5 py-px text-[10px] font-semibold leading-4 text-primary-foreground">
+                  新
+                </span>
+              )}
+            </span>
             <span className="text-xs text-muted-foreground">一疊電子發票一次掃完，最後一起確認</span>
           </span>
         </button>
