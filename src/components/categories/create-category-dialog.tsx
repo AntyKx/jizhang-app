@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createCategory } from "@/app/(app)/categories/actions";
 import { IconPicker } from "@/components/categories/icon-picker";
-import { cn } from "@/lib/utils";
+import { TypeToggle } from "@/components/record/type-toggle";
 
 export function CreateCategoryDialog() {
   const [open, setOpen] = useState(false);
@@ -69,32 +69,7 @@ export function CreateCategoryDialog() {
             />
           </div>
 
-          <div className="flex items-center justify-center gap-2 rounded-full bg-muted p-1">
-            <button
-              type="button"
-              onClick={() => setType("expense")}
-              className={cn(
-                "flex-1 rounded-full py-2 text-sm font-medium transition-colors",
-                type === "expense"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground",
-              )}
-            >
-              支出
-            </button>
-            <button
-              type="button"
-              onClick={() => setType("income")}
-              className={cn(
-                "flex-1 rounded-full py-2 text-sm font-medium transition-colors",
-                type === "income"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground",
-              )}
-            >
-              收入
-            </button>
-          </div>
+          <TypeToggle value={type} onChange={setType} />
 
           <IconPicker
             icon={icon}

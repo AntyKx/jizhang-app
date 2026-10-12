@@ -21,11 +21,11 @@ import { StaggerList } from "@/components/motion/stagger-list";
 import { SlidingIndicator } from "@/components/motion/sliding-indicator";
 import { type PaymentMethod } from "@/lib/payment-methods";
 import { accountTypeToPaymentMethod } from "@/lib/account-type";
-import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { PaymentMethodField } from "@/components/record/payment-method-field";
 import { todayInTaipeiString } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import type { QuickAddAccount, QuickAddCategory } from "@/lib/quick-add-context";
+import { AccountChips } from "@/components/accounts/account-chips";
 
 function bounceDown(e: React.PointerEvent<HTMLElement>) {
   gsap.to(e.currentTarget, { scale: 0.94, duration: 0.12, ease: "power2.out" });
@@ -390,24 +390,11 @@ export function QuickAddCategoryFlow({
               {!isTheirs && accounts.length > 1 && (
                 <div className="flex flex-col gap-2">
                   <Label>帳戶</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {accounts.map((a) => (
-                      <button
-                        key={a.id}
-                        type="button"
-                        onClick={() => selectAccount(a)}
-                        className={cn(
-                          "flex items-center gap-1 rounded-full px-3 py-1.5 text-sm transition-colors",
-                          accountId === a.id
-                            ? "bg-primary/10 text-primary"
-                            : "bg-muted/60 text-muted-foreground hover:bg-muted",
-                        )}
-                      >
-                        <AccountTypeIcon type={a.type} className="size-3.5" />
-                        {a.name}
-                      </button>
-                    ))}
-                  </div>
+                  <AccountChips
+                    accounts={accounts}
+                    value={accountId}
+                    onChange={selectAccount}
+                  />
                 </div>
               )}
 

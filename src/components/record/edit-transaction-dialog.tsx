@@ -11,13 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
 import { DeleteConfirmFooter } from "@/components/ui/delete-confirm-footer";
 import { deleteTransaction, updateTransaction } from "@/app/(app)/transactions/actions";
@@ -27,9 +20,9 @@ import { SplitExpenseField, computeSplitOverflow, type SplitParticipantDraft } f
 import { type PaymentMethod } from "@/lib/payment-methods";
 import { accountTypeToPaymentMethod, type AccountType } from "@/lib/account-type";
 import { currencyAllowsDecimal } from "@/lib/currency";
-import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { PaymentMethodField } from "@/components/record/payment-method-field";
-import { cn } from "@/lib/utils";
+import { TypeToggle } from "@/components/record/type-toggle";
+import { AccountChips } from "@/components/accounts/account-chips";
 
 type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
 type Account = { id: string; name: string; type: AccountType; currency: string };
@@ -179,28 +172,16 @@ export function EditTransactionDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
               <Label>類型</Label>
-              <Select
-                items={{ expense: "支出", income: "收入" }}
+              <TypeToggle
                 value={type}
-                onValueChange={(v) => {
-                  if (!v || v === type) return;
-                  setType(v as "income" | "expense");
-                  // The old category belongs to the old type — a category
-                  // is always exactly one type, so it can never be valid
-                  // for the other one. Leaving it set would silently save
-                  // a type/category mismatch if the user doesn't reopen the
-                  // category picker.
+                onChange={(v) => {
+                  setType(v);
+                  // A category always belongs to exactly one type — the
+                  // previously selected one can't be valid after switching,
+                  // so clear it instead of silently saving a mismatch.
                   setCategoryId("");
                 }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="expense">支出</SelectItem>
-                  <SelectItem value="income">收入</SelectItem>
-                </SelectContent>
-              </Select>
+              />
             </div>
             <div className="flex flex-col gap-2">
               <Label>金額</Label>
@@ -217,35 +198,22 @@ export function EditTransactionDialog({
             <CategoryPickerSheet categories={relevantCategories} value={categoryId} onChange={setCategoryId} />
           </div>
 
+          {accounts.length > 1 && (
+            <div className="flex flex-col gap-2">
+              <Label>帳戶</Label>
+              <AccountChips
+                accounts={accounts}
+                value={accountId}
+                onChange={selectAccount}
+              />
+            </div>
+          )}
+
           <PaymentMethodField
             accountType={accounts.find((a) => a.id === accountId)?.type}
             value={paymentMethod}
             onChange={setPaymentMethod}
           />
-
-          {accounts.length > 1 && (
-            <div className="flex flex-col gap-2">
-              <Label>帳戶</Label>
-              <div className="flex flex-wrap gap-2">
-                {accounts.map((a) => (
-                  <button
-                    key={a.id}
-                    type="button"
-                    onClick={() => selectAccount(a)}
-                    className={cn(
-                      "flex items-center gap-1 rounded-full px-3 py-1.5 text-sm transition-colors",
-                      accountId === a.id
-                        ? "bg-primary/10 text-primary"
-                        : "bg-muted/60 text-muted-foreground hover:bg-muted",
-                    )}
-                  >
-                    <AccountTypeIcon type={a.type} className="size-3.5" />
-                    {a.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {type === "expense" && splitLocked && (
             <p className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
@@ -265,6 +233,11 @@ export function EditTransactionDialog({
           )}
 
           <div className="flex flex-col gap-2">
+            <Label htmlFor="edit-note">備註</Label>
+            <Input id="edit-note" value={note} onChange={(e) => setNote(e.target.value)} />
+          </div>
+
+          <div className="flex flex-col gap-2">
             <Label htmlFor="edit-date">日期</Label>
             <Input
               id="edit-date"
@@ -272,11 +245,6 @@ export function EditTransactionDialog({
               value={occurredAt}
               onChange={(e) => setOccurredAt(e.target.value)}
             />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="edit-note">備註</Label>
-            <Input id="edit-note" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
         </div>
 

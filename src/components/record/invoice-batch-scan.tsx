@@ -9,13 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
-import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { createTransaction } from "@/app/(app)/transactions/actions";
 import { isFail } from "@/lib/action-result";
 import { accountTypeToPaymentMethod, type AccountType } from "@/lib/account-type";
 import { itemsToNote, parseEInvoice, type EInvoice } from "@/lib/einvoice/qr";
 import { readInvoiceFromFile, scanForInvoiceCodes } from "@/lib/einvoice/find-qr";
 import { cn } from "@/lib/utils";
+import { AccountChips } from "@/components/accounts/account-chips";
 
 type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
 type Account = { id: string; name: string; type: AccountType; currency: string };
@@ -282,22 +282,11 @@ export function InvoiceBatchScan({
         {accounts.length > 1 && (
           <div className="flex flex-col gap-2">
             <Label>全部記到</Label>
-            <div className="flex flex-wrap gap-2">
-              {accounts.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() => setAccountId(a.id)}
-                  className={cn(
-                    "flex items-center gap-1 rounded-full px-3 py-1.5 text-sm transition-colors",
-                    accountId === a.id ? "bg-primary/10 text-primary" : "bg-muted/60 text-muted-foreground hover:bg-muted",
-                  )}
-                >
-                  <AccountTypeIcon type={a.type} className="size-3.5" />
-                  {a.name}
-                </button>
-              ))}
-            </div>
+            <AccountChips
+              accounts={accounts}
+              value={accountId}
+              onChange={(a) => setAccountId(a.id)}
+            />
           </div>
         )}
 

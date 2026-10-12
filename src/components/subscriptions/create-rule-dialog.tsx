@@ -24,11 +24,11 @@ import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
 import { PaymentMethodField } from "@/components/record/payment-method-field";
-import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { type PaymentMethod } from "@/lib/payment-methods";
 import { accountTypeToPaymentMethod, type AccountType } from "@/lib/account-type";
 import { currencyAllowsDecimal } from "@/lib/currency";
-import { cn } from "@/lib/utils";
+import { TypeToggle } from "@/components/record/type-toggle";
+import { AccountChips } from "@/components/accounts/account-chips";
 
 type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
 type Account = { id: string; name: string; type: AccountType; currency: string };
@@ -89,28 +89,17 @@ export function CreateRuleDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="type">類型</Label>
-              <Select
-                name="type"
+              <Label>類型</Label>
+              <TypeToggle name="type"
                 value={type}
-                onValueChange={(v) => {
-                  if (!v || v === type) return;
-                  setType(v as "income" | "expense");
+                onChange={(v) => {
+                  setType(v);
                   // A category always belongs to exactly one type — the
                   // previously selected one can't be valid after switching,
                   // so clear it instead of silently saving a mismatch.
                   setCategoryId("");
                 }}
-                items={{ expense: "支出", income: "收入" }}
-              >
-                <SelectTrigger id="type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="expense">支出</SelectItem>
-                  <SelectItem value="income">收入</SelectItem>
-                </SelectContent>
-              </Select>
+              />
             </div>
             <div className="flex flex-col gap-2">
               <Label>金額</Label>
@@ -154,6 +143,17 @@ export function CreateRuleDialog({
             <input type="hidden" name="categoryId" value={categoryId} />
           </div>
 
+          {accounts.length > 1 && (
+            <div className="flex flex-col gap-2">
+              <Label>帳戶</Label>
+              <AccountChips
+                accounts={accounts}
+                value={accountId}
+                onChange={selectAccount}
+              />
+            </div>
+          )}
+
           <div className="flex flex-col gap-2">
             <PaymentMethodField
               accountType={accounts.find((a) => a.id === accountId)?.type}
@@ -162,30 +162,6 @@ export function CreateRuleDialog({
             />
             <input type="hidden" name="paymentMethod" value={paymentMethod} />
           </div>
-
-          {accounts.length > 1 && (
-            <div className="flex flex-col gap-2">
-              <Label>帳戶</Label>
-              <div className="flex flex-wrap gap-2">
-                {accounts.map((a) => (
-                  <button
-                    key={a.id}
-                    type="button"
-                    onClick={() => selectAccount(a)}
-                    className={cn(
-                      "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm transition-colors",
-                      accountId === a.id
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-muted",
-                    )}
-                  >
-                    <AccountTypeIcon type={a.type} className="size-3.5" />
-                    {a.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
           <input type="hidden" name="accountId" value={accountId} />
 
           <Button type="submit" disabled={!amount || Number(amount) <= 0}>

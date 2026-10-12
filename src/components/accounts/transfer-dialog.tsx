@@ -13,20 +13,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { createTransfer } from "@/app/(app)/transactions/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { type AccountType } from "@/lib/account-type";
 import { currencyAllowsDecimal } from "@/lib/currency";
-import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { todayInTaipeiString } from "@/lib/date";
+import { AccountChips } from "@/components/accounts/account-chips";
 
 type Account = { id: string; name: string; type: AccountType; currency: string };
 
@@ -91,58 +84,22 @@ export function TransferDialog({ accounts }: { accounts: Account[] }) {
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
-              <Label>從</Label>
-              <Select
-                value={fromId}
-                onValueChange={(v) => {
-                  if (!v) return;
-                  setFromId(v);
-                  const newFromCurrency = accounts.find((a) => a.id === v)?.currency;
-                  if (toId === v || accounts.find((a) => a.id === toId)?.currency !== newFromCurrency) {
-                    setToId(accounts.find((a) => a.id !== v && a.currency === newFromCurrency)?.id ?? "");
-                  }
-                }}
-                items={Object.fromEntries(accounts.map((a) => [a.id, a.name]))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      <span className="flex items-center gap-1.5">
-                        <AccountTypeIcon type={a.type} className="size-3.5" />
-                        {a.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>到</Label>
-              <Select
-                value={toId}
-                onValueChange={(v) => v && setToId(v)}
-                items={Object.fromEntries(toOptions.map((a) => [a.id, a.name]))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {toOptions.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      <span className="flex items-center gap-1.5">
-                        <AccountTypeIcon type={a.type} className="size-3.5" />
-                        {a.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="flex flex-col gap-2">
+            <Label>從</Label>
+            <AccountChips
+              accounts={accounts}
+              value={fromId}
+              onChange={(a) => {
+                setFromId(a.id);
+                if (toId === a.id || accounts.find((x) => x.id === toId)?.currency !== a.currency) {
+                  setToId(accounts.find((x) => x.id !== a.id && x.currency === a.currency)?.id ?? "");
+                }
+              }}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label>到</Label>
+            <AccountChips accounts={toOptions} value={toId} onChange={(a) => setToId(a.id)} />
           </div>
 
           <div className="flex flex-col gap-2">

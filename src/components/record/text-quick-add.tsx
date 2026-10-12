@@ -7,13 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { createTransaction, deleteTransaction } from "@/app/(app)/transactions/actions";
 import { createSplitExpense, deleteSplitExpense } from "@/app/(app)/shared/actions";
 import { isFail } from "@/lib/action-result";
@@ -23,7 +16,6 @@ import { type PaymentMethod } from "@/lib/payment-methods";
 import { accountTypeToPaymentMethod, type AccountType } from "@/lib/account-type";
 import { currencyAllowsDecimal } from "@/lib/currency";
 import { PaymentMethodField } from "@/components/record/payment-method-field";
-import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import {
   SplitExpenseField,
   computeSplitOverflow,
@@ -31,8 +23,9 @@ import {
   type SplitParticipantDraft,
 } from "@/components/record/split-expense-field";
 import { todayInTaipeiString } from "@/lib/date";
-import { cn } from "@/lib/utils";
 import { AiParsedNote } from "@/components/record/ai-parsed-note";
+import { TypeToggle } from "@/components/record/type-toggle";
+import { AccountChips } from "@/components/accounts/account-chips";
 
 type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
 type Account = { id: string; name: string; type: AccountType; currency: string };
@@ -329,26 +322,16 @@ export function TextQuickAdd({
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
               <Label>類型</Label>
-              <Select
-                items={{ expense: "支出", income: "收入" }}
+              <TypeToggle
                 value={draft.type}
-                onValueChange={(v) => {
-                  if (!v || v === draft.type) return;
-                  setDraft({ ...draft, type: v as "income" | "expense" });
+                onChange={(v) => {
+                  setDraft({ ...draft, type: v });
                   // A category always belongs to exactly one type — the
                   // previously selected one can't be valid after switching,
                   // so clear it instead of silently saving a mismatch.
                   setCategoryId("");
                 }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="expense">支出</SelectItem>
-                  <SelectItem value="income">收入</SelectItem>
-                </SelectContent>
-              </Select>
+              />
             </div>
             <div className="flex flex-col gap-2">
               <Label>金額</Label>
@@ -371,39 +354,26 @@ export function TextQuickAdd({
             <CategoryPickerSheet categories={relevantCategories} value={categoryId} onChange={setCategoryId} />
           </div>
 
+          {!isTheirs && accounts.length > 1 && (
+            <div className="flex flex-col gap-2">
+              <Label>帳戶</Label>
+              <AccountChips
+                accounts={accounts}
+                value={accountId}
+                onChange={(a) => {
+                  setAccountId(a.id);
+                  setDraft({ ...draft, paymentMethod: accountTypeToPaymentMethod[a.type] });
+                }}
+              />
+            </div>
+          )}
+
           {!isTheirs && (
             <PaymentMethodField
               accountType={accounts.find((a) => a.id === accountId)?.type}
               value={draft.paymentMethod}
               onChange={(paymentMethod) => setDraft({ ...draft, paymentMethod })}
             />
-          )}
-
-          {!isTheirs && accounts.length > 1 && (
-            <div className="flex flex-col gap-2">
-              <Label>帳戶</Label>
-              <div className="flex flex-wrap gap-2">
-                {accounts.map((a) => (
-                  <button
-                    key={a.id}
-                    type="button"
-                    onClick={() => {
-                      setAccountId(a.id);
-                      setDraft({ ...draft, paymentMethod: accountTypeToPaymentMethod[a.type] });
-                    }}
-                    className={cn(
-                      "flex items-center gap-1 rounded-full px-3 py-1.5 text-sm transition-colors",
-                      accountId === a.id
-                        ? "bg-primary/10 text-primary"
-                        : "bg-muted/60 text-muted-foreground hover:bg-muted",
-                    )}
-                  >
-                    <AccountTypeIcon type={a.type} className="size-3.5" />
-                    {a.name}
-                  </button>
-                ))}
-              </div>
-            </div>
           )}
 
           {draft.type === "expense" && (
