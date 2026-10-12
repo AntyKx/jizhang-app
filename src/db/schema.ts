@@ -228,9 +228,13 @@ export const transactions = pgTable("transactions", {
     (): AnyPgColumn => sharedExpenses.id,
     { onDelete: "set null" },
   ),
+  // E-invoice number (AB12345678) when the row came from scanning an
+  // invoice's QR code — lets a second scan of the same invoice be caught.
+  invoiceNumber: text("invoice_number"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("transactions_user_occurred_at_idx").on(table.userId, table.occurredAt),
+  index("transactions_user_invoice_idx").on(table.userId, table.invoiceNumber),
   index("transactions_user_account_idx").on(table.userId, table.accountId),
   index("transactions_user_category_idx").on(table.userId, table.categoryId),
 ]);

@@ -10,6 +10,10 @@ import { listAccounts } from "@/lib/account";
 import { getTodayInTaipei } from "@/lib/date";
 import { getAiUsageStatus, recordAiUsage } from "@/lib/entitlements";
 import { suggestCategoryForMerchant } from "@/lib/merchant-category-memory";
+import { describeItemsForPrompt, eInvoiceSchema } from "@/lib/einvoice/schema";
+import { itemsToNote } from "@/lib/einvoice/qr";
+import { lookupSellerNames } from "@/lib/einvoice/seller-name";
+import { findRecordedInvoices } from "@/app/(app)/transactions/actions";
 
 const receiptScanSchema = z.object({
   amount: z.number().positive().describe("收據上的總金額，純數字"),
@@ -39,10 +43,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { imageBase64, mediaType } = await req.json();
+  const { imageBase64, mediaType, invoice: rawInvoice } = await req.json();
   if (!imageBase64 || typeof imageBase64 !== "string") {
     return NextResponse.json({ error: "missing image" }, { status: 400 });
   }
+  // Decoded on the phone from the e-invoice's QR codes (lib/einvoice) when
+  // the photo has them: exact amount, date, invoice number and items.
+  const invoiceParsed = rawInvoice ? eInvoiceSchema.safeParse(rawInvoice) : null;
+  const invoice = invoiceParsed?.success ? invoiceParsed.data : null;
 
   const usage = await getAiUsageStatus(userId, "receipt_scan");
   if (!usage.allowed) {
@@ -53,7 +61,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: message }, { status: 429 });
   }
 
-  const [expenseCategories, userAccounts] = await Promise.all([
+  const [expenseCategories, userAccounts, sellerNames, recorded] = await Promise.all([
     db
       .select({ name: categories.name })
       .from(categories)
@@ -61,7 +69,19 @@ export async function POST(req: Request) {
         and(eq(categories.type, "expense"), eq(categories.userId, userId)),
       ),
     listAccounts(userId),
+    invoice ? lookupSellerNames([invoice.sellerId]) : null,
+    invoice ? findRecordedInvoices([invoice.invoiceNumber]) : [],
   ]);
+  const sellerName = invoice ? (sellerNames?.get(invoice.sellerId) ?? null) : null;
+  const invoiceHint = invoice
+    ? `
+
+這是一張電子發票，以下是從 QR Code 讀到的準確資料，金額和日期以此為準：
+日期 ${invoice.date}、總金額 ${invoice.total}
+賣方公司登記名稱：${sellerName ?? "（查不到）"}
+品項：${describeItemsForPrompt(invoice.items)}
+商家請寫一般人熟悉的店名（例如「統一超商股份有限公司」寫「7-ELEVEN」），照片上有店名就以照片為準；分類請參考品項判斷。`
+    : "";
 
   const today = format(getTodayInTaipei(), "yyyy-MM-dd");
 
@@ -81,19 +101,34 @@ export async function POST(req: Request) {
 可用分類清單：${expenseCategories.map((c) => c.name).join("、")}
 可用帳戶清單：${userAccounts.map((a) => a.name).join("、")}
 
-請仔細看清楚金額（通常是「總計」「合計」「應付金額」旁的數字，不是單項價格），分類須完全符合上述清單其中之一，否則為 null。`,
+請仔細看清楚金額（通常是「總計」「合計」「應付金額」旁的數字，不是單項價格），分類須完全符合上述清單其中之一，否則為 null。${invoiceHint}`,
           },
           { type: "file", mediaType: mediaType || "image/jpeg", data: imageBase64 },
         ],
       },
     ],
   }).catch(() => null);
-  if (!generated) {
+  if (!generated && !invoice) {
     return NextResponse.json({ error: "收據辨識失敗，請換一張清楚的照片再試，或手動記帳" }, { status: 502 });
   }
-  const { object } = generated;
+  if (generated) await recordAiUsage(userId, "receipt_scan");
 
-  await recordAiUsage(userId, "receipt_scan");
+  // With a QR code, its numbers win over what the model read off the paper,
+  // and the items become the note. If the model failed, the QR data alone
+  // still fills in everything but the category.
+  const object = invoice
+    ? {
+        paymentMethod: "cash" as const,
+        accountName: null,
+        categoryName: null,
+        note: null,
+        ...generated?.object,
+        merchant: generated?.object.merchant ?? sellerName,
+        amount: invoice.total,
+        occurredAt: invoice.date,
+        ...(itemsToNote(invoice.items) ? { note: itemsToNote(invoice.items) } : {}),
+      }
+    : generated!.object;
 
   // Prefer how this user has actually categorized this merchant before over
   // the model's fresh guess — no extra AI call, and it's more trustworthy
@@ -101,5 +136,9 @@ export async function POST(req: Request) {
   const rememberedCategory = await suggestCategoryForMerchant(userId, object.merchant, "expense");
   const result = rememberedCategory ? { ...object, categoryName: rememberedCategory } : object;
 
-  return NextResponse.json({ result });
+  return NextResponse.json({
+    result,
+    invoiceNumber: invoice?.invoiceNumber ?? null,
+    alreadyRecordedOn: recorded[0]?.occurredAt ?? null,
+  });
 }

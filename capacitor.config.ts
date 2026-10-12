@@ -8,6 +8,10 @@ const config: CapacitorConfig = {
   appId: "com.anty.jizhang",
   appName: "小熊記帳本",
   webDir: "public",
+  // Tells the web app this build's WebView can open a live camera
+  // (MainActivity grants CAMERA) — older installs fall back to photos for
+  // 連續掃描發票 (see invoice-batch-scan.tsx).
+  appendUserAgent: "JizhangLiveCamera",
   server: {
     // Clerk's dev instances (pk_test_* keys) needed a cross-domain
     // "dev browser" handshake through their own accounts.dev host. Moving to

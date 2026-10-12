@@ -72,6 +72,8 @@ export const backupSchema = z.object({
       merchant: z.string().nullable(),
       occurredAt: z.string(),
       recurringRuleId: z.string().uuid().nullable(),
+      // Optional: backups made before invoice scanning don't have it.
+      invoiceNumber: z.string().nullable().optional(),
     }),
   ),
   budgets: z.array(

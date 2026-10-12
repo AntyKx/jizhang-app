@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { toast } from "sonner";
-import { Camera } from "lucide-react";
+import { Camera, QrCode, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +29,8 @@ import { compressImageToBase64 } from "@/lib/compress-image";
 import { todayInTaipeiString } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import { AiParsedNote } from "@/components/record/ai-parsed-note";
+import { readInvoiceFromFile } from "@/lib/einvoice/find-qr";
+import { InvoiceBatchScan } from "@/components/record/invoice-batch-scan";
 
 type Category = { id: string; name: string; icon: string | null; color: string | null; type: "income" | "expense" };
 type Account = { id: string; name: string; type: AccountType; currency: string };
@@ -75,6 +77,10 @@ export function ReceiptScanQuickAdd({
   const [isSharedExpense, setIsSharedExpense] = useState(false);
   const [splitParticipants, setSplitParticipants] = useState<SplitParticipantDraft[]>([]);
   const [pending, setPending] = useState(false);
+  // Set when the photo's e-invoice QR code was read (see lib/einvoice).
+  const [invoiceNumber, setInvoiceNumber] = useState<string | null>(null);
+  const [alreadyRecordedOn, setAlreadyRecordedOn] = useState<string | null>(null);
+  const [batchMode, setBatchMode] = useState(false);
 
   // Revoke the object URL when it's replaced or the component unmounts, so
   // repeated scans in one session don't leak blob URLs.
@@ -88,12 +94,17 @@ export function ReceiptScanQuickAdd({
     setPreviewUrl(URL.createObjectURL(file));
     setParsing(true);
     setParseFailed(false);
+    setInvoiceNumber(null);
+    setAlreadyRecordedOn(null);
     try {
-      const { base64, mediaType } = await compressImageToBase64(file);
+      const [{ base64, mediaType }, invoice] = await Promise.all([
+        compressImageToBase64(file),
+        readInvoiceFromFile(file),
+      ]);
       const res = await fetch("/api/receipt-scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: base64, mediaType }),
+        body: JSON.stringify({ imageBase64: base64, mediaType, invoice }),
       });
       if (!res.ok) {
         if (res.status === 429) {
@@ -102,9 +113,13 @@ export function ReceiptScanQuickAdd({
         }
         throw new Error("解析失敗");
       }
-      const { result } = (await res.json()) as {
+      const { result, invoiceNumber: scannedNumber, alreadyRecordedOn: recordedOn } = (await res.json()) as {
         result: Omit<Draft, "type">;
+        invoiceNumber: string | null;
+        alreadyRecordedOn: string | null;
       };
+      setInvoiceNumber(scannedNumber);
+      setAlreadyRecordedOn(recordedOn);
       const matchedAccount = accounts.find((a) => a.name === result.accountName);
       const resolvedAccountId = matchedAccount?.id ?? defaultAccountId;
       setAccountId(resolvedAccountId);
@@ -159,6 +174,7 @@ export function ReceiptScanQuickAdd({
           merchant: draft.merchant ?? undefined,
           note: draft.note ?? undefined,
           occurredAt: draft.occurredAt,
+          invoiceNumber: invoiceNumber ?? undefined,
           splitParticipants:
             draft.type === "expense" && isSharedExpense
               ? splitParticipants.map((p) => ({ name: p.name, amount: Number(p.amount) }))
@@ -184,6 +200,18 @@ export function ReceiptScanQuickAdd({
         setPending(false);
       }
     })();
+  }
+
+  if (batchMode) {
+    return (
+      <InvoiceBatchScan
+        categories={categories}
+        accounts={accounts}
+        defaultAccountId={defaultAccountId}
+        onDone={onDone}
+        onCancel={() => setBatchMode(false)}
+      />
+    );
   }
 
   return (
@@ -219,7 +247,24 @@ export function ReceiptScanQuickAdd({
         </button>
       )}
       {!previewUrl && (
-        <p className="text-center text-xs text-muted-foreground">照片會傳給 AI 服務辨識，辨識完不會保存原始照片</p>
+        <p className="text-center text-xs text-muted-foreground">
+          電子發票會自動讀 QR Code 的金額和品項。照片會傳給 AI 服務辨識，辨識完不會保存原始照片
+        </p>
+      )}
+      {!previewUrl && (
+        <button
+          type="button"
+          onClick={() => setBatchMode(true)}
+          className="flex items-center gap-3 rounded-2xl bg-muted/50 p-4 text-left transition-colors hover:bg-muted"
+        >
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <ScanLine className="size-5" />
+          </span>
+          <span className="flex flex-col">
+            <span className="text-sm font-medium">連續掃描發票</span>
+            <span className="text-xs text-muted-foreground">一疊電子發票一次掃完，最後一起確認</span>
+          </span>
+        </button>
       )}
 
       {previewUrl && (
@@ -256,7 +301,18 @@ export function ReceiptScanQuickAdd({
               ⚠️ 沒解析成功，請對照照片手動補金額和分類
             </p>
           ) : (
-            <AiParsedNote />
+            <AiParsedNote fields={invoiceNumber ? "分類" : undefined} />
+          )}
+          {invoiceNumber && (
+            <p className="flex items-center gap-1.5 text-xs text-emerald-700">
+              <QrCode className="size-3.5" />
+              金額、日期、品項已從發票 QR Code 讀取（{invoiceNumber}）
+            </p>
+          )}
+          {alreadyRecordedOn && (
+            <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-sm text-amber-800">
+              這張發票在 {alreadyRecordedOn} 已經記過了
+            </p>
           )}
 
           <div className="grid grid-cols-2 gap-3">
@@ -346,11 +402,21 @@ export function ReceiptScanQuickAdd({
           )}
 
           <div className="flex flex-col gap-2">
-            <Label>商家 / 備註</Label>
+            <Label>商家</Label>
             <Input
-              value={draft.merchant ?? draft.note ?? ""}
-              onChange={(e) => setDraft({ ...draft, merchant: e.target.value, note: null })}
+              value={draft.merchant ?? ""}
+              onChange={(e) => setDraft({ ...draft, merchant: e.target.value })}
               placeholder="例：全聯"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label>備註</Label>
+            <Input
+              value={draft.note ?? ""}
+              onChange={(e) => setDraft({ ...draft, note: e.target.value })}
+              placeholder="例：品項、用途"
+              maxLength={200}
             />
           </div>
 
@@ -367,6 +433,7 @@ export function ReceiptScanQuickAdd({
             onClick={handleConfirm}
             disabled={
               pending ||
+              Boolean(alreadyRecordedOn) ||
               !draft.amount ||
               draft.amount <= 0 ||
               (isSharedExpense && computeSplitOverflow(amountText, splitParticipants) > 0)

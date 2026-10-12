@@ -62,6 +62,7 @@ const createTransactionSchema = z.object({
   // can collapse multiple settlements of the same event into one display
   // group (see src/lib/transactions/group-settlements.ts).
   linkedSharedExpenseId: z.string().uuid().optional(),
+  invoiceNumber: z.string().regex(/^[A-Z]{2}\d{8}$/).optional(),
 });
 
 export async function createTransaction(input: {
@@ -81,9 +82,14 @@ export async function createTransaction(input: {
   // createSplitExpense for that standalone case instead.
   splitParticipants?: { name: string; amount: number }[];
   linkedSharedExpenseId?: string;
+  // From a scanned e-invoice QR code; the same invoice can't be recorded twice.
+  invoiceNumber?: string;
 }) {
   const userId = await requireUserId();
   const parsed = createTransactionSchema.parse(input);
+  if (parsed.invoiceNumber && (await findRecordedInvoices([parsed.invoiceNumber])).length > 0) {
+    return fail(`發票 ${parsed.invoiceNumber} 已經記過了`);
+  }
   const { accountId } = parsed;
   const categoryId = await ownedCategoryId(userId, parsed.categoryId);
 
@@ -129,6 +135,7 @@ export async function createTransaction(input: {
       merchant: parsed.merchant,
       occurredAt: parsed.occurredAt,
       linkedSharedExpenseId,
+      invoiceNumber: parsed.invoiceNumber,
     })
     .returning({ id: transactions.id });
   const updateAccountBalance = db
@@ -652,4 +659,16 @@ export async function loadMoreTransactions(cursor: TransactionsCursor, filter?: 
     nextCursor:
       mightHaveMore && last ? { occurredAt: last.occurredAt, createdAt: last.createdAt } : null,
   };
+}
+
+// Which of these e-invoice numbers this user has already recorded — for
+// flagging repeats in the receipt/invoice scan review before saving.
+export async function findRecordedInvoices(invoiceNumbers: string[]) {
+  const userId = await requireUserId();
+  const numbers = z.array(z.string().regex(/^[A-Z]{2}\d{8}$/)).max(100).parse(invoiceNumbers);
+  if (numbers.length === 0) return [];
+  return db
+    .select({ invoiceNumber: transactions.invoiceNumber, occurredAt: transactions.occurredAt })
+    .from(transactions)
+    .where(and(eq(transactions.userId, userId), inArray(transactions.invoiceNumber, numbers)));
 }

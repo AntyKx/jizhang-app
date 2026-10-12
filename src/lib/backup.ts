@@ -89,6 +89,7 @@ export async function buildBackup(userId: string) {
         merchant: transactions.merchant,
         occurredAt: transactions.occurredAt,
         recurringRuleId: transactions.recurringRuleId,
+        invoiceNumber: transactions.invoiceNumber,
       })
       .from(transactions)
       .where(eq(transactions.userId, userId)),
