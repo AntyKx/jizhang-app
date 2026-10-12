@@ -28,7 +28,13 @@ const CARET = "right-[82px]";
 export function VoiceFixedHint({ preview = false }: { preview?: boolean }) {
   const eligible = useSyncExternalStore(noopSubscribe, isFixedAndroidApp, () => false);
   const [previewClosed, setPreviewClosed] = useState(false);
-  const content = "語音記帳修好了！按麥克風說「午餐 150」試試看";
+  const content = (
+    <>
+      語音記帳修好了！
+      <br />
+      按麥克風說「午餐 150」試試看
+    </>
+  );
 
   // Admin preview: shown on any device and never remembered as dismissed,
   // so reloading brings it back.
