@@ -16,7 +16,9 @@ import { lookupSellerNames } from "@/lib/einvoice/seller-name";
 import { findRecordedInvoices } from "@/app/(app)/transactions/actions";
 
 const receiptScanSchema = z.object({
-  amount: z.number().positive().describe("收據上的總金額，純數字"),
+  // Nullable for the same reason as quick-add: a photo that isn't a receipt
+  // would otherwise come back with an invented total.
+  amount: z.number().positive().nullable().describe("收據上的總金額，純數字；照片不是收據或看不到金額就是 null，不要猜"),
   categoryName: z
     .string()
     .nullable()
@@ -112,6 +114,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "收據辨識失敗，請換一張清楚的照片再試，或手動記帳" }, { status: 502 });
   }
   if (generated) await recordAiUsage(userId, "receipt_scan");
+  if (!invoice && generated?.object.amount == null) {
+    return NextResponse.json({ error: "看不出這張照片的金額，請拍清楚收據的總計，或手動記帳" }, { status: 422 });
+  }
 
   // With a QR code, its numbers win over what the model read off the paper,
   // and the items become the note. If the model failed, the QR data alone
@@ -128,7 +133,7 @@ export async function POST(req: Request) {
         occurredAt: invoice.date,
         ...(itemsToNote(invoice.items) ? { note: itemsToNote(invoice.items) } : {}),
       }
-    : generated!.object;
+    : { ...generated!.object, amount: generated!.object.amount! };
 
   // Prefer how this user has actually categorized this merchant before over
   // the model's fresh guess — no extra AI call, and it's more trustworthy
