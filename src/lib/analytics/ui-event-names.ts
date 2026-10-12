@@ -7,6 +7,7 @@ export const UI_EVENT_LABELS = {
   voice_permission_denied: "麥克風權限被拒",
   voice_unsupported: "裝置不支援錄音",
   voice_too_short: "錄音太短",
+  voice_no_speech: "錄音沒聽到聲音",
   voice_failed: "語音辨識失敗",
   first_record_chip: "點新手範例句",
   first_record_voice_chip: "點新手「用說的試試」",

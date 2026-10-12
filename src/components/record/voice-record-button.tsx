@@ -31,6 +31,9 @@ const SILENCE_DURATION_MS = 1500;
 // Safety cap so a noisy environment that never reads as "silent" can't
 // record forever.
 const MAX_RECORDING_MS = 30000;
+// Tapped the mic but never said anything — stop on our own instead of
+// waiting out MAX_RECORDING_MS, and don't send the silence (see below).
+const NO_SPEECH_TIMEOUT_MS = 6000;
 // How often MediaRecorder hands us a chunk — also the granularity at which
 // trailing silence can be trimmed off before sending audio for transcription.
 const CHUNK_MS = 250;
@@ -103,6 +106,14 @@ export function VoiceRecordButton({
   // the reaction-time gap between tapping the button and actually talking,
   // same rationale as the trailing trim above.
   const speechStartIndexRef = useRef<number | null>(null);
+  // Whether the level meter actually ran (AudioContext available and not
+  // suspended) and whether it ever heard anything above the silence floor.
+  // Sending a silent clip makes the transcription model invent text — often
+  // the example sentence from its own prompt — which then parses into a
+  // real-looking entry. Only skip sending when the meter really ran, so a
+  // device where it can't run still gets transcribed as before.
+  const meterRanRef = useRef(false);
+  const heardSpeechRef = useRef(false);
 
   async function handleRecordingDone() {
     setState("processing");
@@ -117,6 +128,12 @@ export function VoiceRecordButton({
           : chunksRef.current.length;
       const trimmed = chunksRef.current.slice(start, end);
       const chunks = trimmed.length >= MIN_CHUNKS_TO_SEND ? trimmed : chunksRef.current;
+
+      if (meterRanRef.current && !heardSpeechRef.current) {
+        track("voice_no_speech");
+        toast.error("沒有聽到聲音，再說一次看看");
+        return;
+      }
 
       if (chunks.length < MIN_CHUNKS_TO_SEND) {
         track("voice_too_short");
@@ -183,6 +200,13 @@ export function VoiceRecordButton({
         return;
       }
 
+      // A suspended context reads as flat silence; don't let that count as
+      // "measured and silent".
+      if (audioContext.state !== "running") {
+        requestAnimationFrame(tick);
+        return;
+      }
+      meterRanRef.current = true;
       analyser.getByteTimeDomainData(data);
       let sumSquares = 0;
       for (let i = 0; i < data.length; i++) {
@@ -195,6 +219,7 @@ export function VoiceRecordButton({
       if (rms > SILENCE_THRESHOLD) {
         if (!hasSpoken) speechStartIndexRef.current = chunksRef.current.length;
         hasSpoken = true;
+        heardSpeechRef.current = true;
         silenceStartedAt = null;
         silenceStartIndexRef.current = null;
       } else if (hasSpoken) {
@@ -208,7 +233,7 @@ export function VoiceRecordButton({
         }
       }
 
-      if (now - startedAt > MAX_RECORDING_MS) {
+      if (now - startedAt > MAX_RECORDING_MS || (!hasSpoken && now - startedAt > NO_SPEECH_TIMEOUT_MS)) {
         closeAudioContext();
         stopRecording();
         return;
@@ -233,6 +258,8 @@ export function VoiceRecordButton({
       chunksRef.current = [];
       silenceStartIndexRef.current = null;
       speechStartIndexRef.current = null;
+      meterRanRef.current = false;
+      heardSpeechRef.current = false;
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };

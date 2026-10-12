@@ -3,6 +3,33 @@ import { transcribe } from "ai";
 import { auth } from "@clerk/nextjs/server";
 import { getAiUsageStatus, recordAiUsage } from "@/lib/entitlements";
 
+const TRANSCRIBE_PROMPT =
+  "這是記帳用的中文語音輸入，內容通常是金額、商家、消費項目，例如：午餐麥當勞120元刷卡、水果攤買芭樂50元、傳統市場買菜200元現金。";
+
+// Phrases speech models are known to produce from silence or noise (they
+// were trained on subtitled video), never something said to a ledger app.
+// Not bare "訂閱": "Netflix 訂閱 390" is a real entry.
+const HALLUCINATION_MARKERS = ["字幕", "訂閱頻道", "訂閱我", "點贊", "點讚", "謝謝觀看", "感謝觀看", "感謝收看", "amara", "請不吝"];
+
+function normalize(text: string) {
+  return text.toLowerCase().replace(/[\s，。、,.!?！？:：；;「」"'（）()]/g, "");
+}
+
+const NORMALIZED_PROMPT = normalize(TRANSCRIBE_PROMPT);
+
+// Given near-silent audio the model tends to echo back its own prompt —
+// usually one of the example entries, which then parses into a perfectly
+// plausible fake record. Treat any output that's just a piece of the prompt,
+// or a known subtitle-style hallucination, as "heard nothing".
+function looksHallucinated(text: string) {
+  const n = normalize(text);
+  if (!n) return true;
+  // Length floor so a real short entry that happens to overlap an example
+  // ("買菜200元") still goes through; every full example is longer.
+  if (n.length >= 8 && NORMALIZED_PROMPT.includes(n)) return true;
+  return HALLUCINATION_MARKERS.some((m) => n.includes(m));
+}
+
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) {
@@ -55,8 +82,7 @@ export async function POST(req: Request) {
       providerOptions: {
         openai: {
           language: "zh",
-          prompt:
-            "這是記帳用的中文語音輸入，內容通常是金額、商家、消費項目，例如：午餐麥當勞120元刷卡、水果攤買芭樂50元、傳統市場買菜200元現金。",
+          prompt: TRANSCRIBE_PROMPT,
         },
       },
     });
@@ -65,7 +91,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "語音辨識失敗，請再試一次" }, { status: 502 });
   }
 
-  if (!text) {
+  if (!text || looksHallucinated(text)) {
+    // Still counted: the transcription call was made and paid for.
+    if (text) await recordAiUsage(userId, "voice_transcribe");
     return NextResponse.json({ error: "沒有聽到聲音，再說一次看看" }, { status: 422 });
   }
 
