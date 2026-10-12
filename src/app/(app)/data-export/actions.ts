@@ -9,10 +9,12 @@ import {
   aiUsageEvents,
   budgets,
   categories,
+  monthlyReports,
   recurringRules,
   savingsGoals,
   sharedExpenses,
   transactions,
+  uiEvents,
   userSettings,
 } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
@@ -41,6 +43,8 @@ function deleteLedgerContent(userId: string) {
     db.delete(savingsGoals).where(eq(savingsGoals.userId, userId)),
     db.delete(accounts).where(eq(accounts.userId, userId)),
     db.delete(categories).where(eq(categories.userId, userId)),
+    // Written from the ledger, so it goes with it.
+    db.delete(monthlyReports).where(eq(monthlyReports.userId, userId)),
   ] as const;
 }
 
@@ -78,6 +82,7 @@ export async function deleteAccountData() {
   await db.batch([
     ...deleteLedgerContent(userId),
     db.delete(aiUsageEvents).where(eq(aiUsageEvents.userId, userId)),
+    db.delete(uiEvents).where(eq(uiEvents.userId, userId)),
     db.delete(userSettings).where(eq(userSettings.userId, userId)),
   ]);
   await deleteAllSnapshots(userId);

@@ -57,6 +57,13 @@ export default async function AdminAiPage() {
     "voice_failed",
   ];
   const otherEvents: UiEventName[] = ["first_record_chip", "first_record_voice_chip", "quickadd_tip_dismissed"];
+  const upsellEvents: UiEventName[] = [
+    "monthly_report_seen",
+    "monthly_report_unlock_tap",
+    "locked_preview_unlock_tap",
+    "account_limit_seen",
+    "account_limit_unlock_tap",
+  ];
 
   const today = getTodayInTaipei();
   const days = Array.from({ length: DAYS }, (_, i) => formatDateInTaipei(subDays(today, DAYS - 1 - i)));
@@ -132,6 +139,10 @@ export default async function AdminAiPage() {
         </Panel>
         <Panel title="引導點擊（近 30 天）">
           <EventTable names={otherEvents} get={evN} />
+        </Panel>
+        <Panel title="解鎖引導（近 30 天）">
+          <p className="mb-3 text-xs text-muted-foreground">從 2026-10-12 開始記錄。點「解鎖」只代表進了升級頁，實際購買看「付費」頁。</p>
+          <EventTable names={upsellEvents} get={evN} />
         </Panel>
       </div>
 

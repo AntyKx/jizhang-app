@@ -11,6 +11,11 @@ export const UI_EVENT_LABELS = {
   first_record_chip: "點新手範例句",
   first_record_voice_chip: "點新手「用說的試試」",
   quickadd_tip_dismissed: "關閉一句話記帳提示",
+  monthly_report_seen: "看到小熊月報",
+  monthly_report_unlock_tap: "月報點「解鎖」",
+  locked_preview_unlock_tap: "鎖定統計點「解鎖」",
+  account_limit_seen: "新增第 2 個帳戶被擋",
+  account_limit_unlock_tap: "帳戶上限點「解鎖」",
 } as const;
 
 export type UiEventName = keyof typeof UI_EVENT_LABELS;

@@ -127,7 +127,7 @@ export function GuideBody() {
       </GuideSection>
 
       <GuideSection id="account" icon={<UserCog {...iconProps} />} title="帳號與升級" summary="一次買斷，不用訂閱" bear="secure-login" href="/upgrade" hrefLabel="查看升級方案">
-        <p>新帳號有 {TRIAL_DAYS} 天全功能試用。升級一次買斷，解鎖多帳戶、進階統計、匯出和分帳。</p>
+        <p>新帳號有 {TRIAL_DAYS} 天全功能試用。升級一次買斷，解鎖多帳戶、進階統計、小熊月報分析、匯出和分帳。每月前 10 天，首頁會出現上個月的小熊月報。</p>
       </GuideSection>
     </div>
   );

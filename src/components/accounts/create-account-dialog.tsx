@@ -26,9 +26,23 @@ import { accountTypeLabels, type AccountType } from "@/lib/account-type";
 import { currencyAllowsDecimal, supportedCurrencies } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import { StatementDayPicker } from "@/components/accounts/statement-day-picker";
+import { AccountLimitUpsell } from "@/components/upgrade/account-limit-upsell";
+import { useCoreUnlocked } from "@/components/core-access-context";
+import { track } from "@/lib/analytics/track";
 
-export function CreateAccountDialog({ defaultCurrency = "TWD" }: { defaultCurrency?: string }) {
+export function CreateAccountDialog({
+  defaultCurrency = "TWD",
+  accountCount,
+}: {
+  defaultCurrency?: string;
+  // All accounts incl. archived — the same count the server gate in
+  // createAccount uses.
+  accountCount: number;
+}) {
   const [open, setOpen] = useState(false);
+  // Past the free tier's one account: show what more accounts are for
+  // instead of a form that would only fail with a toast after filling it in.
+  const locked = !useCoreUnlocked() && accountCount >= 1;
   const [type, setType] = useState<AccountType>("bank");
   const [currency, setCurrency] = useState(defaultCurrency);
   const [initialBalance, setInitialBalance] = useState("");
@@ -37,12 +51,21 @@ export function CreateAccountDialog({ defaultCurrency = "TWD" }: { defaultCurren
   const formRef = useRef<HTMLFormElement>(null);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next && locked) track("account_limit_seen");
+        setOpen(next);
+      }}
+    >
       <DialogTrigger render={<Button />}>新增帳戶</DialogTrigger>
       <DialogContent className="max-h-[calc(100dvh-2rem)]">
         <DialogHeader>
-          <DialogTitle>新增帳戶</DialogTitle>
+          <DialogTitle>{locked ? "把錢分開記，更清楚" : "新增帳戶"}</DialogTitle>
         </DialogHeader>
+        {locked ? (
+          <AccountLimitUpsell />
+        ) : (
         <form
           ref={formRef}
           action={async (formData) => {
@@ -144,6 +167,7 @@ export function CreateAccountDialog({ defaultCurrency = "TWD" }: { defaultCurren
 
           <Button type="submit">建立</Button>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );

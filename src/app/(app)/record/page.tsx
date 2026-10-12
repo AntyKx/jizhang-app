@@ -7,6 +7,7 @@ import { QuickAddSection } from "@/components/record/quick-add-section";
 import { HomeSummarySection } from "@/components/record/home-summary-section";
 import { DueSubscriptionsSection } from "@/components/record/due-subscriptions-section";
 import { TrialReminderSection } from "@/components/record/trial-reminder-section";
+import { MonthlyReportSection } from "@/components/record/monthly-report-section";
 import { TodayTransactionsSection } from "@/components/record/today-transactions-section";
 import { Reveal } from "@/components/motion/reveal";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,6 +48,10 @@ export default async function RecordPage() {
           banner and the AI quick-add row whenever nothing's due. */}
       <Suspense fallback={null}>
         <TrialReminderSection userId={userId} />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <MonthlyReportSection userId={userId} />
       </Suspense>
 
       <Suspense fallback={null}>

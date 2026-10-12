@@ -1,5 +1,6 @@
 import { requireUserId } from "@/lib/auth";
-import { requireCoreAccess } from "@/lib/entitlements";
+import { hasCoreAccess } from "@/lib/entitlements";
+import { LockedPreview } from "@/components/upgrade/locked-preview";
 import { resolveStatsRange } from "@/lib/stats/range";
 import { getIncomeExpenseTrend } from "@/lib/stats/overview-queries";
 import { getNetWorthTrend } from "@/lib/stats/networth-queries";
@@ -24,8 +25,10 @@ export default async function StatsAdvancedPage({
   searchParams: Promise<{ range?: string; date?: string }>;
 }) {
   const userId = await requireUserId();
-  await requireCoreAccess(userId, "stats-advanced");
   const params = await searchParams;
+  // Not a redirect: free users see their own data blurred under the unlock
+  // card (LockedPreview), which sells it far better than a feature list.
+  const unlocked = await hasCoreAccess(userId);
   const range = resolveStatsRange(params);
 
   const [netWorthTrend, incomeExpenseTrend, savingsTrend, monthComparison, highlights] = await Promise.all([
@@ -41,6 +44,7 @@ export default async function StatsAdvancedPage({
       <StatsTabNav active="/stats/advanced" />
       <StatsRangeSwitcher basePath="/stats/advanced" range={range} />
 
+      <LockedPreview unlocked={unlocked} from="stats-advanced" title="解鎖「趨勢」分析" points={["淨資產、收支、儲蓄率的長期走勢", "每個月跟上個月比，一眼看出變化", "年度亮點，回顧你這一年"]}>
       <StaggerList className="flex flex-col gap-6">
         <section className="flex flex-col gap-2">
           <h2 className="text-sm font-semibold text-muted-foreground">淨資產趨勢</h2>
@@ -71,6 +75,7 @@ export default async function StatsAdvancedPage({
           <PeriodHighlightsGrid data={highlights} rangeLabel={range.label} />
         </section>
       </StaggerList>
+      </LockedPreview>
     </>
   );
 }

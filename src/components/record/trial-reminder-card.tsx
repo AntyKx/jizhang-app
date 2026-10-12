@@ -87,8 +87,8 @@ export function TrialReminderCard({
 
       <p className="text-sm text-pretty text-muted-foreground">
         {variant === "ending"
-          ? "到期後多帳戶、進階統計、匯出、新增分帳會鎖起來，記過的資料都會保留。"
-          : "多帳戶、進階統計、匯出、新增分帳已經鎖起來了，記過的資料都還在。"}
+          ? "到期後多帳戶、進階統計、小熊月報分析、匯出、新增分帳會鎖起來，記過的資料都會保留。"
+          : "多帳戶、進階統計、小熊月報分析、匯出、新增分帳已經鎖起來了，記過的資料都還在。"}
       </p>
 
       <Link

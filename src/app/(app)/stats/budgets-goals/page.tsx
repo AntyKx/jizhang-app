@@ -2,7 +2,8 @@ import { and, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { budgets, categories, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
-import { requireCoreAccess } from "@/lib/entitlements";
+import { hasCoreAccess } from "@/lib/entitlements";
+import { LockedPreview } from "@/components/upgrade/locked-preview";
 import { resolveStatsRange } from "@/lib/stats/range";
 import { getBudgetVsActualTrend, getSavingsGoalsSnapshot } from "@/lib/stats/budget-goal-queries";
 import { Progress } from "@/components/ui/progress";
@@ -19,8 +20,10 @@ export default async function StatsBudgetsGoalsPage({
   searchParams: Promise<{ range?: string; date?: string }>;
 }) {
   const userId = await requireUserId();
-  await requireCoreAccess(userId, "stats-budgets-goals");
   const params = await searchParams;
+  // Not a redirect: free users see their own data blurred under the unlock
+  // card (LockedPreview), which sells it far better than a feature list.
+  const unlocked = await hasCoreAccess(userId);
   const range = resolveStatsRange(params);
 
   const [rangeTransactions, monthBudgets, goals, budgetTrend] = await Promise.all([
@@ -69,6 +72,7 @@ export default async function StatsBudgetsGoalsPage({
       <StatsTabNav active="/stats/budgets-goals" />
       <StatsRangeSwitcher basePath="/stats/budgets-goals" range={range} />
 
+      <LockedPreview unlocked={unlocked} from="stats-budgets-goals" title="解鎖「預算目標」統計" points={["近 6 個月預算 vs 實際花費", "每個分類預算用了多少", "儲蓄目標進度一次看"]}>
       <StaggerList className="flex flex-col gap-6">
         <section className="flex flex-col gap-2">
           <h2 className="text-sm font-semibold text-muted-foreground">整體預算 vs 實際（近 6 個月）</h2>
@@ -127,6 +131,7 @@ export default async function StatsBudgetsGoalsPage({
           </section>
         )}
       </StaggerList>
+      </LockedPreview>
     </>
   );
 }

@@ -97,7 +97,7 @@ export default async function AccountsPage() {
               accounts={accounts.map((a) => ({ id: a.id, name: a.name, type: a.type, currency: a.currency }))}
             />
           )}
-          <CreateAccountDialog defaultCurrency={defaultCurrency} />
+          <CreateAccountDialog defaultCurrency={defaultCurrency} accountCount={allAccounts.length} />
         </div>
       </div>
 
