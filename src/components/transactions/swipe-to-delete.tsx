@@ -49,6 +49,12 @@ export function SwipeToDelete({
     longPressFired: false,
   });
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A plain tap is recognized on pointerup but only acted on in the click
+  // that follows. Opening the edit dialog right on pointerup let the
+  // browser's follow-up click land on whatever the new dialog put under the
+  // finger — focusing 備註 (keyboard pops up) or silently flipping an account
+  // or payment-method chip.
+  const tapPending = useRef(false);
 
   function clearLongPressTimer() {
     if (longPressTimer.current) {
@@ -58,6 +64,7 @@ export function SwipeToDelete({
   }
 
   function handlePointerDown(e: React.PointerEvent) {
+    tapPending.current = false;
     if (disabled || actionsWidth === 0) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -117,6 +124,12 @@ export function SwipeToDelete({
       setOffset(0);
       return;
     }
+    tapPending.current = true;
+  }
+
+  function handleClick() {
+    if (!tapPending.current) return;
+    tapPending.current = false;
     onTap?.();
   }
 
@@ -155,7 +168,11 @@ export function SwipeToDelete({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        onPointerCancel={() => {
+          handlePointerUp();
+          tapPending.current = false;
+        }}
+        onClick={handleClick}
         onKeyDown={
           onTap
             ? (e) => {
