@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { resolveExportUser } from "@/lib/export-link";
 import { getExportTransactions, toCsv } from "@/lib/export";
 import { todayInTaipeiString } from "@/lib/date";
 import { requireCoreAccessApi } from "@/lib/entitlements";
 
-export async function GET() {
-  const { userId } = await auth();
+export async function GET(request: Request) {
+  const userId = await resolveExportUser(request, "csv");
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const gate = await requireCoreAccessApi(userId);

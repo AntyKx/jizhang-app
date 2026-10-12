@@ -12,7 +12,10 @@ import { getAiUsageStatus, recordAiUsage } from "@/lib/entitlements";
 import { suggestCategoryForMerchant } from "@/lib/merchant-category-memory";
 
 const quickAddSchema = z.object({
-  amount: z.number().positive().describe("交易金額，純數字"),
+  // Nullable on purpose: with a required positive number the model has to
+  // invent an amount for input that has none ("你好", or noise a voice clip
+  // turned into words), and that invented draft looks perfectly real.
+  amount: z.number().positive().nullable().describe("交易金額，純數字；句子裡完全沒有提到金額就是 null，不要猜"),
   type: z.enum(["income", "expense"]).describe("收入或支出"),
   categoryName: z
     .string()
@@ -120,6 +123,12 @@ export async function POST(req: Request) {
   }
 
   await recordAiUsage(userId, "quick_add");
+
+  // No amount in the sentence — the client then keeps the text and opens the
+  // manual form instead of showing a made-up draft.
+  if (object.amount === null) {
+    return NextResponse.json({ error: "no amount" }, { status: 422 });
+  }
 
   // Prefer how this user has actually categorized this merchant before over
   // the model's fresh guess — no extra AI call, and it's more trustworthy

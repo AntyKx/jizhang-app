@@ -14,6 +14,7 @@ import { CloudSnapshotList } from "@/components/data-export/cloud-snapshot-list"
 import { DeleteAllDataDialog } from "@/components/data-export/delete-all-data-dialog";
 import { RestoreBackupDialog } from "@/components/data-export/restore-backup-dialog";
 import { cn } from "@/lib/utils";
+import { ExportLink } from "@/components/data-export/export-link";
 
 export default async function DataExportPage() {
   const userId = await requireUserId();
@@ -56,27 +57,27 @@ export default async function DataExportPage() {
         <h2 className="text-sm font-semibold text-muted-foreground">匯出資料</h2>
         {unlocked ? (
           <>
-            <a
-              href="/api/export/csv"
+            <ExportLink
+              kind="csv"
               className={cn(buttonVariants({ variant: "outline" }), "h-auto w-full justify-start gap-2.5 py-2.5")}
             >
               <FileText className="size-4" strokeWidth={1.75} />
               匯出 CSV（全部交易明細）
-            </a>
-            <a
-              href="/api/export/xlsx"
+            </ExportLink>
+            <ExportLink
+              kind="xlsx"
               className={cn(buttonVariants({ variant: "outline" }), "h-auto w-full justify-start gap-2.5 py-2.5")}
             >
               <FileSpreadsheet className="size-4" strokeWidth={1.75} />
               匯出 Excel（全部交易明細）
-            </a>
-            <a
-              href="/api/export/monthly-report"
+            </ExportLink>
+            <ExportLink
+              kind="monthly-report"
               className={cn(buttonVariants({ variant: "outline" }), "h-auto w-full justify-start gap-2.5 py-2.5")}
             >
               <CalendarRange className="size-4" strokeWidth={1.75} />
               匯出本月月報（Excel）
-            </a>
+            </ExportLink>
           </>
         ) : (
           <Link
@@ -94,13 +95,13 @@ export default async function DataExportPage() {
         <p className="text-sm text-muted-foreground">
           把完整資料（帳戶、交易、預算、目標、訂閱、分帳本）下載成一份檔案。
         </p>
-        <a
-          href="/api/export/backup"
+        <ExportLink
+          kind="backup"
           className={cn(buttonVariants({ variant: "outline" }), "h-auto w-full justify-start gap-2.5 py-2.5")}
         >
           <FileText className="size-4" strokeWidth={1.75} />
           下載備份檔案
-        </a>
+        </ExportLink>
 
         <RestoreBackupDialog />
       </section>

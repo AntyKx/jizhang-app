@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { resolveExportUser } from "@/lib/export-link";
 import { buildBackup } from "@/lib/backup";
 
 // Deliberately not gated by requireCoreAccessApi — downloading a copy of
@@ -8,8 +8,8 @@ import { buildBackup } from "@/lib/backup";
 // up via this page, which would be a broken promise for free users if this
 // were paywalled). Only restoreBackup() (the destructive, replace-style
 // operation) stays behind the core-unlock gate.
-export async function GET() {
-  const { userId } = await auth();
+export async function GET(request: Request) {
+  const userId = await resolveExportUser(request, "backup");
   if (!userId) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { resolveExportUser } from "@/lib/export-link";
 import { resolveStatsRange } from "@/lib/stats/range";
 import { buildMonthlyReportWorkbook } from "@/lib/export";
 import { requireCoreAccessApi } from "@/lib/entitlements";
 
 export async function GET(request: Request) {
-  const { userId } = await auth();
+  const userId = await resolveExportUser(request, "monthly-report");
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const gate = await requireCoreAccessApi(userId);

@@ -18,6 +18,7 @@ import {
   userSettings,
 } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
+import { EXPORT_KINDS, signExportToken, type ExportKind } from "@/lib/export-link";
 import { hasCoreAccess } from "@/lib/entitlements";
 import { backupSchema, type Backup } from "@/lib/backup-schema";
 import {
@@ -235,4 +236,14 @@ export async function restoreFromSnapshot(day: string) {
   }
 
   return applyBackup(userId, parsed);
+}
+
+// For the Android app only: a signed link the phone's browser can download
+// from (see lib/export-link.ts). On bearledger.app rather than the app's own
+// host, because Capacitor keeps navigations to its own host inside the
+// WebView — which is exactly where downloads don't work.
+export async function getExportLink(kind: ExportKind) {
+  const userId = await requireUserId();
+  if (!EXPORT_KINDS.includes(kind)) throw new Error("invalid export");
+  return `https://bearledger.app/api/export/${kind}?t=${signExportToken(userId, kind)}`;
 }

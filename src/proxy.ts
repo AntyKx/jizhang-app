@@ -24,6 +24,11 @@ const isPublicRoute = createRouteMatcher([
   // middleware only. The route itself is not open: it requires a Bearer
   // CRON_SECRET and refuses outright when that env var is missing.
   "/api/cron(.*)",
+  // Downloads opened in the phone's browser from the Android app (whose
+  // WebView can't download) carry a signed ?t= token instead of a session.
+  // Not open: every export route still resolves its user itself — the token
+  // or the Clerk session — and refuses without one (see lib/export-link.ts).
+  "/api/export/(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
