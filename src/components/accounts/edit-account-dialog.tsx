@@ -86,7 +86,7 @@ export function EditAccountDialog({
 
   return (
     <Dialog open={!!account} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] sm:max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>編輯帳戶</DialogTitle>
         </DialogHeader>

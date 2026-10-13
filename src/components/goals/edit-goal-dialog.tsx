@@ -68,7 +68,7 @@ export function EditGoalDialog({ goal, onClose }: { goal: Goal | null; onClose: 
 
   return (
     <Dialog open={!!goal} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>編輯儲蓄目標</DialogTitle>
         </DialogHeader>

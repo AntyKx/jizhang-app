@@ -1,4 +1,3 @@
-import { TransferPreviewChips, TransferPreviewPicker } from "@/components/dev/transfer-dialog-preview";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -47,13 +46,6 @@ export default async function DevToolsPage() {
           只有你的帳號看得到這頁——用來測試解鎖／訂閱狀態下的畫面差異，不會影響任何其他使用者。
         </p>
       </div>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-muted-foreground">轉帳畫面預覽（暫時）</h2>
-        <p className="text-sm text-muted-foreground">用 12 個假帳戶模擬帳戶很多的使用者，按確認不會真的轉帳。</p>
-        <TransferPreviewPicker />
-        <TransferPreviewChips />
-      </section>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-muted-foreground">核心解鎖</h2>

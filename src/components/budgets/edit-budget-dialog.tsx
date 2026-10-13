@@ -56,7 +56,7 @@ export function EditBudgetDialog({ budget, onClose }: { budget: Budget | null; o
 
   return (
     <Dialog open={!!budget} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>編輯{budget?.categoryName ?? "整體"}預算</DialogTitle>
         </DialogHeader>

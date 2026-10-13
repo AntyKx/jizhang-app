@@ -59,7 +59,7 @@ export function CreateAccountDialog({
       }}
     >
       <DialogTrigger render={<Button />}>新增帳戶</DialogTrigger>
-      <DialogContent className="max-h-[calc(100dvh-2rem)]">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{locked ? "把錢分開記，更清楚" : "新增帳戶"}</DialogTitle>
         </DialogHeader>
