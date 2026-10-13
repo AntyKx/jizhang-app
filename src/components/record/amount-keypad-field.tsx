@@ -48,7 +48,6 @@ export function AmountKeypadField({
   confirmLabel = "完成",
   onConfirm,
   inline = false,
-  reserveSpace = "below",
   className,
 }: {
   value: string;
@@ -84,36 +83,33 @@ export function AmountKeypadField({
   // "fixed" panel ended up filling the Dialog itself and hid every other
   // field (name, date, category) while typing.
   inline?: boolean;
-  // TEMPORARY (keypad-overlap preview): where the panel's height is
-  // reserved while open. "below" = spacer right under the display (live),
-  // "end" = extra bottom padding on the enclosing sheet, "none" = nothing.
-  reserveSpace?: "below" | "end" | "none";
 }) {
   const [open, setOpen] = useState(autoOpen);
   const displayRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  // Height of the overlay panel, reserved as a spacer under the display
-  // while it's open. Without it the panel (~420px) covered the display
-  // itself whenever the form was short — e.g. the record sheet sizes to
-  // its content, so with few fields the amount sat right where the panel
-  // slides up. The spacer grows the sheet (or the page) so the display is
-  // pushed above the panel. Stays 0 inside a Dialog: there the overlay is
-  // laid out relative to the Dialog (see `inline`), not the screen.
+  // Height of the overlay panel, measured so room can be made for it.
+  // Without that the panel (~420px) covered the display itself whenever the
+  // form was short — the record sheet sizes to its content, so with few
+  // fields the amount sat right where the panel slides up. Stays 0 inside a
+  // Dialog: there the overlay is laid out relative to the Dialog (see
+  // `inline`), not the screen.
   const [panelHeight, setPanelHeight] = useState(0);
   useEffect(() => {
     const display = displayRef.current;
     const panel = panelRef.current;
-    if (inline || reserveSpace === "none" || !display || !panel || display.closest('[data-slot="dialog-content"]')) return;
+    if (inline || !display || !panel || display.closest('[data-slot="dialog-content"]')) return;
     const observer = new ResizeObserver(() => setPanelHeight(panel.offsetHeight));
     observer.observe(panel);
     return () => observer.disconnect();
-  }, [inline, reserveSpace]);
+  }, [inline]);
 
-  // "end": pad the bottom of the enclosing sheet instead, so the fields
-  // under the display stay visible above the panel and the reserved room
-  // sits exactly behind the panel.
+  // While open, pad the bottom of the enclosing sheet by the panel's
+  // height: the sheet grows upward, pushing the display above the panel,
+  // while the fields under the display stay visible and the added room sits
+  // exactly behind the panel. (A spacer right under the display was tried
+  // first; it left a visible blank gap between the display and the panel.)
   useEffect(() => {
-    if (reserveSpace !== "end" || !open || panelHeight === 0) return;
+    if (!open || panelHeight === 0) return;
     const body = displayRef.current?.closest<HTMLElement>('[data-slot="bottom-sheet-body"]');
     if (!body) return;
     const previous = body.style.paddingBottom;
@@ -121,9 +117,9 @@ export function AmountKeypadField({
     return () => {
       body.style.paddingBottom = previous;
     };
-  }, [reserveSpace, open, panelHeight]);
+  }, [open, panelHeight]);
 
-  // The spacer makes room; this scrolls into it when the display is still
+  // The padding makes room; this scrolls into it when the display is still
   // behind the panel — a field lower on a scrolling page, or a sheet
   // already at its max height. Measured after the panel's 300ms slide.
   useEffect(() => {
@@ -245,7 +241,6 @@ export function AmountKeypadField({
   return (
     <>
       {display}
-      {reserveSpace === "below" && open && panelHeight > 0 && <div aria-hidden style={{ height: panelHeight }} className="shrink-0" />}
 
       <div
         className={cn(
