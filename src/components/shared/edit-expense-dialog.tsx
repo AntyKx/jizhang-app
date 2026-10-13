@@ -108,7 +108,7 @@ export function EditSplitExpenseDialog({
             <Input id="edit-shared-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={50} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label>金額</Label>
               <AmountKeypadField value={amount} onChange={setAmount} allowDecimal={false} inline />

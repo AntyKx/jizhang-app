@@ -169,7 +169,7 @@ export function EditTransactionDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-2">
               <Label>類型</Label>
               <TypeToggle

@@ -87,7 +87,7 @@ export function CreateRuleDialog({
             <Input id="name" name="name" placeholder="例：Netflix 訂閱" required />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-2">
               <Label>類型</Label>
               <TypeToggle name="type"

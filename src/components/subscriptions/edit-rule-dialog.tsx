@@ -128,7 +128,7 @@ export function EditRuleDialog({
             <Input id="edit-name" name="name" defaultValue={rule.name} required />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-2">
               <Label>類型</Label>
               <TypeToggle name="type"
