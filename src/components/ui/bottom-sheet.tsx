@@ -65,6 +65,7 @@ function BottomSheetContent({
           <div className="mx-auto mb-1 h-1.5 w-10 shrink-0 rounded-full bg-muted-foreground/30" />
           <div
             ref={containerRef}
+            data-slot="bottom-sheet-body"
             // overflow-x-hidden set explicitly here (not just relying on
             // the outer Popup's own overflow-hidden) — the Popup also
             // carries a CSS transform for its swipe-drag positioning, and

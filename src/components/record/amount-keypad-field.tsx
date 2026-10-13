@@ -48,6 +48,7 @@ export function AmountKeypadField({
   confirmLabel = "完成",
   onConfirm,
   inline = false,
+  reserveSpace = "below",
   className,
 }: {
   value: string;
@@ -83,6 +84,10 @@ export function AmountKeypadField({
   // "fixed" panel ended up filling the Dialog itself and hid every other
   // field (name, date, category) while typing.
   inline?: boolean;
+  // TEMPORARY (keypad-overlap preview): where the panel's height is
+  // reserved while open. "below" = spacer right under the display (live),
+  // "end" = extra bottom padding on the enclosing sheet, "none" = nothing.
+  reserveSpace?: "below" | "end" | "none";
 }) {
   const [open, setOpen] = useState(autoOpen);
   const displayRef = useRef<HTMLButtonElement>(null);
@@ -98,11 +103,25 @@ export function AmountKeypadField({
   useEffect(() => {
     const display = displayRef.current;
     const panel = panelRef.current;
-    if (inline || !display || !panel || display.closest('[data-slot="dialog-content"]')) return;
+    if (inline || reserveSpace === "none" || !display || !panel || display.closest('[data-slot="dialog-content"]')) return;
     const observer = new ResizeObserver(() => setPanelHeight(panel.offsetHeight));
     observer.observe(panel);
     return () => observer.disconnect();
-  }, [inline]);
+  }, [inline, reserveSpace]);
+
+  // "end": pad the bottom of the enclosing sheet instead, so the fields
+  // under the display stay visible above the panel and the reserved room
+  // sits exactly behind the panel.
+  useEffect(() => {
+    if (reserveSpace !== "end" || !open || panelHeight === 0) return;
+    const body = displayRef.current?.closest<HTMLElement>('[data-slot="bottom-sheet-body"]');
+    if (!body) return;
+    const previous = body.style.paddingBottom;
+    body.style.paddingBottom = `${panelHeight}px`;
+    return () => {
+      body.style.paddingBottom = previous;
+    };
+  }, [reserveSpace, open, panelHeight]);
 
   // The spacer makes room; this scrolls into it when the display is still
   // behind the panel — a field lower on a scrolling page, or a sheet
@@ -226,7 +245,7 @@ export function AmountKeypadField({
   return (
     <>
       {display}
-      {open && panelHeight > 0 && <div aria-hidden style={{ height: panelHeight }} className="shrink-0" />}
+      {reserveSpace === "below" && open && panelHeight > 0 && <div aria-hidden style={{ height: panelHeight }} className="shrink-0" />}
 
       <div
         className={cn(
