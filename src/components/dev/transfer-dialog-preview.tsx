@@ -59,11 +59,11 @@ function CommonFields() {
     <>
       <div className="flex flex-col gap-2">
         <Label>金額</Label>
-        <AmountKeypadField value={amount} onChange={setAmount} allowDecimal={false} />
+        <AmountKeypadField value={amount} onChange={setAmount} allowDecimal={false} className="h-12 rounded-xl text-2xl" />
       </div>
       <div className="flex flex-col gap-2">
         <Label>手續費（選填）</Label>
-        <AmountKeypadField value={fee} onChange={setFee} allowDecimal={false} />
+        <AmountKeypadField value={fee} onChange={setFee} allowDecimal={false} className="h-10 rounded-xl text-lg" />
         <p className="text-xs text-muted-foreground">手續費只會從轉出帳戶扣除，轉入帳戶不受影響。</p>
       </div>
       <div className="flex flex-col gap-2">
