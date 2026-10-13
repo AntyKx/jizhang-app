@@ -4,6 +4,7 @@ import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 
 import { cn } from "@/lib/utils"
+import { IosScrollLock } from "@/components/ui/ios-scroll-lock"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
@@ -76,6 +77,7 @@ function DialogContent({
         )}
         {...props}
       >
+        <IosScrollLock />
         {/* Zero-height sticky rail so the X stays pinned to the top while a
             tall dialog scrolls, instead of scrolling away with the content.
             Has to come first in the DOM — a sticky element only pins once

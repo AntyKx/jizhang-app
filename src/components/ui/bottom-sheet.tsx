@@ -4,6 +4,7 @@ import * as React from "react"
 import { Drawer as DrawerPrimitive } from "@base-ui/react/drawer"
 
 import { cn } from "@/lib/utils"
+import { IosScrollLock } from "@/components/ui/ios-scroll-lock"
 
 function BottomSheet({ ...props }: DrawerPrimitive.Root.Props) {
   return <DrawerPrimitive.Root data-slot="bottom-sheet" swipeDirection="down" {...props} />
@@ -60,6 +61,7 @@ function BottomSheetContent({
           )}
           {...props}
         >
+          <IosScrollLock />
           <div className="mx-auto mb-1 h-1.5 w-10 shrink-0 rounded-full bg-muted-foreground/30" />
           <div
             ref={containerRef}
