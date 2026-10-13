@@ -24,13 +24,6 @@ const ACCOUNTS: { id: string; name: string; type: AccountType }[] = [
   { id: "3", name: "中信薪轉", type: "bank" },
 ];
 
-const LABELS: Record<Variant, string> = {
-  current: "目前線上版（空白在金額下方）",
-  A: "A：預留空間移到最底部",
-  B: "B：鍵盤嵌在抽屜裡",
-  C: "C：不處理遮擋，鍵盤上顯示分類",
-};
-
 function PreviewSheet({ variant, open, onOpenChange }: { variant: Variant; open: boolean; onOpenChange: (v: boolean) => void }) {
   const [amount, setAmount] = useState("");
   const [accountId, setAccountId] = useState("1");
@@ -91,18 +84,16 @@ function PreviewSheet({ variant, open, onOpenChange }: { variant: Variant; open:
   );
 }
 
-export function RecordKeypadPreview() {
-  const [variant, setVariant] = useState<Variant | null>(null);
+// One variant, opened on load — rendered inside a phone-width iframe by
+// /design-preview/keypad. Closing just reopens it, so the frame never
+// ends up empty.
+export function RecordKeypadPreviewFrame({ variant }: { variant: Variant }) {
+  const [round, setRound] = useState(0);
   return (
-    <>
-      {(Object.keys(LABELS) as Variant[]).map((v) => (
-        <Button key={v} variant={v === "current" ? "outline" : "default"} className="w-full" onClick={() => setVariant(v)}>
-          {LABELS[v]}
-        </Button>
-      ))}
-      {variant && (
-        <PreviewSheet key={variant} variant={variant} open onOpenChange={(v) => !v && setVariant(null)} />
-      )}
-    </>
+    <div className="flex min-h-[100dvh] flex-col gap-3 p-4">
+      <h1 className="text-2xl font-semibold">記帳</h1>
+      <p className="text-sm text-muted-foreground">（背景頁面）</p>
+      <PreviewSheet key={round} variant={variant} open onOpenChange={(v) => !v && setRound((r) => r + 1)} />
+    </div>
   );
 }

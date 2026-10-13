@@ -1,4 +1,3 @@
-import { RecordKeypadPreview } from "@/components/dev/record-keypad-preview";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -47,12 +46,6 @@ export default async function DevToolsPage() {
           只有你的帳號看得到這頁——用來測試解鎖／訂閱狀態下的畫面差異，不會影響任何其他使用者。
         </p>
       </div>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-muted-foreground">記帳數字鍵盤預覽（暫時）</h2>
-        <p className="text-sm text-muted-foreground">模擬欄位不多的記帳抽屜，比較鍵盤打開時金額欄位的處理方式。按完成不會儲存。</p>
-        <RecordKeypadPreview />
-      </section>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-muted-foreground">核心解鎖</h2>
