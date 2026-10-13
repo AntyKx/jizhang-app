@@ -189,6 +189,7 @@ export function EditTransactionDialog({
                 value={amount}
                 onChange={setAmount}
                 allowDecimal={currencyAllowsDecimal(accounts.find((a) => a.id === accountId)?.currency)}
+                inline
               />
             </div>
           </div>

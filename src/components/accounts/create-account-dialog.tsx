@@ -138,7 +138,7 @@ export function CreateAccountDialog({
           </div>
           <div className="flex flex-col gap-2">
             <Label>期初餘額</Label>
-            <AmountKeypadField value={initialBalance} onChange={setInitialBalance} allowDecimal={currencyAllowsDecimal(currency)} />
+            <AmountKeypadField value={initialBalance} onChange={setInitialBalance} allowDecimal={currencyAllowsDecimal(currency)} inline />
           </div>
 
           <button

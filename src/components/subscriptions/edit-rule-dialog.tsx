@@ -148,6 +148,7 @@ export function EditRuleDialog({
                 value={amount}
                 onChange={setAmount}
                 allowDecimal={currencyAllowsDecimal(accounts.find((a) => a.id === accountId)?.currency)}
+                inline
               />
               <input type="hidden" name="amount" value={amount} />
             </div>

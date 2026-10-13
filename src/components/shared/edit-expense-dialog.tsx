@@ -111,7 +111,7 @@ export function EditSplitExpenseDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
               <Label>金額</Label>
-              <AmountKeypadField value={amount} onChange={setAmount} allowDecimal={false} />
+              <AmountKeypadField value={amount} onChange={setAmount} allowDecimal={false} inline />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="edit-shared-date">日期</Label>

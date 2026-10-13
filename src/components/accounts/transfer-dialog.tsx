@@ -144,6 +144,7 @@ export function TransferDialog({ accounts }: { accounts: Account[] }) {
               onChange={setAmount}
               allowDecimal={currencyAllowsDecimal(fromCurrency)}
               className="h-12 rounded-xl text-2xl"
+              inline
             />
           </div>
 
@@ -154,6 +155,7 @@ export function TransferDialog({ accounts }: { accounts: Account[] }) {
               onChange={setFee}
               allowDecimal={currencyAllowsDecimal(fromCurrency)}
               className="h-12 rounded-xl text-2xl"
+              inline
             />
             <p className="text-xs text-muted-foreground">手續費只會從轉出帳戶扣除，轉入帳戶不受影響。</p>
           </div>
