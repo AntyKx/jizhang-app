@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { transcribe } from "ai";
 import { auth } from "@clerk/nextjs/server";
 import { getAiUsageStatus, recordAiUsage } from "@/lib/entitlements";
+import { getVoiceVocabulary } from "@/lib/voice-vocabulary";
 
 const TRANSCRIBE_PROMPT =
   "這是記帳用的中文語音輸入，內容通常是金額、商家、消費項目，例如：午餐麥當勞120元刷卡、水果攤買芭樂50元、傳統市場買菜200元現金。";
@@ -15,18 +16,21 @@ function normalize(text: string) {
   return text.toLowerCase().replace(/[\s，。、,.!?！？:：；;「」"'（）()]/g, "");
 }
 
-const NORMALIZED_PROMPT = normalize(TRANSCRIBE_PROMPT);
+function buildPrompt(vocabulary: string[]) {
+  if (vocabulary.length === 0) return TRANSCRIBE_PROMPT;
+  return `${TRANSCRIBE_PROMPT}常用詞：${vocabulary.join("、")}。`;
+}
 
 // Given near-silent audio the model tends to echo back its own prompt —
-// usually one of the example entries, which then parses into a perfectly
-// plausible fake record. Treat any output that's just a piece of the prompt,
+// usually one of the example entries (or a run of the user's own
+// vocabulary list), which then parses into a perfectly plausible fake record. Treat any output that's just a piece of the prompt,
 // or a known subtitle-style hallucination, as "heard nothing".
-function looksHallucinated(text: string) {
+function looksHallucinated(text: string, prompt: string) {
   const n = normalize(text);
   if (!n) return true;
   // Length floor so a real short entry that happens to overlap an example
   // ("買菜200元") still goes through; every full example is longer.
-  if (n.length >= 8 && NORMALIZED_PROMPT.includes(n)) return true;
+  if (n.length >= 8 && normalize(prompt).includes(n)) return true;
   return HALLUCINATION_MARKERS.some((m) => n.includes(m));
 }
 
@@ -48,10 +52,14 @@ export async function POST(req: Request) {
   // hourly rate limit and has its own monthly cap (so this endpoint can't be
   // called on its own without bound). Requiring quick_add quota up front
   // keeps a user who's out of it from transcribing audio they then can't use.
-  const [usage, voiceUsage] = await Promise.all([
+  const [usage, voiceUsage, vocabulary] = await Promise.all([
     getAiUsageStatus(userId, "quick_add"),
     getAiUsageStatus(userId, "voice_transcribe"),
+    // A vocabulary lookup failure shouldn't block voice entry — fall back
+    // to the fixed prompt.
+    getVoiceVocabulary(userId).catch(() => []),
   ]);
+  const prompt = buildPrompt(vocabulary);
   const blocked = !usage.allowed ? usage : !voiceUsage.allowed ? voiceUsage : null;
   if (blocked) {
     const message =
@@ -82,7 +90,10 @@ export async function POST(req: Request) {
       providerOptions: {
         openai: {
           language: "zh",
-          prompt: TRANSCRIBE_PROMPT,
+          // Fixed examples plus this user's own merchant/category/account
+          // names, so proper nouns only they use ("全聯", "悠遊卡") are
+          // heard as those words instead of a same-sounding guess.
+          prompt,
         },
       },
     });
@@ -91,7 +102,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "語音辨識失敗，請再試一次" }, { status: 502 });
   }
 
-  if (!text || looksHallucinated(text)) {
+  if (!text || looksHallucinated(text, prompt)) {
     // Still counted: the transcription call was made and paid for.
     if (text) await recordAiUsage(userId, "voice_transcribe");
     return NextResponse.json({ error: "沒有聽到聲音，再說一次看看" }, { status: 422 });
