@@ -61,7 +61,12 @@ function DialogContent({
           // as bottom-sheet.tsx's inner content div, since `overflow` and
           // `transform` together on one element is a known unreliable
           // WebKit combination for clipping.
-          "touch-pan-y overflow-x-hidden fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // max-h + overflow-y-auto: without a height cap a tall dialog
+          // (e.g. 轉帳 with many accounts — two wrapping chip rows) grew
+          // past the viewport; being centered, its top and bottom both went
+          // off-screen with nothing to scroll, so the confirm button was
+          // unreachable. Set here so every dialog gets it, not per call site.
+          "touch-pan-y overflow-x-hidden max-h-[calc(100dvh-2rem)] overflow-y-auto fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
@@ -110,7 +115,11 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        // Sticky so the confirm button stays reachable while a tall dialog
+        // scrolls (-bottom-4 cancels the content's p-4). The background is
+        // bg-muted/50 pre-mixed onto the popover color — it has to be opaque
+        // or scrolled content shows through.
+        "sticky -bottom-4 z-10 -mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-popover))] p-4 sm:flex-row sm:justify-end",
         className
       )}
       {...props}
