@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Delete } from "lucide-react";
 import { gsap } from "@/lib/gsap";
 import { Button } from "@/components/ui/button";
@@ -85,6 +85,47 @@ export function AmountKeypadField({
   inline?: boolean;
 }) {
   const [open, setOpen] = useState(autoOpen);
+  const displayRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Height of the overlay panel, reserved as a spacer under the display
+  // while it's open. Without it the panel (~420px) covered the display
+  // itself whenever the form was short — e.g. the record sheet sizes to
+  // its content, so with few fields the amount sat right where the panel
+  // slides up. The spacer grows the sheet (or the page) so the display is
+  // pushed above the panel. Stays 0 inside a Dialog: there the overlay is
+  // laid out relative to the Dialog (see `inline`), not the screen.
+  const [panelHeight, setPanelHeight] = useState(0);
+  useEffect(() => {
+    const display = displayRef.current;
+    const panel = panelRef.current;
+    if (inline || !display || !panel || display.closest('[data-slot="dialog-content"]')) return;
+    const observer = new ResizeObserver(() => setPanelHeight(panel.offsetHeight));
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [inline]);
+
+  // The spacer makes room; this scrolls into it when the display is still
+  // behind the panel — a field lower on a scrolling page, or a sheet
+  // already at its max height. Measured after the panel's 300ms slide.
+  useEffect(() => {
+    if (!open || panelHeight === 0) return;
+    const timer = setTimeout(() => {
+      const display = displayRef.current;
+      if (!display) return;
+      const overlap = display.getBoundingClientRect().bottom + 12 - (window.innerHeight - panelHeight);
+      if (overlap <= 0) return;
+      let scroller = display.parentElement;
+      while (scroller) {
+        const { overflowY } = getComputedStyle(scroller);
+        if ((overflowY === "auto" || overflowY === "scroll") && scroller.scrollHeight > scroller.clientHeight) break;
+        scroller = scroller.parentElement;
+      }
+      if (scroller) scroller.scrollBy({ top: overlap, behavior: "smooth" });
+      else if (!display.closest('[data-slot="bottom-sheet-content"]')) window.scrollBy({ top: overlap, behavior: "smooth" });
+    }, 320);
+    return () => clearTimeout(timer);
+  }, [open, panelHeight]);
+
   const KEYS = allowDecimal ? KEYS_WITH_DECIMAL : KEYS_NO_DECIMAL;
 
   function press(key: (typeof KEYS)[number]) {
@@ -148,6 +189,7 @@ export function AmountKeypadField({
 
   const display = (
     <button
+      ref={displayRef}
       type="button"
       onClick={() => setOpen(inline ? !open : true)}
       className={cn(
@@ -184,6 +226,7 @@ export function AmountKeypadField({
   return (
     <>
       {display}
+      {open && panelHeight > 0 && <div aria-hidden style={{ height: panelHeight }} className="shrink-0" />}
 
       <div
         className={cn(
@@ -193,6 +236,7 @@ export function AmountKeypadField({
         onClick={() => setOpen(false)}
       >
         <div
+          ref={panelRef}
           className={cn(
             "absolute inset-x-0 bottom-0 mx-auto flex w-full max-w-md flex-col gap-3 rounded-t-3xl border border-b-0 bg-card p-4 shadow-lg transition-transform duration-300 ease-out",
             "pb-[max(1rem,env(safe-area-inset-bottom))]",
