@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { transactions, userSettings } from "@/db/schema";
@@ -6,6 +5,7 @@ import { listAccounts, listArchivedAccounts } from "@/lib/account";
 import { requireUserId } from "@/lib/auth";
 import { CreateAccountDialog } from "@/components/accounts/create-account-dialog";
 import { AccountsList } from "@/components/accounts/accounts-list";
+import { ArchivedAccountsSection } from "@/components/accounts/archived-accounts-list";
 import { TransferDialog } from "@/components/accounts/transfer-dialog";
 import { TransferHistory } from "@/components/accounts/transfer-history";
 import { BearIllustration } from "@/components/bear-illustration";
@@ -136,16 +136,23 @@ export default async function AccountsPage() {
         </OneTimeHint>
       )}
 
+      {archivedAccounts.length > 0 && (
+        <ArchivedAccountsSection
+          accounts={archivedAccounts.map((a) => ({
+            id: a.id,
+            name: a.name,
+            type: a.type,
+            currency: a.currency,
+            currentBalance: a.currentBalance,
+            excludeFromNetWorth: a.excludeFromNetWorth,
+            initialBalance: a.initialBalance,
+            statementDay: a.statementDay,
+          }))}
+        />
+      )}
+
       {transfers.length > 0 && <TransferHistory transfers={transfers} accountsById={accountsById} />}
 
-      {archivedAccounts.length > 0 && (
-        <Link
-          href="/accounts/archived"
-          className="text-muted-foreground text-center text-sm underline underline-offset-4"
-        >
-          已封存帳戶（{archivedAccounts.length}）
-        </Link>
-      )}
     </div>
   );
 }
