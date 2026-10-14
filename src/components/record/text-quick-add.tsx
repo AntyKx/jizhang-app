@@ -280,6 +280,15 @@ export function TextQuickAdd({
 
   const relevantCategories = categories.filter((c) => c.type === (draft?.type ?? "expense"));
   const isTheirs = Boolean(draft) && draft?.type === "expense" && isSharedExpense && sharedDirection === "theirs";
+  // Only AI-guessed names still present in the split block saving — once the
+  // user retypes, removes, or switches direction away from a name, its
+  // NewNameConfirm badge disappears, so it can't keep the button disabled
+  // with nothing left on screen to tap.
+  const namesInUse = isTheirs ? [theirsCounterpartyName.trim()] : splitParticipants.map((p) => p.name);
+  const hasUnconfirmedNewName =
+    draft?.type === "expense" &&
+    isSharedExpense &&
+    aiNewNames.some((n) => !confirmedNewNames.has(n) && namesInUse.includes(n));
 
   return (
     <div className="flex flex-col gap-4">
@@ -420,8 +429,10 @@ export function TextQuickAdd({
               draft.amount <= 0 ||
               (isTheirs
                 ? !theirsCounterpartyName.trim()
-                : isSharedExpense && computeSplitOverflow(amountText, splitParticipants) > 0) ||
-              (isSharedExpense && aiNewNames.some((n) => !confirmedNewNames.has(n)))
+                : draft.type === "expense" &&
+                  isSharedExpense &&
+                  computeSplitOverflow(amountText, splitParticipants) > 0) ||
+              hasUnconfirmedNewName
             }
           >
             {pending ? "儲存中…" : "確認記帳"}
