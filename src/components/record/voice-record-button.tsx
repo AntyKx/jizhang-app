@@ -150,7 +150,20 @@ export function VoiceRecordButton({
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? "語音辨識失敗");
+        const message = body?.error ?? "語音辨識失敗";
+        // Expected refusals get their own event so /admin can tell them
+        // apart from real API failures; they skip the catch-all below.
+        const reason =
+          res.status === 429 ? "voice_failed_quota"
+          : res.status === 401 ? "voice_failed_auth"
+          : res.status === 422 ? "voice_failed_empty"
+          : null;
+        if (reason) {
+          track(reason);
+          toast.error(message);
+          return;
+        }
+        throw new Error(message);
       }
       const { text } = (await res.json()) as { text: string };
       onTranscribed(text);

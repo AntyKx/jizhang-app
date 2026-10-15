@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { startOfMonth, subDays } from "date-fns";
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { aiUsageEvents, uiEvents } from "@/db/schema";
 import { UI_EVENT_LABELS, type UiEventName } from "@/lib/analytics/ui-event-names";
@@ -21,10 +21,26 @@ const KIND_LABEL: Record<string, string> = {
   receipt_scan: "收據辨識",
   monthly_summary: "AI 摘要",
 };
+const VOICE_FAIL_EVENTS: UiEventName[] = [
+  "voice_failed",
+  "voice_failed_quota",
+  "voice_failed_auth",
+  "voice_failed_empty",
+  "voice_no_speech",
+  "voice_too_short",
+];
+const VOICE_FAIL_SHORT: Partial<Record<UiEventName, string>> = {
+  voice_failed: "API 錯誤",
+  voice_failed_quota: "額度",
+  voice_failed_auth: "未登入",
+  voice_failed_empty: "轉錄空白",
+  voice_no_speech: "沒聲音",
+  voice_too_short: "太短",
+};
 
 export default async function AdminAiPage() {
   const since30 = subDays(getTodayInTaipei(), DAYS - 1);
-  const [{ users }, daily, monthRows, eventRows, voiceOk] = await Promise.all([
+  const [{ users }, daily, monthRows, eventRows, voiceOk, voiceFailRows] = await Promise.all([
     getAdminData(),
     getDailyActivity(DAYS),
     db
@@ -41,6 +57,11 @@ export default async function AdminAiPage() {
       .select({ n: sql<number>`count(*)::int`, users: sql<number>`count(distinct ${aiUsageEvents.userId})::int` })
       .from(aiUsageEvents)
       .where(and(eq(aiUsageEvents.kind, "voice_transcribe"), gte(aiUsageEvents.createdAt, since30))),
+    db
+      .select({ userId: uiEvents.userId, name: uiEvents.name, n: sql<number>`count(*)::int` })
+      .from(uiEvents)
+      .where(and(inArray(uiEvents.name, VOICE_FAIL_EVENTS), gte(uiEvents.createdAt, since30)))
+      .groupBy(uiEvents.userId, uiEvents.name),
   ]);
   const ev = new Map(eventRows.map((r) => [r.name, r]));
   const evN = (name: UiEventName) => ev.get(name) ?? { n: 0, users: 0 };
@@ -54,8 +75,24 @@ export default async function AdminAiPage() {
     "voice_permission_denied",
     "voice_unsupported",
     "voice_too_short",
+    "voice_no_speech",
+    "voice_failed_empty",
+    "voice_failed_quota",
+    "voice_failed_auth",
     "voice_failed",
   ];
+  // Who hit each failure, so a spike can be traced to one account (often a
+  // test account out of quota) instead of guessed at.
+  const failureUsers = (() => {
+    const rows = new Map<string, { userId: string; counts: Partial<Record<UiEventName, number>>; total: number }>();
+    for (const r of voiceFailRows) {
+      const row = rows.get(r.userId) ?? { userId: r.userId, counts: {}, total: 0 };
+      row.counts[r.name as UiEventName] = r.n;
+      row.total += r.n;
+      rows.set(r.userId, row);
+    }
+    return [...rows.values()].sort((a, b) => b.total - a.total);
+  })();
   const otherEvents: UiEventName[] = ["first_record_chip", "first_record_voice_chip", "quickadd_tip_dismissed"];
   const upsellEvents: UiEventName[] = [
     "monthly_report_seen",
@@ -145,6 +182,40 @@ export default async function AdminAiPage() {
           <EventTable names={upsellEvents} get={evN} />
         </Panel>
       </div>
+
+      <Panel title="語音失敗的帳號（近 30 天）">
+        <p className="mb-3 text-xs text-muted-foreground">
+          2026-10-15 前的「API 錯誤」也包含額度、未登入、轉錄空白，之後才分開記。
+        </p>
+        {failureUsers.length === 0 ? (
+          <p className="text-sm text-muted-foreground">近 30 天沒有語音失敗</p>
+        ) : (
+          <AdminTable head={["使用者", "方案", ...VOICE_FAIL_EVENTS.map((e) => VOICE_FAIL_SHORT[e] ?? e), "合計"]}>
+            {failureUsers.map((row) => {
+              const u = userBy.get(row.userId);
+              return (
+                <tr key={row.userId}>
+                  <td>
+                    <Link href={`/admin/users/${row.userId}`} className="hover:underline">
+                      {u?.name ?? u?.email ?? row.userId}
+                    </Link>
+                    {row.userId === process.env.DEV_ADMIN_USER_ID && (
+                      <span className="ml-1.5 text-xs text-muted-foreground">（你）</span>
+                    )}
+                  </td>
+                  <td>{u && <PlanBadge plan={u.plan} />}</td>
+                  {VOICE_FAIL_EVENTS.map((e) => (
+                    <td key={e} className="tabular-nums">
+                      {row.counts[e] ?? <span className="text-muted-foreground">–</span>}
+                    </td>
+                  ))}
+                  <td className="font-medium tabular-nums">{row.total}</td>
+                </tr>
+              );
+            })}
+          </AdminTable>
+        )}
+      </Panel>
 
       <Panel title="本月各使用者用量">
         {usage.length === 0 ? (

@@ -8,7 +8,12 @@ export const UI_EVENT_LABELS = {
   voice_unsupported: "裝置不支援錄音",
   voice_too_short: "錄音太短",
   voice_no_speech: "錄音沒聽到聲音",
-  voice_failed: "語音辨識失敗",
+  // voice_failed is the catch-all (API/network error). Before 2026-10-15 it
+  // also covered the three split-out reasons below.
+  voice_failed: "語音辨識失敗（API／網路錯誤）",
+  voice_failed_quota: "語音被額度／頻率擋下",
+  voice_failed_auth: "語音失敗：未登入",
+  voice_failed_empty: "轉錄後沒有內容",
   first_record_chip: "點新手範例句",
   first_record_voice_chip: "點新手「用說的試試」",
   quickadd_tip_dismissed: "關閉一句話記帳提示",
