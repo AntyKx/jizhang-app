@@ -14,6 +14,11 @@ export const UI_EVENT_LABELS = {
   voice_failed_quota: "語音被額度／頻率擋下",
   voice_failed_auth: "語音失敗：未登入",
   voice_failed_empty: "轉錄後沒有內容",
+  // Logged server-side (lib/analytics/server-event.ts) when the model call fails.
+  quickadd_ai_failed: "一句話記帳 AI 失敗",
+  shared_ai_failed: "分帳一句話 AI 失敗",
+  receipt_ai_failed: "收據辨識 AI 失敗",
+  summary_ai_failed: "AI 摘要失敗",
   first_record_chip: "點新手範例句",
   first_record_voice_chip: "點新手「用說的試試」",
   quickadd_tip_dismissed: "關閉一句話記帳提示",

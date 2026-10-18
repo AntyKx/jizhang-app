@@ -7,15 +7,16 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { categories } from "@/db/schema";
 import { listAccounts } from "@/lib/account";
-import { getTodayInTaipei } from "@/lib/date";
+import { getTodayInTaipei, normalizeAiDate, recentDaysForPrompt, withWeekday } from "@/lib/date";
 import { getAiUsageStatus, recordAiUsage } from "@/lib/entitlements";
 import { suggestCategoryForMerchant } from "@/lib/merchant-category-memory";
+import { logServerEvent } from "@/lib/analytics/server-event";
 
 const quickAddSchema = z.object({
   // Nullable on purpose: with a required positive number the model has to
   // invent an amount for input that has none ("你好", or noise a voice clip
   // turned into words), and that invented draft looks perfectly real.
-  amount: z.number().positive().nullable().describe("交易金額，純數字；句子裡完全沒有提到金額就是 null，不要猜"),
+  amount: z.number().positive().nullable().describe("交易金額，純數字；splitDirection 為 mine 時是使用者實際付出的總額，不是平分後自己那份；句子裡完全沒有提到金額就是 null，不要猜"),
   type: z.enum(["income", "expense"]).describe("收入或支出"),
   categoryName: z
     .string()
@@ -105,7 +106,8 @@ export async function POST(req: Request) {
       model: "anthropic/claude-haiku-4-5",
       schema: quickAddSchema,
       prompt: `你是記帳助理，將使用者輸入的一句話解析成結構化的記帳資料。
-今天日期是 ${today}。
+今天日期是 ${withWeekday(today)}。
+最近日期對照（「上週五」「這週一」等請從這裡查，週一是一週的第一天）：${recentDaysForPrompt(today)}
 可用分類清單：${userCategories.map((c) => `${c.name}(${c.type})`).join("、")}
 可用帳戶清單：${userAccounts.map((a) => a.name).join("、")}
 
@@ -114,11 +116,12 @@ export async function POST(req: Request) {
 請解析出金額、收入或支出、最符合的分類名稱（須完全符合上述清單其中之一）、付款方式、最符合的帳戶名稱（只有使用者明確提到才選，須完全符合上述帳戶清單其中之一，否則為 null）、商家、備註與日期。
 
 如果使用者提到分帳、AA、各付一半、算我的、對方付的等語意，額外判斷 isSharedExpense、splitDirection、splitCounterpartyName、splitParticipantAmount。
-例如「晚餐1000，我跟老婆各付一半」→ isSharedExpense=true, splitDirection=mine, splitCounterpartyName=老婆, splitParticipantAmount=500。
+例如「晚餐1000，我跟老婆各付一半」→ amount=1000（使用者實際付出的總額，不是自己那一半）, isSharedExpense=true, splitDirection=mine, splitCounterpartyName=老婆, splitParticipantAmount=500。
 例如「老婆付的午餐300，算我的」→ isSharedExpense=true, splitDirection=theirs, splitCounterpartyName=老婆, amount=300。
 只是提到「跟誰一起」但沒有分攤金額語意（例如「晚餐1000，跟老婆一起吃」）則 isSharedExpense=false，其餘分帳欄位為 null。`,
     }));
-  } catch {
+  } catch (err) {
+    await logServerEvent(userId, "quickadd_ai_failed", err);
     return NextResponse.json({ error: "解析失敗，請稍後再試或手動記帳" }, { status: 502 });
   }
 
@@ -134,7 +137,11 @@ export async function POST(req: Request) {
   // the model's fresh guess — no extra AI call, and it's more trustworthy
   // than a generic classification (see merchant-category-memory.ts).
   const rememberedCategory = await suggestCategoryForMerchant(userId, object.merchant, object.type);
-  const result = rememberedCategory ? { ...object, categoryName: rememberedCategory } : object;
+  const result = {
+    ...object,
+    occurredAt: normalizeAiDate(object.occurredAt, today),
+    ...(rememberedCategory ? { categoryName: rememberedCategory } : {}),
+  };
 
   return NextResponse.json({ result });
 }

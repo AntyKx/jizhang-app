@@ -7,9 +7,10 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { categories } from "@/db/schema";
 import { listAccounts } from "@/lib/account";
-import { getTodayInTaipei } from "@/lib/date";
+import { getTodayInTaipei, normalizeAiDate } from "@/lib/date";
 import { getAiUsageStatus, recordAiUsage } from "@/lib/entitlements";
 import { suggestCategoryForMerchant } from "@/lib/merchant-category-memory";
+import { logServerEvent } from "@/lib/analytics/server-event";
 import { describeItemsForPrompt, eInvoiceSchema } from "@/lib/einvoice/schema";
 import { itemsToNote } from "@/lib/einvoice/qr";
 import { lookupSellerNames } from "@/lib/einvoice/seller-name";
@@ -109,7 +110,10 @@ export async function POST(req: Request) {
         ],
       },
     ],
-  }).catch(() => null);
+  }).catch(async (err) => {
+    await logServerEvent(userId, "receipt_ai_failed", err);
+    return null;
+  });
   if (!generated && !invoice) {
     return NextResponse.json({ error: "收據辨識失敗，請換一張清楚的照片再試，或手動記帳" }, { status: 502 });
   }
@@ -133,7 +137,11 @@ export async function POST(req: Request) {
         occurredAt: invoice.date,
         ...(itemsToNote(invoice.items) ? { note: itemsToNote(invoice.items) } : {}),
       }
-    : { ...generated!.object, amount: generated!.object.amount! };
+    : {
+        ...generated!.object,
+        amount: generated!.object.amount!,
+        occurredAt: normalizeAiDate(generated!.object.occurredAt, today),
+      };
 
   // Prefer how this user has actually categorized this merchant before over
   // the model's fresh guess — no extra AI call, and it's more trustworthy

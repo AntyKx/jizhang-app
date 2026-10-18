@@ -22,6 +22,10 @@ const KIND_LABEL: Record<string, string> = {
   monthly_summary: "AI 摘要",
 };
 const VOICE_FAIL_EVENTS: UiEventName[] = [
+  "quickadd_ai_failed",
+  "receipt_ai_failed",
+  "shared_ai_failed",
+  "summary_ai_failed",
   "voice_failed",
   "voice_failed_quota",
   "voice_failed_auth",
@@ -30,7 +34,11 @@ const VOICE_FAIL_EVENTS: UiEventName[] = [
   "voice_too_short",
 ];
 const VOICE_FAIL_SHORT: Partial<Record<UiEventName, string>> = {
-  voice_failed: "API 錯誤",
+  quickadd_ai_failed: "一句話",
+  receipt_ai_failed: "收據",
+  shared_ai_failed: "分帳",
+  summary_ai_failed: "摘要",
+  voice_failed: "語音 API",
   voice_failed_quota: "額度",
   voice_failed_auth: "未登入",
   voice_failed_empty: "轉錄空白",
@@ -183,12 +191,12 @@ export default async function AdminAiPage() {
         </Panel>
       </div>
 
-      <Panel title="語音失敗的帳號（近 30 天）">
+      <Panel title="AI 失敗的帳號（近 30 天）">
         <p className="mb-3 text-xs text-muted-foreground">
-          2026-10-15 前的「API 錯誤」也包含額度、未登入、轉錄空白，之後才分開記。
+          2026-10-15 前的「語音 API」也包含額度、未登入、轉錄空白，之後才分開記；一句話／收據／分帳／摘要從 2026-10-18 開始記。
         </p>
         {failureUsers.length === 0 ? (
-          <p className="text-sm text-muted-foreground">近 30 天沒有語音失敗</p>
+          <p className="text-sm text-muted-foreground">近 30 天沒有 AI 失敗</p>
         ) : (
           <AdminTable head={["使用者", "方案", ...VOICE_FAIL_EVENTS.map((e) => VOICE_FAIL_SHORT[e] ?? e), "合計"]}>
             {failureUsers.map((row) => {

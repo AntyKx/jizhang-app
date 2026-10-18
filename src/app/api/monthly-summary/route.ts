@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getAiUsageStatus, recordAiUsage } from "@/lib/entitlements";
 import { resolveStatsRange } from "@/lib/stats/range";
 import { generatePeriodSummary, getPeriodFacts } from "@/lib/period-summary";
+import { logServerEvent } from "@/lib/analytics/server-event";
 
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -37,7 +38,8 @@ export async function POST(request: Request) {
   let text: string;
   try {
     text = await generatePeriodSummary(range.label, facts);
-  } catch {
+  } catch (err) {
+    await logServerEvent(userId, "summary_ai_failed", err);
     return NextResponse.json({ summary: "目前無法產生摘要，請稍後再試。" }, { status: 502 });
   }
   await recordAiUsage(userId, "monthly_summary");

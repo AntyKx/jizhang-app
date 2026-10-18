@@ -6,8 +6,9 @@ import { and, eq } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { categories } from "@/db/schema";
-import { getTodayInTaipei } from "@/lib/date";
+import { getTodayInTaipei, normalizeAiDate, recentDaysForPrompt, withWeekday } from "@/lib/date";
 import { getFrequentSplitNames } from "@/lib/shared-expenses";
+import { logServerEvent } from "@/lib/analytics/server-event";
 import { getAiUsageStatus, recordAiUsage, requireCoreAccessApi } from "@/lib/entitlements";
 
 const sharedQuickAddSchema = z.object({
@@ -65,14 +66,18 @@ export async function POST(req: Request) {
     model: "anthropic/claude-haiku-4-5",
     schema: sharedQuickAddSchema,
     prompt: `你是分帳記帳助理，將使用者輸入的一句話解析成一筆「分帳支出」——使用者跟某位朋友或家人分攤的一筆花費。
-今天日期是 ${today}。
+今天日期是 ${withWeekday(today)}。
+最近日期對照（「上週五」「這週一」等請從這裡查，週一是一週的第一天）：${recentDaysForPrompt(today)}
 可用分類清單：${expenseCategories.map((c) => c.name).join("、")}
 使用者最近常分帳的對象（若文字中提到類似名字，優先比對這份清單）：${frequentNames.join("、") || "（無）"}
 
 使用者輸入：「${text}」
 
 請解析出金額、最符合的分類名稱（須完全符合上述清單其中之一，否則為 null）、分帳對象的姓名、方向（使用者付款則對方欠使用者 iOwe=false；對方付款則使用者欠對方 iOwe=true）、項目名稱、日期。`,
-  }).catch(() => null);
+  }).catch(async (err) => {
+    await logServerEvent(userId, "shared_ai_failed", err);
+    return null;
+  });
   if (!generated) {
     return NextResponse.json({ error: "解析失敗，請稍後再試或手動記帳" }, { status: 502 });
   }
@@ -80,5 +85,5 @@ export async function POST(req: Request) {
 
   await recordAiUsage(userId, "shared_quick_add");
 
-  return NextResponse.json({ result: object });
+  return NextResponse.json({ result: { ...object, occurredAt: normalizeAiDate(object.occurredAt, today) } });
 }
