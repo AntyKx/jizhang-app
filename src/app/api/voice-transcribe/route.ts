@@ -98,7 +98,8 @@ export async function POST(req: Request) {
       },
     });
     text = result.text.trim();
-  } catch {
+  } catch (err) {
+    console.error("voice-transcribe failed", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "語音辨識失敗，請再試一次" }, { status: 502 });
   }
 

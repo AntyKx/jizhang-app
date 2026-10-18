@@ -40,9 +40,6 @@ const CHUNK_MS = 250;
 // Extra chunks kept past the detected start of silence, so trimming can't
 // clip the tail end of the user's actual last word.
 const TRIM_BUFFER_CHUNKS = 2;
-// Extra chunks kept before the detected start of speech, for the same
-// reason (don't clip the onset of the first word).
-const LEADING_BUFFER_CHUNKS = 1;
 // Below this many chunks (~750ms), there's not enough real audio for
 // Whisper to work with and it's prone to hallucinating content outright —
 // bail out client-side instead of sending it.
@@ -102,10 +99,6 @@ export function VoiceRecordButton({
   // silent audio, and every auto-stopped recording otherwise ends with
   // exactly the ~1.5s of silence that triggered the stop.
   const silenceStartIndexRef = useRef<number | null>(null);
-  // Index into chunksRef marking where speech was first detected — trims
-  // the reaction-time gap between tapping the button and actually talking,
-  // same rationale as the trailing trim above.
-  const speechStartIndexRef = useRef<number | null>(null);
   // Whether the level meter actually ran (AudioContext available and not
   // suspended) and whether it ever heard anything above the silence floor.
   // Sending a silent clip makes the transcription model invent text — often
@@ -118,15 +111,16 @@ export function VoiceRecordButton({
   async function handleRecordingDone() {
     setState("processing");
     try {
-      const start =
-        speechStartIndexRef.current !== null
-          ? Math.max(0, speechStartIndexRef.current - LEADING_BUFFER_CHUNKS)
-          : 0;
+      // Only the tail is trimmed, never the head: the container header (WebM
+      // EBML / MP4 init segment) lives in the first chunk(s) — in Chrome it
+      // even straddles chunks 0 and 1. Cutting the leading silence dropped
+      // it, and the model rejected the clip as an unsupported format for
+      // anyone who paused before speaking (verified 2026-10-18).
       const end =
         silenceStartIndexRef.current !== null
           ? silenceStartIndexRef.current + TRIM_BUFFER_CHUNKS
           : chunksRef.current.length;
-      const trimmed = chunksRef.current.slice(start, end);
+      const trimmed = chunksRef.current.slice(0, end);
       const chunks = trimmed.length >= MIN_CHUNKS_TO_SEND ? trimmed : chunksRef.current;
 
       if (meterRanRef.current && !heardSpeechRef.current) {
@@ -230,7 +224,6 @@ export function VoiceRecordButton({
 
       const now = Date.now();
       if (rms > SILENCE_THRESHOLD) {
-        if (!hasSpoken) speechStartIndexRef.current = chunksRef.current.length;
         hasSpoken = true;
         heardSpeechRef.current = true;
         silenceStartedAt = null;
@@ -270,7 +263,6 @@ export function VoiceRecordButton({
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       chunksRef.current = [];
       silenceStartIndexRef.current = null;
-      speechStartIndexRef.current = null;
       meterRanRef.current = false;
       heardSpeechRef.current = false;
       recorder.ondataavailable = (e) => {
