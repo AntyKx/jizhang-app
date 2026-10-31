@@ -4,7 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, recurringRules } from "@/db/schema";
+import { accounts, recurringRules, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { getDefaultAccountId } from "@/lib/account";
 import { ownedCategoryId } from "@/lib/category";
@@ -215,6 +215,14 @@ export async function postRecurringOccurrence(ruleId: string) {
   // nothing and the user can simply retry.
   let advanced: boolean;
   try {
+    // Link the row back to its rule — /stats' 固定支出 split counts exactly
+    // the expenses carrying a recurringRuleId. Set here rather than through
+    // createTransaction's input, since that action is client-callable and
+    // the rule's ownership was only checked above.
+    await db
+      .update(transactions)
+      .set({ recurringRuleId: rule.id })
+      .where(and(eq(transactions.id, created.id), eq(transactions.userId, userId)));
     advanced = await advanceRule(userId, rule);
   } catch {
     await deleteTransactionUnchecked(userId, created.id);
