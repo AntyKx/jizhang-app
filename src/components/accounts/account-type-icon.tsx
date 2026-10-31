@@ -1,4 +1,4 @@
-import { Banknote, CreditCard, Landmark, Smartphone, TrendingUp } from "lucide-react";
+import { Banknote, CreditCard, HandCoins, Landmark, Smartphone, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AccountType } from "@/lib/account-type";
 
@@ -11,6 +11,7 @@ const icons = {
   credit_card: CreditCard,
   e_wallet: Smartphone,
   investment: TrendingUp,
+  loan: HandCoins,
 } as const satisfies Record<AccountType, unknown>;
 
 export function AccountTypeIcon({ type, className }: { type: AccountType; className?: string }) {

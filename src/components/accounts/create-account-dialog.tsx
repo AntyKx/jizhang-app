@@ -22,7 +22,7 @@ import {
 import { createAccount } from "@/app/(app)/accounts/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
-import { accountTypeLabels, type AccountType } from "@/lib/account-type";
+import { accountTypeLabels, initialBalanceFromInput, type AccountType } from "@/lib/account-type";
 import { currencyAllowsDecimal, supportedCurrencies } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import { StatementDayPicker } from "@/components/accounts/statement-day-picker";
@@ -73,9 +73,7 @@ export function CreateAccountDialog({
               name: String(formData.get("name") ?? ""),
               type: (formData.get("type") as keyof typeof accountTypeLabels) ?? "cash",
               currency: String(formData.get("currency") ?? defaultCurrency),
-              // Only credit cards can open in debt; drop a sign left over from
-              // toggling it on and then switching the type away.
-              initialBalance: Number(type === "credit_card" ? initialBalance : initialBalance.replace("-", "")) || 0,
+              initialBalance: initialBalanceFromInput(type, initialBalance),
               excludeFromNetWorth,
               statementDay: statementDay ? Number(statementDay) : null,
             });
@@ -139,7 +137,7 @@ export function CreateAccountDialog({
             </Select>
           </div>
           <div className="flex flex-col gap-2">
-            <Label>期初餘額</Label>
+            <Label>{type === "loan" ? "剩餘貸款金額" : "期初餘額"}</Label>
             <AmountKeypadField value={initialBalance} onChange={setInitialBalance} allowDecimal={currencyAllowsDecimal(currency)} inline allowNegative={type === "credit_card"} />
           </div>
 

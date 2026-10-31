@@ -25,7 +25,7 @@ export const backupSchema = z.object({
     z.object({
       id: z.string().uuid(),
       name: z.string(),
-      type: z.enum(["cash", "bank", "credit_card", "e_wallet", "investment"]),
+      type: z.enum(["cash", "bank", "credit_card", "e_wallet", "investment", "loan"]),
       currency: z.string(),
       initialBalance: z.string(),
       initialExchangeRate: z.string(),

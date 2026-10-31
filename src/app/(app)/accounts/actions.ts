@@ -11,6 +11,7 @@ import { supportedCurrencies } from "@/lib/currency";
 import { getExchangeRateToTwd } from "@/lib/fx";
 import { hasCoreAccess } from "@/lib/entitlements";
 import { fail, isFail, type Fail } from "@/lib/action-result";
+import type { AccountType } from "@/lib/account-type";
 
 // getExchangeRateToTwd throws its own user-facing message (unreachable FX
 // API, unsupported currency) — converted to the same fail() shape as this
@@ -25,7 +26,7 @@ async function tryExchangeRate(currency: string, date: string): Promise<number |
   }
 }
 
-const accountTypeSchema = z.enum(["cash", "bank", "credit_card", "e_wallet", "investment"]);
+const accountTypeSchema = z.enum(["cash", "bank", "credit_card", "e_wallet", "investment", "loan"]);
 const currencySchema = z.enum(
   Object.keys(supportedCurrencies) as [keyof typeof supportedCurrencies, ...(keyof typeof supportedCurrencies)[]],
 );
@@ -49,7 +50,7 @@ const createAccountSchema = z.object({
 
 export async function createAccount(input: {
   name: string;
-  type: "cash" | "bank" | "credit_card" | "e_wallet" | "investment";
+  type: AccountType;
   currency?: string;
   initialBalance?: number;
   excludeFromNetWorth?: boolean;
@@ -105,7 +106,7 @@ const updateAccountSchema = z.object({
 export async function updateAccount(input: {
   id: string;
   name: string;
-  type: "cash" | "bank" | "credit_card" | "e_wallet" | "investment";
+  type: AccountType;
   excludeFromNetWorth: boolean;
   initialBalance: number;
   statementDay?: number | null;

@@ -16,7 +16,7 @@ import {
 import { updateAccount } from "@/app/(app)/accounts/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
-import { accountTypeLabels, type AccountType } from "@/lib/account-type";
+import { accountTypeLabels, initialBalanceFromInput, type AccountType } from "@/lib/account-type";
 import { currencyAllowsDecimal } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import { StatementDayPicker } from "@/components/accounts/statement-day-picker";
@@ -55,11 +55,11 @@ export function EditAccountDialog({
       // Round away any legacy decimal when this currency doesn't take one —
       // allowDecimal only removes the "." key for new input, it doesn't
       // retroactively reformat an existing stored value.
-      setInitialBalance(
-        currencyAllowsDecimal(account.currency)
-          ? account.initialBalance
-          : Math.round(Number(account.initialBalance)).toString(),
-      );
+      const stored = currencyAllowsDecimal(account.currency)
+        ? account.initialBalance
+        : Math.round(Number(account.initialBalance)).toString();
+      // Loans are edited as the positive amount owed (see initialBalanceFromInput).
+      setInitialBalance(account.type === "loan" ? stored.replace("-", "") : stored);
       setStatementDay(account.statementDay != null ? String(account.statementDay) : undefined);
     }
   }
@@ -72,7 +72,7 @@ export function EditAccountDialog({
         name: name.trim(),
         type,
         excludeFromNetWorth,
-        initialBalance: Number(type === "credit_card" ? initialBalance : initialBalance.replace("-", "")),
+        initialBalance: initialBalanceFromInput(type, initialBalance),
         statementDay: statementDay ? Number(statementDay) : null,
       });
       if (isFail(result)) {
@@ -130,7 +130,7 @@ export function EditAccountDialog({
           )}
 
           <div className="flex flex-col gap-2">
-            <Label>期初餘額</Label>
+            <Label>{type === "loan" ? "剩餘貸款金額" : "期初餘額"}</Label>
             <AmountKeypadField value={initialBalance} onChange={setInitialBalance} allowDecimal={currencyAllowsDecimal(account?.currency)} inline allowNegative={type === "credit_card"} />
             <p className="text-xs text-muted-foreground">
               修改這裡不會動到已經記錄的交易，只會依調整的差額更新目前餘額。

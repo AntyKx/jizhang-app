@@ -39,6 +39,7 @@ export const paymentMethodsForAccountType: Record<AccountType, PaymentMethod[]> 
   credit_card: ["credit_card", "mobile_payment", "auto_debit", "other"],
   e_wallet: ["mobile_payment", "auto_debit", "other"],
   investment: ["other", "auto_debit"],
+  loan: ["auto_debit", "other"],
 };
 
 export function paymentMethodLabel(value: string): string {

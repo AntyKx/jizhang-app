@@ -50,7 +50,7 @@ type Account = {
 // (credit cards), then where money actually sits (bank), then wallets/
 // investments. Not the same order accountTypeLabels happens to declare its
 // keys in.
-const TYPE_ORDER: AccountType[] = ["cash", "credit_card", "bank", "e_wallet", "investment"];
+const TYPE_ORDER: AccountType[] = ["cash", "credit_card", "bank", "e_wallet", "investment", "loan"];
 
 function SortableAccountRow({
   account: a,
