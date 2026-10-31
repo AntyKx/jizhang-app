@@ -73,7 +73,9 @@ export function CreateAccountDialog({
               name: String(formData.get("name") ?? ""),
               type: (formData.get("type") as keyof typeof accountTypeLabels) ?? "cash",
               currency: String(formData.get("currency") ?? defaultCurrency),
-              initialBalance: Number(initialBalance) || 0,
+              // Only credit cards can open in debt; drop a sign left over from
+              // toggling it on and then switching the type away.
+              initialBalance: Number(type === "credit_card" ? initialBalance : initialBalance.replace("-", "")) || 0,
               excludeFromNetWorth,
               statementDay: statementDay ? Number(statementDay) : null,
             });
@@ -138,7 +140,7 @@ export function CreateAccountDialog({
           </div>
           <div className="flex flex-col gap-2">
             <Label>期初餘額</Label>
-            <AmountKeypadField value={initialBalance} onChange={setInitialBalance} allowDecimal={currencyAllowsDecimal(currency)} inline />
+            <AmountKeypadField value={initialBalance} onChange={setInitialBalance} allowDecimal={currencyAllowsDecimal(currency)} inline allowNegative={type === "credit_card"} />
           </div>
 
           <button

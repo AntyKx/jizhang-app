@@ -18,6 +18,7 @@ const KEYS_NO_DECIMAL = ["7", "8", "9", "4", "5", "6", "1", "2", "3", "0", "back
 // progress value like a trailing "." with no digits after it yet.
 function formatAmount(value: string): string {
   if (!value) return "0";
+  if (value.startsWith("-")) return `-${formatAmount(value.slice(1))}`;
   const [intPart, decPart] = value.split(".");
   const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   return decPart !== undefined ? `${formattedInt}.${decPart}` : formattedInt;
@@ -48,6 +49,7 @@ export function AmountKeypadField({
   confirmLabel = "完成",
   onConfirm,
   inline = false,
+  allowNegative = false,
   className,
 }: {
   value: string;
@@ -83,6 +85,11 @@ export function AmountKeypadField({
   // "fixed" panel ended up filling the Dialog itself and hid every other
   // field (name, date, category) while typing.
   inline?: boolean;
+  // Adds a +/− toggle next to the display, for values that can legitimately
+  // go below zero (an account's opening balance — credit card debt, a loan).
+  // The sign lives as a leading "-" in the value string; a lone "-" means
+  // "negative, no digits yet".
+  allowNegative?: boolean;
 }) {
   const [open, setOpen] = useState(autoOpen);
   const displayRef = useRef<HTMLButtonElement>(null);
@@ -143,23 +150,33 @@ export function AmountKeypadField({
 
   const KEYS = allowDecimal ? KEYS_WITH_DECIMAL : KEYS_NO_DECIMAL;
 
+  const negative = value.startsWith("-");
+
   function press(key: (typeof KEYS)[number]) {
+    const sign = negative ? "-" : "";
+    const digits = negative ? value.slice(1) : value;
     if (key === "backspace") {
-      onChange(value.slice(0, -1));
+      // Keep the sign once digits run out, so clearing a negative amount
+      // doesn't silently flip it positive; the toggle removes it.
+      onChange(sign + digits.slice(0, -1));
       return;
     }
     if (key === ".") {
-      if (value.includes(".")) return;
-      onChange(value === "" ? "0." : value + ".");
+      if (digits.includes(".")) return;
+      onChange(sign + (digits === "" ? "0." : digits + "."));
       return;
     }
-    const decimalIndex = value.indexOf(".");
-    if (decimalIndex !== -1 && value.length - decimalIndex - 1 >= maxDecimals) return;
-    if (value === "0") {
-      onChange(key);
+    const decimalIndex = digits.indexOf(".");
+    if (decimalIndex !== -1 && digits.length - decimalIndex - 1 >= maxDecimals) return;
+    if (digits === "0") {
+      onChange(sign + key);
       return;
     }
-    onChange(value + key);
+    onChange(sign + digits + key);
+  }
+
+  function toggleSign() {
+    onChange(negative ? value.slice(1) : "-" + value);
   }
 
   const keys = (
@@ -202,20 +219,41 @@ export function AmountKeypadField({
     </Button>
   );
 
-  const display = (
+  const displayButton = (
     <button
       ref={displayRef}
       type="button"
       onClick={() => setOpen(inline ? !open : true)}
       className={cn(
         "flex h-16 items-center justify-center rounded-2xl border bg-card text-3xl font-semibold tabular-nums transition-colors",
-        !value && "text-muted-foreground",
+        allowNegative && "min-w-0 flex-1",
+        (!value || value === "-") && "text-muted-foreground",
+        negative && value !== "-" && "text-destructive",
         open && "border-primary ring-2 ring-ring",
         className,
       )}
     >
       {formatAmount(value)}
     </button>
+  );
+  const display = allowNegative ? (
+    <div className="flex gap-2">
+      <button
+        type="button"
+        onClick={toggleSign}
+        aria-label={negative ? "改為正數" : "改為負數"}
+        aria-pressed={negative}
+        className={cn(
+          "flex h-16 w-14 shrink-0 items-center justify-center rounded-2xl border text-2xl font-semibold transition-colors",
+          negative ? "border-destructive/40 bg-destructive/10 text-destructive" : "bg-card text-muted-foreground",
+        )}
+      >
+        {negative ? "−" : "+"}
+      </button>
+      {displayButton}
+    </div>
+  ) : (
+    displayButton
   );
 
   if (inline) {

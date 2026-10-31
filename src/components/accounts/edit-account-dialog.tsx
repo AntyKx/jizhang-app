@@ -65,14 +65,14 @@ export function EditAccountDialog({
   }
 
   function handleSave() {
-    if (!account || !name.trim() || !initialBalance) return;
+    if (!account || !name.trim() || !initialBalance || initialBalance === "-") return;
     startTransition(async () => {
       const result = await updateAccount({
         id: account.id,
         name: name.trim(),
         type,
         excludeFromNetWorth,
-        initialBalance: Number(initialBalance),
+        initialBalance: Number(type === "credit_card" ? initialBalance : initialBalance.replace("-", "")),
         statementDay: statementDay ? Number(statementDay) : null,
       });
       if (isFail(result)) {
@@ -131,7 +131,7 @@ export function EditAccountDialog({
 
           <div className="flex flex-col gap-2">
             <Label>期初餘額</Label>
-            <AmountKeypadField value={initialBalance} onChange={setInitialBalance} allowDecimal={currencyAllowsDecimal(account?.currency)} inline />
+            <AmountKeypadField value={initialBalance} onChange={setInitialBalance} allowDecimal={currencyAllowsDecimal(account?.currency)} inline allowNegative={type === "credit_card"} />
             <p className="text-xs text-muted-foreground">
               修改這裡不會動到已經記錄的交易，只會依調整的差額更新目前餘額。
             </p>
@@ -161,7 +161,7 @@ export function EditAccountDialog({
             </span>
           </button>
 
-          <Button onClick={handleSave} disabled={pending || !name.trim() || !initialBalance}>
+          <Button onClick={handleSave} disabled={pending || !name.trim() || !initialBalance || initialBalance === "-"}>
             {pending ? "儲存中…" : "儲存變更"}
           </Button>
         </div>
