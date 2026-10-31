@@ -10,6 +10,7 @@ import { getTodayInTaipei, normalizeAiDate, recentDaysForPrompt, withWeekday } f
 import { getFrequentSplitNames } from "@/lib/shared-expenses";
 import { logServerEvent } from "@/lib/analytics/server-event";
 import { getAiUsageStatus, recordAiUsage, requireCoreAccessApi } from "@/lib/entitlements";
+import { CATEGORY_HINT } from "@/lib/ai-category-hint";
 
 const sharedQuickAddSchema = z.object({
   amount: z.number().positive().describe("金額，純數字"),
@@ -69,6 +70,7 @@ export async function POST(req: Request) {
 今天日期是 ${withWeekday(today)}。
 最近日期對照（「上週五」「這週一」等請從這裡查，週一是一週的第一天）：${recentDaysForPrompt(today)}
 可用分類清單：${expenseCategories.map((c) => c.name).join("、")}
+${CATEGORY_HINT}
 使用者最近常分帳的對象（若文字中提到類似名字，優先比對這份清單）：${frequentNames.join("、") || "（無）"}
 
 使用者輸入：「${text}」

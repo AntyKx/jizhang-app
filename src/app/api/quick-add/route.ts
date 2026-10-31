@@ -11,6 +11,7 @@ import { getTodayInTaipei, normalizeAiDate, recentDaysForPrompt, withWeekday } f
 import { getAiUsageStatus, recordAiUsage } from "@/lib/entitlements";
 import { suggestCategoryForMerchant } from "@/lib/merchant-category-memory";
 import { logServerEvent } from "@/lib/analytics/server-event";
+import { CATEGORY_HINT } from "@/lib/ai-category-hint";
 
 const quickAddSchema = z.object({
   // Nullable on purpose: with a required positive number the model has to
@@ -109,6 +110,7 @@ export async function POST(req: Request) {
 今天日期是 ${withWeekday(today)}。
 最近日期對照（「上週五」「這週一」等請從這裡查，週一是一週的第一天）：${recentDaysForPrompt(today)}
 可用分類清單：${userCategories.map((c) => `${c.name}(${c.type})`).join("、")}
+${CATEGORY_HINT}
 可用帳戶清單：${userAccounts.map((a) => a.name).join("、")}
 
 使用者輸入：「${text}」

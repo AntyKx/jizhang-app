@@ -15,6 +15,7 @@ import { describeItemsForPrompt, eInvoiceSchema } from "@/lib/einvoice/schema";
 import { itemsToNote } from "@/lib/einvoice/qr";
 import { lookupSellerNames } from "@/lib/einvoice/seller-name";
 import { findRecordedInvoices } from "@/app/(app)/transactions/actions";
+import { CATEGORY_HINT } from "@/lib/ai-category-hint";
 
 const receiptScanSchema = z.object({
   // Nullable for the same reason as quick-add: a photo that isn't a receipt
@@ -102,6 +103,7 @@ export async function POST(req: Request) {
             text: `你是記帳助理，請解析這張收據/發票照片，抓出總金額、最符合的分類、付款方式、帳戶、商家與交易日期。
 今天日期是 ${today}。
 可用分類清單：${expenseCategories.map((c) => c.name).join("、")}
+${CATEGORY_HINT}
 可用帳戶清單：${userAccounts.map((a) => a.name).join("、")}
 
 請仔細看清楚金額（通常是「總計」「合計」「應付金額」旁的數字，不是單項價格），分類須完全符合上述清單其中之一，否則為 null。${invoiceHint}`,

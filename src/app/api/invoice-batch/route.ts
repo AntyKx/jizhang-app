@@ -10,6 +10,7 @@ import { suggestCategoryForMerchant } from "@/lib/merchant-category-memory";
 import { describeItemsForPrompt, eInvoiceSchema } from "@/lib/einvoice/schema";
 import { lookupSellerNames } from "@/lib/einvoice/seller-name";
 import { findRecordedInvoices } from "@/app/(app)/transactions/actions";
+import { CATEGORY_HINT } from "@/lib/ai-category-hint";
 
 const MAX_INVOICES = 50;
 
@@ -59,6 +60,7 @@ export async function POST(req: Request) {
       schema: resultSchema,
       prompt: `你是記帳助理。以下是使用者掃描的電子發票，請為每一張判斷商家（一般人熟悉的店名）和最符合的支出分類。
 可用分類清單：${expenseCategories.map((c) => c.name).join("、")}
+${CATEGORY_HINT}
 
 ${invoices
   .map(
