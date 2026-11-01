@@ -1,9 +1,9 @@
 import { INCOME_COLOR, SLOT_1_COLOR } from "@/components/stats/chart-colors";
 import type { FixedVsVariable } from "@/lib/stats/insight-queries";
 
-// Split comes from whether the expense was posted by a recurring rule, so
-// the empty state is a real instruction ("set your recurring bills up and
-// this becomes meaningful"), not just "no data".
+// Fixed = posted by a recurring rule, or in a category marked 固定支出 (see
+// getFixedVsVariable), so the empty state is a real instruction, not just
+// "no data".
 export function FixedVsVariableCard({ data }: { data: FixedVsVariable }) {
   const total = data.fixed + data.variable;
   if (total === 0) {
@@ -24,7 +24,7 @@ export function FixedVsVariableCard({ data }: { data: FixedVsVariable }) {
           <span className="flex items-center gap-2 text-sm">
             <span className="size-2.5 rounded-full" style={{ backgroundColor: SLOT_1_COLOR }} />
             固定支出
-            <span className="text-xs text-muted-foreground">訂閱・定期帳單</span>
+            <span className="text-xs text-muted-foreground">訂閱・固定分類</span>
           </span>
           <span className="text-sm font-semibold tabular-nums">
             {Math.round(data.fixed).toLocaleString("zh-TW")}
@@ -46,7 +46,7 @@ export function FixedVsVariableCard({ data }: { data: FixedVsVariable }) {
 
       {data.fixed === 0 && (
         <p className="rounded-xl bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
-          還沒有「訂閱／定期收支」紀錄，暫時全算變動支出。把房租、保險等設成定期項目就能看出固定開銷。
+          還沒有固定支出，暫時全算變動支出。把房租、保險等設成定期項目，或在「分類管理」把房貸、利息等分類設成固定支出，就能看出固定開銷。
         </p>
       )}
     </div>

@@ -14,8 +14,9 @@ import { Label } from "@/components/ui/label";
 import { updateCategory } from "@/app/(app)/categories/actions";
 import { isFail } from "@/lib/action-result";
 import { IconPicker } from "@/components/categories/icon-picker";
+import { FixedExpenseSwitch } from "@/components/categories/fixed-expense-switch";
 
-type Category = { id: string; name: string; icon: string | null };
+type Category = { id: string; name: string; icon: string | null; type: "income" | "expense"; isFixed: boolean };
 
 export function EditCategoryDialog({
   category,
@@ -26,6 +27,7 @@ export function EditCategoryDialog({
 }) {
   const [name, setName] = useState("");
   const [icon, setIcon] = useState<string | null>(null);
+  const [isFixed, setIsFixed] = useState(false);
   const [prevCategory, setPrevCategory] = useState(category);
   const [pending, startTransition] = useTransition();
 
@@ -34,13 +36,19 @@ export function EditCategoryDialog({
     if (category) {
       setName(category.name);
       setIcon(category.icon);
+      setIsFixed(category.isFixed);
     }
   }
 
   function handleSave() {
     if (!category || !name.trim() || !icon) return;
     startTransition(async () => {
-      const result = await updateCategory({ id: category.id, name: name.trim(), icon });
+      const result = await updateCategory({
+        id: category.id,
+        name: name.trim(),
+        icon,
+        isFixed: category.type === "expense" && isFixed,
+      });
       if (isFail(result)) {
         toast.error(result.error);
         return;
@@ -67,6 +75,8 @@ export function EditCategoryDialog({
               maxLength={20}
             />
           </div>
+
+          {category?.type === "expense" && <FixedExpenseSwitch checked={isFixed} onChange={setIsFixed} />}
 
           <IconPicker icon={icon} onIconChange={setIcon} />
 

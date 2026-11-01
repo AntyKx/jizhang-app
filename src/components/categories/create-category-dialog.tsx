@@ -15,25 +15,28 @@ import { Label } from "@/components/ui/label";
 import { createCategory } from "@/app/(app)/categories/actions";
 import { IconPicker } from "@/components/categories/icon-picker";
 import { TypeToggle } from "@/components/record/type-toggle";
+import { FixedExpenseSwitch } from "@/components/categories/fixed-expense-switch";
 
 export function CreateCategoryDialog() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<"expense" | "income">("expense");
   const [icon, setIcon] = useState<string | null>(null);
+  const [isFixed, setIsFixed] = useState(false);
   const [pending, startTransition] = useTransition();
 
   function reset() {
     setName("");
     setType("expense");
     setIcon(null);
+    setIsFixed(false);
   }
 
   function handleSave() {
     if (!name.trim() || !icon) return;
     startTransition(async () => {
       try {
-        await createCategory({ name: name.trim(), type, icon });
+        await createCategory({ name: name.trim(), type, icon, isFixed: type === "expense" && isFixed });
         toast.success(`已新增分類 ${name}`);
         reset();
         setOpen(false);
@@ -70,6 +73,8 @@ export function CreateCategoryDialog() {
           </div>
 
           <TypeToggle value={type} onChange={setType} />
+
+          {type === "expense" && <FixedExpenseSwitch checked={isFixed} onChange={setIsFixed} />}
 
           <IconPicker
             icon={icon}

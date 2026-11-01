@@ -19,6 +19,8 @@ export const backupSchema = z.object({
       icon: z.string().nullable(),
       color: z.string().nullable(),
       sortOrder: z.number().int(),
+      // Absent in backups made before 固定支出 categories existed.
+      isFixed: z.boolean().default(false),
     }),
   ),
   accounts: z.array(

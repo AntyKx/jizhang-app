@@ -122,7 +122,12 @@ async function applyBackup(userId: string, parsed: Backup) {
   ];
 
   if (parsed.categories.length > 0) {
-    ops.push(db.insert(categories).values(parsed.categories.map((c) => ({ ...c, userId }))));
+    ops.push(
+      db.insert(categories).values(
+        // 固定 only ever applies to expense categories (see schema.ts).
+        parsed.categories.map((c) => ({ ...c, isFixed: c.type === "expense" && c.isFixed, userId })),
+      ),
+    );
   }
   if (parsed.accounts.length > 0) {
     ops.push(db.insert(accounts).values(parsed.accounts.map((a) => ({ ...a, userId }))));

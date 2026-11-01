@@ -35,6 +35,7 @@ export async function buildBackup(userId: string) {
         icon: categories.icon,
         color: categories.color,
         sortOrder: categories.sortOrder,
+        isFixed: categories.isFixed,
       })
       .from(categories)
       .where(eq(categories.userId, userId)),

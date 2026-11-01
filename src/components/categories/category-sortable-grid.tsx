@@ -24,7 +24,14 @@ import { deleteCategory, reorderCategories } from "@/app/(app)/categories/action
 import { isFail } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 
-type Category = { id: string; name: string; icon: string | null; color: string | null };
+type Category = {
+  id: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+  type: "income" | "expense";
+  isFixed: boolean;
+};
 
 function SortableTile({
   category,
@@ -93,6 +100,11 @@ function SortableTile({
       <span className="text-xs text-muted-foreground">
         {confirmingDelete ? "再點一次刪除" : category.name}
       </span>
+      {category.isFixed && !confirmingDelete && (
+        <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-primary px-1.5 py-px text-[10px] leading-tight font-medium text-primary-foreground">
+          固定
+        </span>
+      )}
     </div>
   );
 }

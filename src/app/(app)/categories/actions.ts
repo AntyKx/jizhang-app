@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { categories } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
@@ -29,6 +29,7 @@ const createCategorySchema = z.object({
   name: z.string().min(1).max(20),
   type: z.enum(["income", "expense"]),
   icon: iconSchema,
+  isFixed: z.boolean().default(false),
 });
 
 function revalidateCategoryPaths() {
@@ -43,6 +44,7 @@ export async function createCategory(input: {
   name: string;
   type: "income" | "expense";
   icon: string;
+  isFixed?: boolean;
 }) {
   const userId = await requireUserId();
   const parsed = createCategorySchema.parse(input);
@@ -53,6 +55,8 @@ export async function createCategory(input: {
     type: parsed.type,
     icon: parsed.icon,
     color: pickCategoryColor(parsed.name),
+    // 固定 only applies to expenses (see schema.ts).
+    isFixed: parsed.type === "expense" && parsed.isFixed,
   });
 
   revalidateCategoryPaths();
@@ -62,18 +66,26 @@ const updateCategorySchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(20),
   icon: iconSchema,
+  isFixed: z.boolean().default(false),
 });
 
 // Every category is exactly one user's own now (no more shared/locked
 // rows) — this guard just stops user A from editing user B's category by
 // id, it's not a "some categories are special" check anymore.
-export async function updateCategory(input: { id: string; name: string; icon: string }) {
+export async function updateCategory(input: { id: string; name: string; icon: string; isFixed?: boolean }) {
   const userId = await requireUserId();
   const parsed = updateCategorySchema.parse(input);
 
   const [updated] = await db
     .update(categories)
-    .set({ name: parsed.name, icon: parsed.icon, color: pickCategoryColor(parsed.name) })
+    .set({
+      name: parsed.name,
+      icon: parsed.icon,
+      color: pickCategoryColor(parsed.name),
+      // Type can't change on edit, but guard in SQL anyway so an income
+      // category can never end up flagged 固定支出.
+      isFixed: sql`(${categories.type} = 'expense' AND ${parsed.isFixed})`,
+    })
     .where(and(eq(categories.id, parsed.id), eq(categories.userId, userId)))
     .returning({ id: categories.id });
   if (!updated) return fail("找不到指定的分類");

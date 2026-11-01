@@ -18,6 +18,7 @@ export default async function CategoriesPage() {
       icon: categories.icon,
       color: categories.color,
       type: categories.type,
+      isFixed: categories.isFixed,
     })
     .from(categories)
     .where(eq(categories.userId, userId))

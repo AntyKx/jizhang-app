@@ -1,5 +1,5 @@
 import { differenceInCalendarDays, format } from "date-fns";
-import { and, eq, gte, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, transactions } from "@/db/schema";
 import { getTodayInTaipei } from "@/lib/date";
@@ -73,44 +73,39 @@ export async function getSavingsRateTrend(
 
 export type FixedVsVariable = { fixed: number; variable: number; fixedPct: number | null };
 
-// "Fixed" is taken straight from whether the expense was posted by a
-// recurring rule (rent, insurance, subscriptions) rather than guessed from
-// categories — the app already knows which transactions came from
-// /subscriptions, so this is a fact, not a heuristic. Knowing the baseline
-// burn is what makes the rest of the money legible as discretionary.
+// An expense is "fixed" when either
+//   - it was posted by a recurring rule (一鍵入帳 sets recurringRuleId), or
+//   - its category is marked 固定支出 (categories.isFixed) — for bills that
+//     recur but vary in amount (房貸利息, 保險), which a rule can't post.
+// One query over all expenses in range, classified per row, so fixed +
+// variable is always exactly the period's total expense — a row can never
+// be counted twice or dropped, whichever of the two conditions it meets.
 export async function getFixedVsVariable(userId: string, range: StatsRange): Promise<FixedVsVariable> {
-  const [fixedRows, variableRows] = await Promise.all([
-    db
-      .select({ amount: transactions.amount, exchangeRate: transactions.exchangeRate })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.userId, userId),
-          eq(transactions.type, "expense"),
-          isNotNull(transactions.recurringRuleId),
-          gte(transactions.occurredAt, range.startStr),
-          lte(transactions.occurredAt, range.endStr),
-        ),
+  const rows = await db
+    .select({
+      amount: transactions.amount,
+      exchangeRate: transactions.exchangeRate,
+      recurringRuleId: transactions.recurringRuleId,
+      categoryIsFixed: categories.isFixed,
+    })
+    .from(transactions)
+    .leftJoin(categories, and(eq(transactions.categoryId, categories.id), eq(categories.userId, userId)))
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        eq(transactions.type, "expense"),
+        gte(transactions.occurredAt, range.startStr),
+        lte(transactions.occurredAt, range.endStr),
       ),
-    db
-      .select({ amount: transactions.amount, exchangeRate: transactions.exchangeRate })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.userId, userId),
-          eq(transactions.type, "expense"),
-          isNull(transactions.recurringRuleId),
-          gte(transactions.occurredAt, range.startStr),
-          lte(transactions.occurredAt, range.endStr),
-        ),
-      ),
-  ]);
+    );
 
-  const sum = (rows: { amount: string; exchangeRate: string }[]) =>
-    rows.reduce((total, r) => total + Number(r.amount) * Number(r.exchangeRate), 0);
-
-  const fixed = sum(fixedRows);
-  const variable = sum(variableRows);
+  let fixed = 0;
+  let variable = 0;
+  for (const r of rows) {
+    const value = Number(r.amount) * Number(r.exchangeRate);
+    if (r.recurringRuleId !== null || r.categoryIsFixed === true) fixed += value;
+    else variable += value;
+  }
   const total = fixed + variable;
 
   return { fixed, variable, fixedPct: total > 0 ? (fixed / total) * 100 : null };

@@ -154,6 +154,10 @@ export const categories = pgTable("categories", {
   color: text("color").default("#6366f1"),
   parentId: uuid("parent_id"),
   sortOrder: integer("sort_order").notNull().default(0),
+  // Every expense in this category counts as 固定支出 on /stats (房貸, 保險,
+  // 利息 — recurring, but not a fixed amount a recurring rule could post).
+  // Only ever true on an expense category; the actions force false otherwise.
+  isFixed: boolean("is_fixed").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("categories_user_idx").on(table.userId),
