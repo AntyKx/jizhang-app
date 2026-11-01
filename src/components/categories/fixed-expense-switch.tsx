@@ -17,7 +17,7 @@ export function FixedExpenseSwitch({ checked, onChange }: { checked: boolean; on
     >
       <span className="flex min-w-0 flex-col gap-0.5">
         <span>固定支出</span>
-        <span className="text-xs text-muted-foreground">例如房貸、保險、利息：這個分類的支出在統計裡都算固定支出</span>
+        <span className="truncate text-xs text-muted-foreground">例如房貸、保險、利息</span>
       </span>
       <span
         className={cn(
