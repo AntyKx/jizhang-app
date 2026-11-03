@@ -179,6 +179,10 @@ export const recurringRules = pgTable("recurring_rules", {
   frequency: recurrenceFrequencyEnum("frequency").notNull().default("monthly"),
   interval: integer("interval").notNull().default(1),
   nextOccurrence: date("next_occurrence").notNull(),
+  // Day of month (1-31) monthly/yearly rules land on, so a rule set on the
+  // 31st goes back to the 31st after a short month instead of sticking to
+  // the 28th (see advanceOccurrence). Null for rules saved before it existed.
+  anchorDay: integer("anchor_day"),
   endDate: date("end_date"),
   isSubscription: boolean("is_subscription").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),

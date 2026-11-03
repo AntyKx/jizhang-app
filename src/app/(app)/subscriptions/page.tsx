@@ -1,4 +1,5 @@
-import { addDays, addMonths, addWeeks, addYears } from "date-fns";
+import { addDays, format } from "date-fns";
+import { advanceOccurrence, type RecurrenceFrequency } from "@/lib/recurrence";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, recurringRules } from "@/db/schema";
@@ -13,31 +14,24 @@ import { BackLink } from "@/components/back-link";
 import { getTodayInTaipei } from "@/lib/date";
 import { GuideHelpLink } from "@/components/guide/guide-help-link";
 
+// Every occurrence from `start` up to `rangeEnd` (and the rule's own end
+// date, if any), stepped with the same anchored logic 一鍵入帳 uses so the
+// projection matches what will actually get posted.
 function expandOccurrences(
   start: string,
-  frequency: "daily" | "weekly" | "monthly" | "yearly",
+  frequency: RecurrenceFrequency,
   interval: number,
-  rangeEndDate: Date,
+  anchorDay: number | null,
+  endDate: string | null,
+  rangeEnd: string,
 ) {
-  const step = (d: Date) => {
-    switch (frequency) {
-      case "daily":
-        return addDays(d, interval);
-      case "weekly":
-        return addWeeks(d, interval);
-      case "monthly":
-        return addMonths(d, interval);
-      case "yearly":
-        return addYears(d, interval);
-    }
-  };
-
-  const occurrences: Date[] = [];
-  let current = new Date(start);
+  const last = endDate && endDate < rangeEnd ? endDate : rangeEnd;
+  const occurrences: string[] = [];
+  let current = start;
   let guard = 0;
-  while (current <= rangeEndDate && guard < 366) {
+  while (current <= last && guard < 366) {
     occurrences.push(current);
-    current = step(current);
+    current = advanceOccurrence(current, frequency, interval, anchorDay);
     guard += 1;
   }
   return occurrences;
@@ -72,11 +66,11 @@ export default async function SubscriptionsPage() {
     .filter((a) => !a.excludeFromNetWorth)
     .map((a) => ({ id: a.id, name: a.name, type: a.type, currency: a.currency }));
 
-  const rangeEnd = addDays(getTodayInTaipei(), 30);
+  const rangeEnd = format(addDays(getTodayInTaipei(), 30), "yyyy-MM-dd");
 
   let projectedNet = 0;
   for (const r of rules) {
-    const occurrences = expandOccurrences(r.nextOccurrence, r.frequency, r.interval, rangeEnd);
+    const occurrences = expandOccurrences(r.nextOccurrence, r.frequency, r.interval, r.anchorDay, r.endDate, rangeEnd);
     const signedAmount = r.type === "income" ? Number(r.amount) : -Number(r.amount);
     projectedNet += signedAmount * occurrences.length;
   }
@@ -146,6 +140,7 @@ export default async function SubscriptionsPage() {
                 frequency: r.frequency,
                 interval: r.interval,
                 nextOccurrence: r.nextOccurrence,
+                endDate: r.endDate,
                 categoryId: r.categoryId,
                 isSubscription: r.isSubscription,
               }}

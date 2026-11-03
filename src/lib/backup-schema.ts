@@ -54,6 +54,7 @@ export const backupSchema = z.object({
       frequency: z.enum(["daily", "weekly", "monthly", "yearly"]),
       interval: z.number().int(),
       nextOccurrence: z.string(),
+      anchorDay: z.number().int().min(1).max(31).nullable().optional(),
       endDate: z.string().nullable(),
       isSubscription: z.boolean(),
       isActive: z.boolean(),

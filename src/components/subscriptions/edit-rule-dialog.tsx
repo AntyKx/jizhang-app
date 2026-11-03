@@ -40,6 +40,7 @@ type Rule = {
   frequency: "daily" | "weekly" | "monthly" | "yearly";
   interval: number;
   nextOccurrence: string;
+  endDate: string | null;
   categoryId: string | null;
   isSubscription: boolean;
 };
@@ -73,7 +74,12 @@ export function EditRuleDialog({
   const [type, setType] = useState(rule.type);
   const [categoryId, setCategoryId] = useState(rule.categoryId ?? "");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(rule.paymentMethod);
-  const [accountId, setAccountId] = useState(rule.accountId);
+  // The rule's account may have been archived since (archived accounts
+  // aren't in `accounts`) — start on a pickable one so saving re-homes the
+  // rule instead of silently keeping it on a hidden account.
+  const [accountId, setAccountId] = useState(
+    accounts.some((a) => a.id === rule.accountId) ? rule.accountId : (accounts[0]?.id ?? rule.accountId),
+  );
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -183,6 +189,12 @@ export function EditRuleDialog({
                 required
               />
             </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="edit-endDate">結束日期（選填）</Label>
+            <Input id="edit-endDate" name="endDate" type="date" defaultValue={rule.endDate ?? ""} />
+            <span className="text-xs text-muted-foreground">分期付款、貸款這類有期限的項目，過了這天就不再提醒</span>
           </div>
 
           <div className="flex flex-col gap-2">

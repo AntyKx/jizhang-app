@@ -18,6 +18,7 @@ type Rule = {
   frequency: "daily" | "weekly" | "monthly" | "yearly";
   interval: number;
   nextOccurrence: string;
+  endDate: string | null;
   categoryId: string | null;
   isSubscription: boolean;
 };
@@ -59,6 +60,7 @@ export function RuleRow({
           </div>
           <div className="text-muted-foreground text-xs">
             下次 {rule.nextOccurrence}
+            {rule.endDate ? ` · 至 ${rule.endDate}` : ""}
             {showAccount && accountName ? ` · ${accountName}` : ""}
           </div>
         </div>

@@ -69,6 +69,7 @@ export async function buildBackup(userId: string) {
         frequency: recurringRules.frequency,
         interval: recurringRules.interval,
         nextOccurrence: recurringRules.nextOccurrence,
+        anchorDay: recurringRules.anchorDay,
         endDate: recurringRules.endDate,
         isSubscription: recurringRules.isSubscription,
         isActive: recurringRules.isActive,

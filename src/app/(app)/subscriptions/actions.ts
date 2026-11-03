@@ -8,7 +8,7 @@ import { accounts, recurringRules, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { getDefaultAccountId } from "@/lib/account";
 import { ownedCategoryId } from "@/lib/category";
-import { advanceOccurrence } from "@/lib/recurrence";
+import { advanceOccurrence, anchorDayOf } from "@/lib/recurrence";
 import { createTransaction } from "@/app/(app)/transactions/actions";
 import { deleteTransactionUnchecked } from "@/lib/transactions/delete-row";
 import { fail, isFail, type Fail } from "@/lib/action-result";
@@ -47,7 +47,7 @@ function revalidateOccurrencePaths() {
 // double-tapped 一鍵入帳/略過 advances the rule only once; returns whether
 // this call was the one that advanced it.
 async function advanceRule(userId: string, rule: typeof recurringRules.$inferSelect): Promise<boolean> {
-  const nextOccurrence = advanceOccurrence(rule.nextOccurrence, rule.frequency, rule.interval);
+  const nextOccurrence = advanceOccurrence(rule.nextOccurrence, rule.frequency, rule.interval, rule.anchorDay);
   const isActive = rule.endDate ? nextOccurrence <= rule.endDate : true;
 
   const updated = await db
@@ -68,6 +68,9 @@ const paymentMethodSchema = z
   .enum(["cash", "credit_card", "debit_card", "mobile_payment", "auto_debit", "other"])
   .default("cash");
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const END_BEFORE_START = "結束日期不能早於下次日期";
+
 const createRuleSchema = z.object({
   categoryId: z.string().uuid().optional(),
   accountId: z.string().uuid().optional(),
@@ -77,7 +80,8 @@ const createRuleSchema = z.object({
   paymentMethod: paymentMethodSchema,
   frequency: z.enum(["daily", "weekly", "monthly", "yearly"]),
   interval: z.coerce.number().int().positive().default(1),
-  nextOccurrence: z.string().min(1),
+  nextOccurrence: z.string().regex(DATE_RE),
+  endDate: z.string().regex(DATE_RE).optional(),
 });
 
 export async function createRecurringRule(formData: FormData) {
@@ -94,7 +98,9 @@ export async function createRecurringRule(formData: FormData) {
     frequency: formData.get("frequency"),
     interval: formData.get("interval") || 1,
     nextOccurrence: formData.get("nextOccurrence"),
+    endDate: formData.get("endDate") || undefined,
   });
+  if (parsed.endDate && parsed.endDate < parsed.nextOccurrence) return fail(END_BEFORE_START);
   // Falls back to the default account only if the form somehow didn't send
   // one (the dialog always does once at least one account exists) — never
   // silently overrides an explicit user choice.
@@ -115,6 +121,8 @@ export async function createRecurringRule(formData: FormData) {
     frequency: parsed.frequency,
     interval: parsed.interval,
     nextOccurrence: parsed.nextOccurrence,
+    anchorDay: anchorDayOf(parsed.nextOccurrence),
+    endDate: parsed.endDate ?? null,
     // Every recurring expense counts toward the "monthly subscription cost"
     // estimate; only expenses make sense as a "subscription" (you don't
     // subscribe to income), so this needs no separate user input.
@@ -134,7 +142,8 @@ const updateRuleSchema = z.object({
   paymentMethod: paymentMethodSchema,
   frequency: z.enum(["daily", "weekly", "monthly", "yearly"]),
   interval: z.coerce.number().int().positive().default(1),
-  nextOccurrence: z.string().min(1),
+  nextOccurrence: z.string().regex(DATE_RE),
+  endDate: z.string().regex(DATE_RE).optional(),
 });
 
 export async function updateRecurringRule(formData: FormData) {
@@ -151,7 +160,9 @@ export async function updateRecurringRule(formData: FormData) {
     frequency: formData.get("frequency"),
     interval: formData.get("interval") || 1,
     nextOccurrence: formData.get("nextOccurrence"),
+    endDate: formData.get("endDate") || undefined,
   });
+  if (parsed.endDate && parsed.endDate < parsed.nextOccurrence) return fail(END_BEFORE_START);
   const accountId = await requireOwnedAccountId(userId, parsed.accountId);
   if (isFail(accountId)) return accountId;
 
@@ -167,6 +178,10 @@ export async function updateRecurringRule(formData: FormData) {
       frequency: parsed.frequency,
       interval: parsed.interval,
       nextOccurrence: parsed.nextOccurrence,
+      // Re-anchored on every save: editing 下次日期 is how the user says
+      // which day of the month this lands on.
+      anchorDay: anchorDayOf(parsed.nextOccurrence),
+      endDate: parsed.endDate ?? null,
       isSubscription: parsed.type === "expense",
     })
     .where(and(eq(recurringRules.id, parsed.id), eq(recurringRules.userId, userId)));
@@ -197,6 +212,13 @@ export async function postRecurringOccurrence(ruleId: string) {
     .where(and(eq(recurringRules.id, ruleId), eq(recurringRules.userId, userId)));
   if (!rule || !rule.isActive) return fail("找不到指定的定期收支項目");
   if (rule.type === "transfer") return fail("轉帳類型的定期項目尚不支援一鍵入帳");
+  const [ruleAccount] = await db
+    .select({ isArchived: accounts.isArchived })
+    .from(accounts)
+    .where(and(eq(accounts.id, rule.accountId), eq(accounts.userId, userId)));
+  if (ruleAccount?.isArchived) {
+    return fail("這個項目綁定的帳戶已封存，請到「訂閱 / 定期收支」改綁其他帳戶");
+  }
 
   const created = await createTransaction({
     categoryId: rule.categoryId ?? undefined,

@@ -139,6 +139,12 @@ export function CreateRuleDialog({
           </div>
 
           <div className="flex flex-col gap-2">
+            <Label htmlFor="endDate">結束日期（選填）</Label>
+            <Input id="endDate" name="endDate" type="date" />
+            <span className="text-xs text-muted-foreground">分期付款、貸款這類有期限的項目，過了這天就不再提醒</span>
+          </div>
+
+          <div className="flex flex-col gap-2">
             <Label>分類（選填）</Label>
             <CategoryPickerSheet categories={relevantCategories} value={categoryId} onChange={setCategoryId} placeholder="不指定" />
             <input type="hidden" name="categoryId" value={categoryId} />
