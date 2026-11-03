@@ -4,7 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts } from "@/db/schema";
+import { accounts, recurringRules } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { pickCategoryColor } from "@/lib/category-color";
 import { supportedCurrencies } from "@/lib/currency";
@@ -155,6 +155,19 @@ export async function archiveAccount(id: string) {
 
   if (activeAccounts.length <= 1 && activeAccounts.some((a) => a.id === id)) {
     return fail("至少要保留一個帳戶，無法封存最後一個帳戶");
+  }
+
+  // An archived account is hidden everywhere, but a recurring rule still
+  // pointing at it would keep nagging on /record and 一鍵入帳 would post
+  // into an account the user can no longer see.
+  const [{ count: activeRuleCount }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(recurringRules)
+    .where(
+      and(eq(recurringRules.userId, userId), eq(recurringRules.accountId, id), eq(recurringRules.isActive, true)),
+    );
+  if (activeRuleCount > 0) {
+    return fail(`有 ${activeRuleCount} 筆定期收支綁在這個帳戶，請先到「訂閱 / 定期收支」改綁其他帳戶或取消`);
   }
 
   await db

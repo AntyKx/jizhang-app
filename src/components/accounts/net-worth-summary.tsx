@@ -24,7 +24,7 @@ export function NetWorthSummary({
 
       <div className="relative flex items-end justify-between gap-4 px-5 pt-5 pb-6">
         <div className="flex flex-col gap-1">
-          <span className="text-sm text-muted-foreground">總資產</span>
+          <span className="text-sm text-muted-foreground">淨資產</span>
           {total === null ? (
             <span className="text-sm text-muted-foreground">目前無法換算外幣，請稍後再試</span>
           ) : (
