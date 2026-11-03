@@ -235,7 +235,7 @@ export function AccountSettings({
             items={supportedCurrencies}
             disabled={savingCurrency}
           >
-            <SelectTrigger>
+            <SelectTrigger className="w-auto max-w-[50%] shrink-0 overflow-hidden">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -261,7 +261,7 @@ export function AccountSettings({
             }}
             disabled={savingAccount}
           >
-            <SelectTrigger>
+            <SelectTrigger className="w-auto max-w-[50%] shrink-0 overflow-hidden">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
