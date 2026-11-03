@@ -1,7 +1,7 @@
 "use client";
 
 import { formatSignedAmount, signedAmount } from "@/lib/transactions/signed-amount";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { format, parse } from "date-fns";
@@ -231,11 +231,47 @@ export function TransactionsList({
     setCursor(initialCursor);
   }
 
+  // Searching re-queries the server (filter.search) instead of only
+  // filtering the pages already loaded — otherwise an older transaction
+  // read as "找不到符合的交易" just because it hadn't been paged in yet.
+  // Debounced; `searchSeq` drops responses that arrive after a newer
+  // keystroke. Re-runs when initialItems changes so results pick up an
+  // edit/delete's router.refresh().
+  const trimmedQuery = query.trim();
+  const [searchResults, setSearchResults] = useState<ListItem[] | null>(null);
+  const [searchCursor, setSearchCursor] = useState<TransactionsCursor | null>(null);
+  const searchSeq = useRef(0);
+  const filterKey = JSON.stringify(filter ?? {});
+  useEffect(() => {
+    const seq = ++searchSeq.current;
+    if (!trimmedQuery) return;
+    const timer = setTimeout(async () => {
+      try {
+        const page = await loadMoreTransactions(null, { ...JSON.parse(filterKey), search: trimmedQuery });
+        if (seq !== searchSeq.current) return;
+        setSearchResults(page.items);
+        setSearchCursor(page.nextCursor);
+      } catch {
+        if (seq === searchSeq.current) toast.error("搜尋失敗，請稍後再試");
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [trimmedQuery, filterKey, initialItems]);
+
   async function handleLoadMore() {
-    if (!cursor || loadingMore) return;
+    const activeCursor = trimmedQuery ? searchCursor : cursor;
+    if (!activeCursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const page = await loadMoreTransactions(cursor, filter);
+      if (trimmedQuery) {
+        const seq = searchSeq.current;
+        const page = await loadMoreTransactions(activeCursor, { ...filter, search: trimmedQuery });
+        if (seq !== searchSeq.current) return;
+        setSearchResults((prev) => [...(prev ?? []), ...page.items]);
+        setSearchCursor(page.nextCursor);
+        return;
+      }
+      const page = await loadMoreTransactions(activeCursor, filter);
       setItems((prev) => [...prev, ...page.items]);
       setCursor(page.nextCursor);
     } catch (err) {
@@ -263,9 +299,12 @@ export function TransactionsList({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return items;
+    // Server results once they arrive; until then, an instant local match
+    // over what's already loaded so typing doesn't blank the list.
+    if (searchResults) return searchResults;
     return items.filter((item) => searchableText(item).some((field) => field?.toLowerCase().includes(q)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, query, accountsById]);
+  }, [items, query, accountsById, searchResults]);
 
   // `filtered` is already sorted newest-first, so grouping consecutive
   // same-month items in one pass preserves that order — no separate sort
@@ -311,14 +350,20 @@ export function TransactionsList({
     <div className="flex flex-col gap-4">
       <Input
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          // Drop the previous query's server results — the local match
+          // stands in until this query's own results arrive.
+          setSearchResults(null);
+          setSearchCursor(null);
+        }}
         placeholder="搜尋商家、備註、分類或帳戶"
       />
 
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-8 text-center">
           <BearIllustration name="search" size={96} />
-          <p className="text-muted-foreground text-sm">找不到符合的交易。</p>
+          <p className="text-muted-foreground text-sm">{trimmedQuery && searchResults === null ? "搜尋中…" : "找不到符合的交易。"}</p>
         </div>
       ) : (
         <StaggerList key={query} className={cn("flex flex-col", collapsibleMonths ? "gap-1" : "gap-6")}>
@@ -403,7 +448,7 @@ export function TransactionsList({
         </StaggerList>
       )}
 
-      {!query.trim() && cursor && (
+      {(trimmedQuery ? searchResults !== null && searchCursor : cursor) && (
         <Button
           variant="outline"
           disabled={loadingMore}

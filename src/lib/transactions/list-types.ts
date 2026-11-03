@@ -62,4 +62,6 @@ export type TransactionsCursor = { occurredAt: string; createdAt: Date };
 // category on /stats — `categoryId: null` means "uncategorized" (a real,
 // selectable state), so it's kept distinct from "no filter" (the field
 // simply absent).
-export type TransactionsFilter = { categoryId?: string | null; start?: string; end?: string };
+// `search` is the list's search box — matched server-side so it reaches
+// rows that haven't been paged in yet (see transactionsFilterConditions).
+export type TransactionsFilter = { categoryId?: string | null; start?: string; end?: string; search?: string };

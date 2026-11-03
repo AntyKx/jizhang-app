@@ -540,15 +540,19 @@ export async function deleteTransaction(transactionId: string) {
   revalidateTransactionPaths();
 }
 
-export async function loadMoreTransactions(cursor: TransactionsCursor, filter?: TransactionsFilter) {
+// `cursor` null fetches the first page — used by the list's search box,
+// which re-queries from the top with `filter.search` set.
+export async function loadMoreTransactions(cursor: TransactionsCursor | null, filter?: TransactionsFilter) {
   const userId = await requireUserId();
 
   // Keyset pagination on the same (occurredAt, createdAt) sort the list
   // renders by — a `before` predicate for whichever row the client last saw.
-  const beforeCursor = or(
-    lt(transactions.occurredAt, cursor.occurredAt),
-    and(eq(transactions.occurredAt, cursor.occurredAt), lt(transactions.createdAt, cursor.createdAt)),
-  );
+  const beforeCursor = cursor
+    ? or(
+        lt(transactions.occurredAt, cursor.occurredAt),
+        and(eq(transactions.occurredAt, cursor.occurredAt), lt(transactions.createdAt, cursor.createdAt)),
+      )
+    : undefined;
 
   // Same category/date-range narrowing as the initial page (see
   // /transactions's page.tsx) — keeps "load more" paging through the same
