@@ -29,6 +29,13 @@ export const transactionTypeEnum = pgEnum("transaction_type", [
   "income",
   "expense",
   "transfer",
+  // 餘額校正: a one-off correction that brings an account's recorded
+  // balance in line with the real one. `amount` is SIGNED (positive = the
+  // balance went up) and the row is never income or expense, so every
+  // income/expense total — which all match those two types explicitly —
+  // leaves it out on its own. Balance code that treats "not expense" as
+  // "add amount" (delete-row, signedAmount) already handles it correctly.
+  "adjustment",
 ]);
 
 export const recurrenceFrequencyEnum = pgEnum("recurrence_frequency", [

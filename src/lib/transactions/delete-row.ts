@@ -54,6 +54,8 @@ export async function deleteTransactionRow(userId: string, tx: typeof transactio
       ]);
     }
   } else {
+    // income and adjustment both add `amount` (an adjustment's is signed),
+    // so removing either subtracts it back out.
     const delta = tx.type === "expense" ? Number(tx.amount) : -Number(tx.amount);
     await db.batch([
       deleteTx,

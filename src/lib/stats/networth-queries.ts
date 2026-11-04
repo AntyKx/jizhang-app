@@ -90,6 +90,8 @@ export async function getNetWorthTrend(userId: string, months = 6): Promise<NetW
     if (!countsAt(t.accountId, boundary)) return 0;
     if (t.type === "expense") return -Number(t.amount) * rate;
     if (t.type === "income") return Number(t.amount) * rate;
+    // Signed: positive raised the balance.
+    if (t.type === "adjustment") return Number(t.amount) * rate;
     return 0;
   }
 

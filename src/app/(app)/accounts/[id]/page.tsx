@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { and, desc, eq, ne, or, gte, lte } from "drizzle-orm";
+import { and, desc, eq, inArray, notInArray, or, gte, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { ChevronLeft } from "lucide-react";
 import { db } from "@/db";
@@ -15,7 +15,7 @@ import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { StatsRangeSwitcher } from "@/components/stats/stats-range-switcher";
 import { AccountDetailTabs } from "@/components/accounts/account-detail-tabs";
 import { accountTypeLabels } from "@/lib/account-type";
-import type { ListItemRow } from "@/lib/transactions/list-types";
+import { transferKind, type ListItemRow } from "@/lib/transactions/list-types";
 
 export default async function AccountDetailPage({
   params,
@@ -74,7 +74,7 @@ export default async function AccountDetailPage({
           and(
             eq(transactions.userId, userId),
             eq(transactions.accountId, id),
-            ne(transactions.type, "transfer"),
+            notInArray(transactions.type, ["transfer", "adjustment"]),
             gte(transactions.occurredAt, range.startStr),
             lte(transactions.occurredAt, range.endStr),
           ),
@@ -90,12 +90,13 @@ export default async function AccountDetailPage({
           createdAt: transactions.createdAt,
           fromAccountId: transactions.accountId,
           toAccountId: transactions.toAccountId,
+          type: transactions.type,
         })
         .from(transactions)
         .where(
           and(
             eq(transactions.userId, userId),
-            eq(transactions.type, "transfer"),
+            inArray(transactions.type, ["transfer", "adjustment"]),
             or(eq(transactions.accountId, id), eq(transactions.toAccountId, id)),
             gte(transactions.occurredAt, range.startStr),
             lte(transactions.occurredAt, range.endStr),
@@ -153,7 +154,7 @@ export default async function AccountDetailPage({
         ...deriveSplitFields(sharedExpenseParticipants),
       };
     }),
-    ...transferRows.map((t) => ({ ...t, kind: "transfer" as const, linkedSharedExpenseId: null, settlementGroupLabel: null })),
+    ...transferRows.map((t) => ({ ...t, ...transferKind(t.type), linkedSharedExpenseId: null, settlementGroupLabel: null })),
   ].sort((a, b) => {
     if (a.occurredAt !== b.occurredAt) return a.occurredAt < b.occurredAt ? 1 : -1;
     return a.createdAt < b.createdAt ? 1 : -1;
@@ -178,6 +179,8 @@ export default async function AccountDetailPage({
 
       <AccountDetailTabs
         accountId={id}
+        accountType={account.type}
+        isArchived={account.isArchived}
         periodLabel={range.label}
         monthlyBreakdown={monthlyBreakdown}
         currentBalance={account.currentBalance}

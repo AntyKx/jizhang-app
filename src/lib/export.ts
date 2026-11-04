@@ -6,7 +6,7 @@ import { paymentMethodLabel } from "@/lib/payment-methods";
 import { getCategoryBreakdown } from "@/lib/stats/category-queries";
 import type { StatsRange } from "@/lib/stats/range";
 
-const typeLabels: Record<string, string> = { income: "收入", expense: "支出", transfer: "轉帳" };
+const typeLabels: Record<string, string> = { income: "收入", expense: "支出", transfer: "轉帳", adjustment: "餘額校正" };
 
 export type ExportRow = {
   occurredAt: string;
@@ -56,7 +56,7 @@ export async function getExportTransactions(userId: string): Promise<ExportRow[]
   return rows.map((r) => ({
     occurredAt: r.occurredAt,
     type: typeLabels[r.type] ?? r.type,
-    category: r.categoryName ?? (r.type === "transfer" ? "" : "未分類"),
+    category: r.categoryName ?? (r.type === "transfer" || r.type === "adjustment" ? "" : "未分類"),
     account: accountsById.get(r.accountId)?.name ?? "",
     toAccount: r.toAccountId ? (accountsById.get(r.toAccountId)?.name ?? "") : "",
     amount: Number(r.amount),

@@ -1,4 +1,4 @@
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, notInArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { categories, sharedExpenses, transactions } from "@/db/schema";
@@ -8,7 +8,7 @@ import { deriveSplitFields, getFrequentSplitNames } from "@/lib/shared-expenses"
 import { TransactionsList } from "@/components/transactions/transactions-list";
 import { TransactionsFilterHeader } from "@/components/transactions/transactions-filter-header";
 import { BackLink } from "@/components/back-link";
-import { TRANSACTIONS_PAGE_SIZE, type ListItemRow, type TransactionsFilter } from "@/lib/transactions/list-types";
+import { TRANSACTIONS_PAGE_SIZE, transferKind, type ListItemRow, type TransactionsFilter } from "@/lib/transactions/list-types";
 import { transactionsFilterConditions } from "@/lib/transactions/filter";
 
 export default async function TransactionsPage({
@@ -62,7 +62,7 @@ export default async function TransactionsPage({
       .where(
         and(
           eq(transactions.userId, userId),
-          ne(transactions.type, "transfer"),
+          notInArray(transactions.type, ["transfer", "adjustment"]),
           ...filterConditions,
         ),
       )
@@ -83,9 +83,10 @@ export default async function TransactionsPage({
             createdAt: transactions.createdAt,
             fromAccountId: transactions.accountId,
             toAccountId: transactions.toAccountId,
+            type: transactions.type,
           })
           .from(transactions)
-          .where(and(eq(transactions.userId, userId), eq(transactions.type, "transfer"), ...filterConditions))
+          .where(and(eq(transactions.userId, userId), inArray(transactions.type, ["transfer", "adjustment"]), ...filterConditions))
           .orderBy(desc(transactions.occurredAt), desc(transactions.createdAt))
           .limit(TRANSACTIONS_PAGE_SIZE),
     db
@@ -122,7 +123,7 @@ export default async function TransactionsPage({
         ...deriveSplitFields(sharedExpenseParticipants),
       };
     }),
-    ...transferRows.map((t) => ({ ...t, kind: "transfer" as const, linkedSharedExpenseId: null, settlementGroupLabel: null })),
+    ...transferRows.map((t) => ({ ...t, ...transferKind(t.type), linkedSharedExpenseId: null, settlementGroupLabel: null })),
   ].sort((a, b) => {
     if (a.occurredAt !== b.occurredAt) return a.occurredAt < b.occurredAt ? 1 : -1;
     return a.createdAt < b.createdAt ? 1 : -1;

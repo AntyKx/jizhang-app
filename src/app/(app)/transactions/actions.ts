@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { eq, and, or, lt, ne, desc, inArray, sql } from "drizzle-orm";
+import { eq, and, or, lt, desc, inArray, notInArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { accounts, categories, sharedExpenses, transactions } from "@/db/schema";
@@ -12,6 +12,7 @@ import { getExchangeRateToTwd } from "@/lib/fx";
 import { deriveSplitFields } from "@/lib/shared-expenses";
 import {
   TRANSACTIONS_PAGE_SIZE,
+  transferKind,
   type ListItemRow,
   type TransactionsCursor,
   type TransactionsFilter,
@@ -302,6 +303,7 @@ export async function updateTransaction(input: {
   // never opens this dialog for a transfer row; this is the same guard
   // duplicateTransaction already has, for anything that calls in directly.
   if (existing.type === "transfer") return fail("轉帳紀錄請用刪除後重新建立的方式修改");
+  if (existing.type === "adjustment") return fail("餘額校正紀錄請刪除後重新校正");
   // Same guard deleteTransaction has — editing a settlement's amount/type
   // would desync it from the split participant it settled.
   if (await isSettlementTransaction(userId, existing.id)) {
@@ -456,7 +458,7 @@ export async function duplicateTransaction(transactionId: string) {
     .from(transactions)
     .where(and(eq(transactions.id, transactionId), eq(transactions.userId, userId)));
   if (!existing) return fail("找不到指定的交易");
-  if (existing.type === "transfer") return fail("轉帳紀錄不能複製");
+  if (existing.type === "transfer" || existing.type === "adjustment") return fail("轉帳或餘額校正紀錄不能複製");
   // A settlement is tied to the split participants it settled (and a refund
   // carries a negative amount) — a copy would be money with no split behind it.
   if (await isSettlementTransaction(userId, existing.id)) return fail("分帳結算交易不能複製");
@@ -596,7 +598,7 @@ export async function loadMoreTransactions(cursor: TransactionsCursor | null, fi
       .where(
         and(
           eq(transactions.userId, userId),
-          ne(transactions.type, "transfer"),
+          notInArray(transactions.type, ["transfer", "adjustment"]),
           beforeCursor,
           ...filterConditions,
         ),
@@ -618,12 +620,13 @@ export async function loadMoreTransactions(cursor: TransactionsCursor | null, fi
             createdAt: transactions.createdAt,
             fromAccountId: transactions.accountId,
             toAccountId: transactions.toAccountId,
+            type: transactions.type,
           })
           .from(transactions)
           .where(
             and(
               eq(transactions.userId, userId),
-              eq(transactions.type, "transfer"),
+              inArray(transactions.type, ["transfer", "adjustment"]),
               beforeCursor,
               ...filterConditions,
             ),
@@ -642,7 +645,7 @@ export async function loadMoreTransactions(cursor: TransactionsCursor | null, fi
         ...deriveSplitFields(sharedExpenseParticipants),
       };
     }),
-    ...transferRows.map((t) => ({ ...t, kind: "transfer" as const, linkedSharedExpenseId: null, settlementGroupLabel: null })),
+    ...transferRows.map((t) => ({ ...t, ...transferKind(t.type), linkedSharedExpenseId: null, settlementGroupLabel: null })),
   ].sort((a, b) => {
     if (a.occurredAt !== b.occurredAt) return a.occurredAt < b.occurredAt ? 1 : -1;
     return a.createdAt < b.createdAt ? 1 : -1;

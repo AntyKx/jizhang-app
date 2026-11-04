@@ -1,6 +1,6 @@
 import { signedAmount } from "@/lib/transactions/signed-amount";
 import { format } from "date-fns";
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, notInArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { accounts, categories, sharedExpenses, transactions } from "@/db/schema";
@@ -70,7 +70,7 @@ export async function TodayTransactionsSection({
     .leftJoin(sharedExpenses, eq(sharedExpenses.linkedTransactionId, transactions.id))
     .leftJoin(originExpense, eq(originExpense.id, transactions.linkedSharedExpenseId))
     .where(
-      and(eq(transactions.userId, userId), eq(transactions.occurredAt, today), ne(transactions.type, "transfer")),
+      and(eq(transactions.userId, userId), eq(transactions.occurredAt, today), notInArray(transactions.type, ["transfer", "adjustment"])),
     )
     .orderBy(desc(transactions.createdAt));
 

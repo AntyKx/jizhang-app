@@ -4,12 +4,14 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, recurringRules } from "@/db/schema";
+import { accounts, recurringRules, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { pickCategoryColor } from "@/lib/category-color";
 import { supportedCurrencies } from "@/lib/currency";
 import { getExchangeRateToTwd } from "@/lib/fx";
 import { hasCoreAccess } from "@/lib/entitlements";
+import { todayInTaipeiString } from "@/lib/date";
+import { revalidateTransactionPaths } from "@/lib/transactions/delete-row";
 import { fail, isFail, type Fail } from "@/lib/action-result";
 import type { AccountType } from "@/lib/account-type";
 
@@ -205,4 +207,55 @@ export async function reorderAccounts(updates: { id: string; sortOrder: number }
   );
 
   revalidateAccountPaths();
+}
+
+const adjustBalanceSchema = z.object({
+  accountId: z.string().uuid(),
+  actualBalance: z.number().finite(),
+});
+
+// 餘額校正: the user types what their bank / card app actually shows and we
+// book the difference as one "adjustment" row dated today, so the recorded
+// balance matches again without touching any past transaction or the
+// opening balance (which would silently rewrite the net-worth history).
+// The row is deliberately neither income nor expense — it never shows up
+// in spending stats, budgets or reports — and deleting it reverts the
+// balance like any other row.
+export async function adjustAccountBalance(input: { accountId: string; actualBalance: number }) {
+  const userId = await requireUserId();
+  const parsed = adjustBalanceSchema.parse(input);
+
+  const [account] = await db
+    .select({ currentBalance: accounts.currentBalance, currency: accounts.currency, isArchived: accounts.isArchived })
+    .from(accounts)
+    .where(and(eq(accounts.id, parsed.accountId), eq(accounts.userId, userId)));
+  if (!account) return fail("找不到指定的帳戶");
+  if (account.isArchived) return fail("封存的帳戶無法校正餘額");
+
+  // Rounded to cents so float noise (0.1 + 0.2) never books a 0.00000001 row.
+  const delta = Math.round((parsed.actualBalance - Number(account.currentBalance)) * 100) / 100;
+  if (delta === 0) return fail("餘額已經一致，不需要校正");
+
+  const today = todayInTaipeiString();
+  const exchangeRate = await tryExchangeRate(account.currency, today);
+  if (isFail(exchangeRate)) return exchangeRate;
+
+  await db.batch([
+    db.insert(transactions).values({
+      userId,
+      accountId: parsed.accountId,
+      type: "adjustment",
+      amount: delta.toString(),
+      exchangeRate: exchangeRate.toString(),
+      occurredAt: today,
+    }),
+    db
+      .update(accounts)
+      .set({ currentBalance: sql`${accounts.currentBalance} + ${delta}` })
+      .where(and(eq(accounts.id, parsed.accountId), eq(accounts.userId, userId))),
+  ]);
+
+  revalidateTransactionPaths();
+  revalidatePath(`/accounts/${parsed.accountId}`);
+  return { delta };
 }

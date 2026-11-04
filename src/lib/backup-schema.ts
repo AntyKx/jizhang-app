@@ -66,7 +66,7 @@ export const backupSchema = z.object({
       accountId: z.string().uuid(),
       toAccountId: z.string().uuid().nullable(),
       categoryId: z.string().uuid().nullable(),
-      type: z.enum(["income", "expense", "transfer"]),
+      type: z.enum(["income", "expense", "transfer", "adjustment"]),
       amount: z.string(),
       exchangeRate: z.string(),
       feeAmount: z.string(),

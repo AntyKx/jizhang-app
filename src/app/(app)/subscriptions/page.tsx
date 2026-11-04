@@ -134,7 +134,7 @@ export default async function SubscriptionsPage() {
                 id: r.id,
                 name: r.name,
                 amount: r.amount,
-                type: r.type === "transfer" ? "expense" : r.type,
+                type: r.type === "income" ? "income" : "expense",
                 paymentMethod: r.paymentMethod,
                 accountId: r.accountId,
                 frequency: r.frequency,

@@ -212,6 +212,9 @@ export async function postRecurringOccurrence(ruleId: string) {
     .where(and(eq(recurringRules.id, ruleId), eq(recurringRules.userId, userId)));
   if (!rule || !rule.isActive) return fail("找不到指定的定期收支項目");
   if (rule.type === "transfer") return fail("轉帳類型的定期項目尚不支援一鍵入帳");
+  // Rules share transactions' type enum; "adjustment" can't be created
+  // through any rule form, but narrow it out for createTransaction.
+  if (rule.type === "adjustment") return fail("這個定期項目的類型不支援一鍵入帳");
   const [ruleAccount] = await db
     .select({ isArchived: accounts.isArchived })
     .from(accounts)

@@ -33,6 +33,9 @@ export type RegularItem = {
 
 export type TransferListItem = {
   kind: "transfer";
+  // "adjustment" is a 餘額校正 riding the same one-account-row pipeline:
+  // signed `amount`, no destination, rendered as its own row style.
+  type: "transfer" | "adjustment";
   id: string;
   amount: string;
   feeAmount: string;
@@ -65,3 +68,9 @@ export type TransactionsCursor = { occurredAt: string; createdAt: Date };
 // `search` is the list's search box — matched server-side so it reaches
 // rows that haven't been paged in yet (see transactionsFilterConditions).
 export type TransactionsFilter = { categoryId?: string | null; start?: string; end?: string; search?: string };
+
+// Narrows a raw transactions.type (the enum) to TransferListItem's fields —
+// for rows fetched by the transfer/adjustment list queries.
+export function transferKind(type: string): { kind: "transfer"; type: "transfer" | "adjustment" } {
+  return { kind: "transfer", type: type === "adjustment" ? "adjustment" : "transfer" };
+}

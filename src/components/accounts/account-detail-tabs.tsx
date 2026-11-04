@@ -2,7 +2,9 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Scale } from "lucide-react";
+import { AdjustBalanceDialog } from "@/components/accounts/adjust-balance-dialog";
+import type { AccountType } from "@/lib/account-type";
 import { SlidingIndicator } from "@/components/motion/sliding-indicator";
 import { TransactionsList } from "@/components/transactions/transactions-list";
 import type { Account, AccountInfo, Category, ListItem } from "@/lib/transactions/list-types";
@@ -16,6 +18,8 @@ const tabs = [
 
 export function AccountDetailTabs({
   accountId,
+  accountType,
+  isArchived,
   periodLabel,
   monthlyBreakdown,
   currentBalance,
@@ -29,6 +33,8 @@ export function AccountDetailTabs({
   frequentSplitNames,
 }: {
   accountId: string;
+  accountType: AccountType;
+  isArchived: boolean;
   periodLabel: string;
   // Non-null only in year view.
   monthlyBreakdown: AccountMonthPoint[] | null;
@@ -44,6 +50,7 @@ export function AccountDetailTabs({
 }) {
   const [active, setActive] = useState<(typeof tabs)[number]["key"]>("overview");
   const containerRef = useRef<HTMLDivElement>(null);
+  const [adjustOpen, setAdjustOpen] = useState(false);
 
   const net = periodIncome - periodExpense;
 
@@ -70,7 +77,19 @@ export function AccountDetailTabs({
       {active === "overview" ? (
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1 rounded-3xl bg-muted/40 p-5">
-            <span className="text-muted-foreground text-sm">目前餘額</span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-muted-foreground text-sm">目前餘額</span>
+              {!isArchived && (
+                <button
+                  type="button"
+                  onClick={() => setAdjustOpen(true)}
+                  className="-my-1 flex items-center gap-1 rounded-full bg-background px-3 py-1 text-xs font-medium text-foreground/80 shadow-sm hover:text-foreground"
+                >
+                  <Scale className="size-3.5" />
+                  校正
+                </button>
+              )}
+            </div>
             <span className="text-3xl font-semibold tabular-nums">
               {currency !== "TWD" && <span className="mr-1 text-base font-normal text-muted-foreground">{currency}</span>}
               {Number(currentBalance).toLocaleString("zh-TW")}
@@ -147,6 +166,14 @@ export function AccountDetailTabs({
           collapsibleMonths={monthlyBreakdown !== null}
         />
       )}
+      <AdjustBalanceDialog
+        open={adjustOpen}
+        onOpenChange={setAdjustOpen}
+        accountId={accountId}
+        accountType={accountType}
+        currency={currency}
+        currentBalance={currentBalance}
+      />
     </div>
   );
 }

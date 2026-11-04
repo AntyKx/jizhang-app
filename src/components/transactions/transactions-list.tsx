@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { format, parse } from "date-fns";
-import { ChevronDown, Repeat2, Trash2 } from "lucide-react";
+import { ChevronDown, Repeat2, Scale, Trash2 } from "lucide-react";
 import { CategoryIconBadge } from "@/components/category-icon";
 import { CategoryPill } from "@/components/transactions/category-pill";
 import { OTHER_COLOR } from "@/components/stats/chart-colors";
@@ -50,6 +50,7 @@ function TransferRow({
 
   const from = accountsById[item.fromAccountId];
   const to = item.toAccountId ? accountsById[item.toAccountId] : undefined;
+  const isAdjustment = item.type === "adjustment";
 
   async function handleDelete() {
     const result = await deleteTransaction(item.id);
@@ -57,8 +58,47 @@ function TransferRow({
       toast.error(result.error);
       return;
     }
-    toast.success("已刪除轉帳紀錄");
+    toast.success(isAdjustment ? "已刪除餘額校正，餘額已還原" : "已刪除轉帳紀錄");
     router.refresh();
+  }
+
+  if (isAdjustment) {
+    const { text, isInflow } = formatSignedAmount({ type: "income", amount: item.amount });
+    return (
+      <SwipeToDelete
+        actions={[
+          {
+            label: "刪除",
+            icon: <Trash2 className="size-4" />,
+            onClick: handleDelete,
+            className: "bg-destructive text-white",
+          },
+        ]}
+      >
+        <div className="flex items-center justify-between gap-3 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground">
+              <Scale className="h-5 w-5" />
+            </div>
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="flex min-w-0 items-center gap-1.5 font-medium">
+                <span className="shrink-0">餘額校正</span>
+                {from && (
+                  <span className="flex min-w-0 items-center gap-1 text-sm font-normal text-muted-foreground">
+                    <AccountTypeIcon type={from.type} className="size-3.5 shrink-0" />
+                    <span className="truncate">{from.name}</span>
+                  </span>
+                )}
+              </div>
+              <span className="truncate text-muted-foreground text-xs">{item.occurredAt}・不計入收支</span>
+            </div>
+          </div>
+          <span className={cn("shrink-0 font-semibold tabular-nums", isInflow ? "text-emerald-600" : "text-destructive")}>
+            {text}
+          </span>
+        </div>
+      </SwipeToDelete>
+    );
   }
 
   return (
