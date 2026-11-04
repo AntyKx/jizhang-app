@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000;
+// Route changes also trigger a check, throttled to this.
+const NAV_CHECK_MIN_GAP_MS = 30 * 1000;
 const COUNTDOWN_MS = 2200;
 
 function isTypingInField(): boolean {
@@ -18,11 +21,15 @@ function isTypingInField(): boolean {
 export default function UpdateChecker() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [reloading, setReloading] = useState(false);
+  const pathname = usePathname();
+  const lastCheckRef = useRef(0);
+  const checkRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     let cancelled = false;
 
     async function check() {
+      lastCheckRef.current = Date.now();
       try {
         const res = await fetch("/api/version", { cache: "no-store" });
         const data = (await res.json()) as { buildId?: string };
@@ -35,6 +42,7 @@ export default function UpdateChecker() {
       }
     }
 
+    checkRef.current = check;
     check();
     const interval = setInterval(check, CHECK_INTERVAL_MS);
     const onVisibility = () => {
@@ -48,6 +56,16 @@ export default function UpdateChecker() {
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
+
+  // A PWA left open in the foreground used to keep running the old bundle
+  // for up to CHECK_INTERVAL_MS after a deploy — long enough for someone to
+  // use a new feature against old client code (e.g. a new row type
+  // rendering as something else). Moving to another page is a natural,
+  // cheap moment to look again.
+  useEffect(() => {
+    if (Date.now() - lastCheckRef.current < NAV_CHECK_MIN_GAP_MS) return;
+    checkRef.current();
+  }, [pathname]);
 
   useEffect(() => {
     if (!updateAvailable) return;
