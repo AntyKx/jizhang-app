@@ -71,13 +71,6 @@ export default function RootLayout({
         <body className="min-h-[100dvh] flex flex-col bg-background pt-[env(safe-area-inset-top)] text-foreground">
           {/* Light by default — dark is opt-in from 帳號設定 → 外觀. */}
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-          {/* iOS 27 frosts the top of installed web apps when the status bar
-              is translucent (WebKit bug 325807). The statusBarStyle switch
-              above only reaches fresh installs — iOS keeps the style an app
-              was added with — so for existing installs a solid fixed strip
-              behind the status bar is the other known way to stop the blur.
-              Zero-height wherever the safe area is 0 (opaque bar, desktop). */}
-          <div aria-hidden className="ios-status-strip pointer-events-none fixed inset-x-0 top-0 z-[60] h-[env(safe-area-inset-top)] bg-background" />
           <ServiceWorkerCleanup />
           <UpdateChecker />
           <GestureLock />

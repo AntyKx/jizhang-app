@@ -235,13 +235,3 @@
     user-select: text;
   }
 }
-/* Only iOS WebKit needs the status-bar strip (see app/layout.tsx); on the
-   Android app the banner gradient keeps showing behind its status bar. */
-.ios-status-strip {
-  display: none;
-}
-@supports (-webkit-touch-callout: none) {
-  .ios-status-strip {
-    display: block;
-  }
-}
