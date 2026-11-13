@@ -33,11 +33,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    // "default" (opaque bar, page starts below it), not "black-translucent":
-    // iOS 27 home-screen web apps blur whatever is drawn under the status
-    // bar and a bit past it, which smeared the home greeting; pushing the
-    // content down 1rem wasn't enough. Android (Capacitor) ignores this.
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "小熊記帳本",
   },
 };
