@@ -52,10 +52,10 @@ export function HomeSummary({
     >
       <div className="absolute -top-20 -right-8 size-[150px] rounded-full bg-[color-mix(in_oklch,var(--secondary)_70%,transparent)]" />
 
-      {/* +1rem below the safe area: iOS 26 draws a soft blur ("scroll edge
+      {/* +1rem below the safe area: iOS 27 draws a soft blur ("scroll edge
           effect") under the status bar that reaches a little past it, so the
           greeting sitting flush against the safe-area line came out smeared
-          on iPhones. */}
+          on iOS 27 iPhones (26 was fine). */}
       <div className="relative flex flex-col gap-4 px-5 pt-[calc(env(safe-area-inset-top)+1rem)] pb-5">
         <div className="flex items-start justify-between">
           <div className="flex flex-col gap-0.5 pt-0.5">
