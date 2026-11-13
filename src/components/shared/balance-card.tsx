@@ -32,7 +32,7 @@ export function BalanceCard({
   const rangeLabel = dateFrom || dateTo ? `${dateFrom ?? "…"} ~ ${dateTo ?? "…"}` : "全部時間";
 
   return (
-    <div className="flex flex-col gap-3 rounded-3xl bg-gradient-to-br from-primary/10 via-card to-card p-5">
+    <div className="flex flex-col gap-3 rounded-2xl bg-gradient-to-br from-primary/10 via-card to-card p-5">
       <span className="text-sm text-muted-foreground">結算狀態・{rangeLabel}</span>
       <span className="flex items-center gap-1.5 text-xl font-semibold tabular-nums">
         {headline}

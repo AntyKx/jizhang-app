@@ -7,8 +7,8 @@ import type { SavingsRatePoint } from "@/lib/stats/insight-queries";
 // rather than being lumped in with "low but positive".
 function toneFor(rate: number): string {
   if (rate < 0) return "text-destructive";
-  if (rate < 10) return "text-amber-600";
-  return "text-emerald-600";
+  if (rate < 10) return "text-warning";
+  return "text-income";
 }
 
 export function SavingsRateCard({
@@ -24,7 +24,7 @@ export function SavingsRateCard({
 }) {
   if (rate === null) {
     return (
-      <div className="flex flex-col gap-1 rounded-3xl bg-muted/40 p-5">
+      <div className="flex flex-col gap-1 rounded-2xl bg-muted/40 p-5">
         <span className="text-sm text-muted-foreground">儲蓄率</span>
         <span className="text-sm text-muted-foreground">這段期間沒有收入紀錄，算不出儲蓄率。</span>
       </div>
@@ -35,11 +35,11 @@ export function SavingsRateCard({
   const delta = previousRate === null ? null : Math.round(rate - previousRate);
 
   return (
-    <div className="flex flex-col gap-2 rounded-3xl bg-muted/40 p-5">
+    <div className="flex flex-col gap-2 rounded-2xl bg-muted/40 p-5">
       <div className="flex items-baseline justify-between">
         <span className="text-sm text-muted-foreground">儲蓄率</span>
         {delta !== null && delta !== 0 && (
-          <span className={cn("text-xs font-medium tabular-nums", delta > 0 ? "text-emerald-600" : "text-destructive")}>
+          <span className={cn("text-xs font-medium tabular-nums", delta > 0 ? "text-income" : "text-destructive")}>
             {delta > 0 ? "↑" : "↓"} {Math.abs(delta)}% 較上期
           </span>
         )}
@@ -71,7 +71,7 @@ export function SavingsRateTrendList({ data }: { data: SavingsRatePoint[] }) {
             <span className="w-10 shrink-0 text-xs text-muted-foreground">{d.bucketLabel}</span>
             <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
               <div
-                className={cn("h-full rounded-full", d.rate !== null && d.rate < 0 ? "bg-destructive" : "bg-emerald-500")}
+                className={cn("h-full rounded-full", d.rate !== null && d.rate < 0 ? "bg-destructive" : "bg-income")}
                 style={{ width: `${d.rate !== null && d.rate < 0 ? 100 : width}%` }}
               />
             </div>

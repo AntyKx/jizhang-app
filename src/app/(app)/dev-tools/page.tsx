@@ -7,6 +7,7 @@ import { isDevAdmin } from "@/lib/entitlements";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { setOwnAiSubscriptionPlatform, setOwnAiSubscriptionStatus, setOwnCoreUnlock } from "./actions";
+import { PageHeader } from "@/components/page-header";
 
 const statusLabel: Record<(typeof aiSubscriptionStatusEnum.enumValues)[number], string> = {
   none: "無訂閱",
@@ -40,8 +41,8 @@ export default async function DevToolsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6">
+      <PageHeader title="開發者工具" back="/more" />
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">開發者工具</h1>
         <p className="text-sm text-muted-foreground">
           只有你的帳號看得到這頁——用來測試解鎖／訂閱狀態下的畫面差異，不會影響任何其他使用者。
         </p>

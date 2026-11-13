@@ -77,7 +77,7 @@ export function PersonGroupCard({
         </span>
         {unsettled.length > 0 && (
           <span className="flex shrink-0 flex-col items-end">
-            <span className={cn("text-sm font-bold tabular-nums", owedToMe ? "text-emerald-600" : "text-destructive")}>
+            <span className={cn("text-sm font-bold tabular-nums", owedToMe ? "text-income" : "text-destructive")}>
               NT${rounded.toLocaleString("zh-TW")}
             </span>
             <span className="text-[11px] text-muted-foreground">{owedToMe ? "欠你" : "你欠"}</span>

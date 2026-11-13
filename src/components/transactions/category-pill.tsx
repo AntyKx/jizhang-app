@@ -1,4 +1,4 @@
-import { categoryTint } from "@/lib/category-tint";
+import { categoryInk, categoryTint } from "@/lib/category-tint";
 
 // Colored category "pill" badge, inspired by Copilot Money's category tags,
 // using the category's own `categoryColor` instead of a fixed accent so
@@ -9,7 +9,7 @@ export function CategoryPill({ name, color }: { name: string; color: string }) {
   return (
     <span
       className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium"
-      style={{ backgroundColor: categoryTint(color), color }}
+      style={{ backgroundColor: categoryTint(color), color: categoryInk(color) }}
     >
       {name}
     </span>

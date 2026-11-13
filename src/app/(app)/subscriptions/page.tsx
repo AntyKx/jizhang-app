@@ -10,9 +10,9 @@ import { RuleRow } from "@/components/subscriptions/rule-row";
 import { StaggerList } from "@/components/motion/stagger-list";
 import { CountUpNumber } from "@/components/motion/count-up-number";
 import { BearIllustration } from "@/components/bear-illustration";
-import { BackLink } from "@/components/back-link";
 import { getTodayInTaipei } from "@/lib/date";
 import { GuideHelpLink } from "@/components/guide/guide-help-link";
+import { PageHeader } from "@/components/page-header";
 
 // Every occurrence from `start` up to `rangeEnd` (and the rule's own end
 // date, if any), stepped with the same anchored logic 一鍵入帳 uses so the
@@ -90,22 +90,20 @@ export default async function SubscriptionsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <BackLink href="/more" label="更多功能" />
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1">
-          <h1 className="text-2xl font-semibold">訂閱 / 定期收支</h1>
-          <GuideHelpLink section="subscriptions" label="訂閱" />
-        </div>
-        <CreateRuleDialog categories={allCategories} accounts={pickableAccounts} />
-      </div>
+      <PageHeader
+        title="訂閱 / 定期收支"
+        back="/more"
+        titleAddon={<GuideHelpLink section="subscriptions" label="訂閱" />}
+        actions={<CreateRuleDialog categories={allCategories} accounts={pickableAccounts} />}
+      />
 
-      <div className="flex items-stretch divide-x rounded-3xl bg-muted/40 py-4">
+      <div className="flex items-stretch divide-x rounded-2xl bg-muted/40 py-4">
         <div className="flex flex-1 flex-col items-center gap-1">
           <span className="text-muted-foreground text-sm font-normal">未來 30 天預估淨變動</span>
           <span
             className={
               projectedNet >= 0
-                ? "text-lg font-semibold text-emerald-600"
+                ? "text-lg font-semibold text-income"
                 : "text-lg font-semibold text-destructive"
             }
           >

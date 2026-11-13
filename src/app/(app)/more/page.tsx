@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BookOpen, ChartNoAxesColumn, DatabaseBackup, FileText, HeartHandshake, Lock, PiggyBank, ReceiptText, RefreshCw, ShieldCheck, Sparkles, Tags, UserCog, Wrench } from "lucide-react";
 import { requireUserId } from "@/lib/auth";
 import { hasCoreAccess, isDevAdmin } from "@/lib/entitlements";
+import { PageHeader } from "@/components/page-header";
 
 const links = [
   { href: "/guide", Icon: BookOpen, label: "使用說明", desc: "功能導覽與操作教學" },
@@ -25,7 +26,7 @@ export default async function MorePage() {
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6">
-      <h1 className="text-2xl font-semibold">更多功能</h1>
+      <PageHeader title="更多功能" />
       <div className="flex flex-col divide-y">
         {links.map(({ href, Icon, label, desc, lockable }) => (
           <Link

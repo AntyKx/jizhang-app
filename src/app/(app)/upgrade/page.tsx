@@ -4,12 +4,12 @@ import { userSettings } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { isTrialActive, trialDaysRemaining } from "@/lib/entitlements";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { BackHistoryLink } from "@/components/back-history-link";
 import { CoreUnlockCta } from "@/components/upgrade/core-unlock-cta";
 import { cn } from "@/lib/utils";
 import { Check, Mic, Minus, TrendingUp, Wallet } from "lucide-react";
 import { createAllInOneCheckoutSession, createBillingPortalSession } from "./actions";
 import { TRIAL_DAYS } from "@/lib/trial";
+import { PageHeader } from "@/components/page-header";
 
 const featureFromLabel: Record<string, string> = {
   "stats-advanced": "進階統計",
@@ -46,7 +46,7 @@ const comparisonRows: { label: string; free: string | boolean; unlocked: string 
 ];
 
 function ComparisonCell({ value }: { value: string | boolean }) {
-  if (value === true) return <Check className="mx-auto size-4 text-emerald-600" strokeWidth={2.5} aria-label="有" />;
+  if (value === true) return <Check className="mx-auto size-4 text-income" strokeWidth={2.5} aria-label="有" />;
   if (value === false) return <Minus className="mx-auto size-4 text-muted-foreground/60" strokeWidth={2} aria-label="無" />;
   return <span>{value}</span>;
 }
@@ -80,11 +80,10 @@ export default async function UpgradePage({
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6">
-      <BackHistoryLink label="返回" />
-      <h1 className="text-2xl font-semibold">升級</h1>
+      <PageHeader title="升級" back="history" />
 
       {status === "success" && (
-        <div className="rounded-2xl border border-emerald-500/50 bg-emerald-500/10 p-4 text-sm text-emerald-700">
+        <div className="rounded-2xl border border-income/50 bg-income/10 p-4 text-sm text-income">
           付款成功！若功能還沒立即解鎖，重新整理頁面看看。
         </div>
       )}
@@ -103,7 +102,7 @@ export default async function UpgradePage({
           </p>
           <div className="flex flex-wrap gap-1.5">
             {["沒有月費", "不會自動續訂", "換手機可恢復購買"].map((t) => (
-              <span key={t} className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700">
+              <span key={t} className="flex items-center gap-1 rounded-full bg-income/10 px-2.5 py-1 text-xs font-medium text-income">
                 <Check className="size-3" strokeWidth={3} />
                 {t}
               </span>
@@ -156,7 +155,7 @@ export default async function UpgradePage({
           ) : (
             <>
               {trialActive && (
-                <div className="rounded-lg bg-amber-500/10 px-3 py-2 text-center text-sm font-medium text-amber-700">
+                <div className="rounded-lg bg-warning/10 px-3 py-2 text-center text-sm font-medium text-warning">
                   試用中，還剩 {trialDaysLeft} 天
                 </div>
               )}

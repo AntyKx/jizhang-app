@@ -315,7 +315,7 @@ export function InvoiceBatchScan({
                   <span className="text-base font-semibold tabular-nums">{formatAmount(r.invoice.total)}</span>
                 </div>
                 {r.alreadyRecordedOn && (
-                  <p className="text-xs text-amber-700">這張在 {r.alreadyRecordedOn} 已經記過了</p>
+                  <p className="text-xs text-warning">這張在 {r.alreadyRecordedOn} 已經記過了</p>
                 )}
                 <div className="grid grid-cols-2 gap-2">
                   <Input
@@ -385,7 +385,7 @@ export function InvoiceBatchScan({
           <div
             className={cn(
               "pointer-events-none absolute inset-0 border-4 transition-colors",
-              flash ? "border-emerald-400" : "border-transparent",
+              flash ? "border-income" : "border-transparent",
             )}
           />
           <p className="absolute inset-x-0 bottom-0 bg-black/50 px-3 py-2 text-center text-xs text-white">

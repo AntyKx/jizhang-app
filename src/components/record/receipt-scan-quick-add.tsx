@@ -314,13 +314,13 @@ export function ReceiptScanQuickAdd({
             <AiParsedNote fields={invoiceNumber ? "分類" : undefined} />
           )}
           {invoiceNumber && (
-            <p className="flex items-center gap-1.5 text-xs text-emerald-700">
+            <p className="flex items-center gap-1.5 text-xs text-income">
               <QrCode className="size-3.5" />
               金額、日期、品項已從發票 QR Code 讀取（{invoiceNumber}）
             </p>
           )}
           {alreadyRecordedOn && (
-            <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-sm text-amber-800">
+            <p className="rounded-xl bg-warning/10 px-3 py-2 text-sm text-warning">
               這張發票在 {alreadyRecordedOn} 已經記過了
             </p>
           )}

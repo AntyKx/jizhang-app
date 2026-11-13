@@ -74,10 +74,10 @@ export default async function StatsPage({
             separate Cards) — they're 3 facets of the same equation, not
             independent datasets, so they read better as one grouped stat
             row than as 3 boxes. */}
-        <div className="flex items-stretch divide-x rounded-3xl bg-muted/40 py-4">
+        <div className="flex items-stretch divide-x rounded-2xl bg-muted/40 py-4">
           <div className="flex flex-1 flex-col items-center gap-1">
             <span className="text-muted-foreground text-sm font-normal">收入</span>
-            <span className="text-lg font-semibold text-emerald-600">
+            <span className="text-lg font-semibold text-income">
               <CountUpNumber value={income} />
             </span>
           </div>
@@ -89,7 +89,7 @@ export default async function StatsPage({
           </div>
           <div className="flex flex-1 flex-col items-center gap-1">
             <span className="text-muted-foreground text-sm font-normal">結餘</span>
-            <span className={cn("text-lg font-semibold", balance >= 0 ? "text-emerald-600" : "text-destructive")}>
+            <span className={cn("text-lg font-semibold", balance >= 0 ? "text-income" : "text-destructive")}>
               <CountUpNumber value={balance} />
             </span>
           </div>
@@ -108,7 +108,7 @@ export default async function StatsPage({
             <p
               className={cn(
                 "text-2xl font-semibold tabular-nums",
-                expensePctChange > 0 ? "text-destructive" : "text-emerald-600",
+                expensePctChange > 0 ? "text-destructive" : "text-income",
               )}
             >
               {expensePctChange > 0 ? "↑" : expensePctChange < 0 ? "↓" : ""}
@@ -140,7 +140,7 @@ export default async function StatsPage({
 
         {anomalies.length > 0 && (
           <section className="flex flex-col gap-2">
-            <h2 className="text-sm font-semibold text-amber-600">消費異常提醒</h2>
+            <h2 className="text-sm font-semibold text-warning">消費異常提醒</h2>
             <CollapsibleProgressList
               gapClassName="gap-2"
               items={anomalies.map((a) => ({
@@ -148,7 +148,7 @@ export default async function StatsPage({
                 node: (
                   <div className="flex justify-between text-sm">
                     <span>{a.categoryName}</span>
-                    <span className="text-amber-600 tabular-nums">
+                    <span className="text-warning tabular-nums">
                       本月 {Math.round(a.thisMonth).toLocaleString("zh-TW")}，較平均高{" "}
                       {Math.round(a.pctChange * 100)}%
                     </span>

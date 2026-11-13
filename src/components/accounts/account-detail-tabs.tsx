@@ -76,7 +76,7 @@ export function AccountDetailTabs({
 
       {active === "overview" ? (
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1 rounded-3xl bg-muted/40 p-5">
+          <div className="flex flex-col gap-1 rounded-2xl bg-muted/40 p-5">
             <div className="flex items-center justify-between gap-2">
               <span className="text-muted-foreground text-sm">目前餘額</span>
               {!isArchived && (
@@ -96,12 +96,12 @@ export function AccountDetailTabs({
             </span>
           </div>
 
-          <div className="flex flex-col gap-3 rounded-3xl bg-muted/40 p-5">
+          <div className="flex flex-col gap-3 rounded-2xl bg-muted/40 p-5">
             <span className="text-muted-foreground text-sm">{periodLabel}收支</span>
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="flex flex-col gap-1">
                 <span className="text-muted-foreground text-xs">收入</span>
-                <span className="font-semibold tabular-nums text-emerald-600">
+                <span className="font-semibold tabular-nums text-income">
                   {periodIncome.toLocaleString("zh-TW")}
                 </span>
               </div>
@@ -113,7 +113,7 @@ export function AccountDetailTabs({
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-muted-foreground text-xs">淨額</span>
-                <span className={cn("font-semibold tabular-nums", net >= 0 ? "text-emerald-600" : "text-destructive")}>
+                <span className={cn("font-semibold tabular-nums", net >= 0 ? "text-income" : "text-destructive")}>
                   {net >= 0 ? "+" : ""}
                   {net.toLocaleString("zh-TW")}
                 </span>
@@ -123,12 +123,12 @@ export function AccountDetailTabs({
 
           {monthlyBreakdown && (
             <>
-              <div className="flex flex-col gap-3 rounded-3xl bg-muted/40 p-5">
+              <div className="flex flex-col gap-3 rounded-2xl bg-muted/40 p-5">
                 <span className="text-muted-foreground text-sm">每月收支</span>
                 <AccountYearChart data={monthlyBreakdown} />
               </div>
 
-              <div className="flex flex-col rounded-3xl bg-muted/40 px-5 py-3">
+              <div className="flex flex-col rounded-2xl bg-muted/40 px-5 py-3">
                 <span className="text-muted-foreground py-2 text-sm">各月明細</span>
                 <div className="flex flex-col divide-y">
                   {monthlyBreakdown

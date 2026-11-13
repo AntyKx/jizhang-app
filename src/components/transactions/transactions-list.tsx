@@ -93,7 +93,7 @@ function TransferRow({
               <span className="truncate text-muted-foreground text-xs">{item.occurredAt}・不計入收支</span>
             </div>
           </div>
-          <span className={cn("shrink-0 font-semibold tabular-nums", isInflow ? "text-emerald-600" : "text-destructive")}>
+          <span className={cn("shrink-0 font-semibold tabular-nums", isInflow ? "text-income" : "text-destructive")}>
             {text}
           </span>
         </div>
@@ -209,7 +209,7 @@ function RegularRow({
         <span
           className={cn(
             "shrink-0 font-semibold tabular-nums",
-            formatSignedAmount(item).isInflow ? "text-emerald-600" : "text-destructive",
+            formatSignedAmount(item).isInflow ? "text-income" : "text-destructive",
           )}
         >
           {formatSignedAmount(item).text}
@@ -475,7 +475,7 @@ export function TransactionsList({
                 <CollapsibleTrigger className="group justify-between border-b py-2 text-sm hover:text-muted-foreground">
                   <span className="font-semibold text-foreground">{monthLabel(group.monthKey)}</span>
                   <span className="flex items-center gap-2 tabular-nums">
-                    {income > 0 && <span className="text-emerald-600">收 {income.toLocaleString("zh-TW")}</span>}
+                    {income > 0 && <span className="text-income">收 {income.toLocaleString("zh-TW")}</span>}
                     {expense !== 0 && <span className="text-destructive">支 {expense.toLocaleString("zh-TW")}</span>}
                     <span>{group.items.length} 筆</span>
                     <ChevronDown className="size-4 transition-transform group-data-[panel-open]:rotate-180" />

@@ -62,7 +62,7 @@ export function QuickCategoryDialog({
                 className="h-[54px] w-[54px]"
                 iconClassName="h-[22px] w-[22px]"
               />
-              <span className="line-clamp-2 text-center text-[11.5px] font-medium leading-tight text-muted-foreground">
+              <span className="line-clamp-2 text-center text-[12.5px] font-medium leading-tight text-muted-foreground">
                 {categoryDisplayName(c.name)}
               </span>
             </button>

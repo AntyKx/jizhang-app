@@ -80,7 +80,7 @@ export function SplitEventCard({
             {unsettled.length > 0 ? (
               <>
                 ・{unsettled.length}人未結清・未結清{" "}
-                <span className={cn("font-medium tabular-nums", owedToMe ? "text-emerald-600" : "text-destructive")}>
+                <span className={cn("font-medium tabular-nums", owedToMe ? "text-income" : "text-destructive")}>
                   NT${Math.round(Math.abs(net)).toLocaleString("zh-TW")}
                 </span>
               </>

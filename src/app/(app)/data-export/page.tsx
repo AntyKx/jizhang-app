@@ -9,12 +9,12 @@ import { hasCoreAccess } from "@/lib/entitlements";
 import { listSnapshots, retentionCutoff, retentionDaysFor, PAID_RETENTION_DAYS } from "@/lib/backup-snapshots";
 import { getTodayInTaipei } from "@/lib/date";
 import { buttonVariants } from "@/components/ui/button";
-import { BackLink } from "@/components/back-link";
 import { CloudSnapshotList } from "@/components/data-export/cloud-snapshot-list";
 import { DeleteAllDataDialog } from "@/components/data-export/delete-all-data-dialog";
 import { RestoreBackupDialog } from "@/components/data-export/restore-backup-dialog";
 import { cn } from "@/lib/utils";
 import { ExportLink } from "@/components/data-export/export-link";
+import { PageHeader } from "@/components/page-header";
 
 export default async function DataExportPage() {
   const userId = await requireUserId();
@@ -50,8 +50,7 @@ export default async function DataExportPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6">
-      <BackLink href="/more" label="更多功能" />
-      <h1 className="text-2xl font-semibold">資料與備份</h1>
+      <PageHeader title="資料與備份" back="/more" />
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold text-muted-foreground">匯出資料</h2>

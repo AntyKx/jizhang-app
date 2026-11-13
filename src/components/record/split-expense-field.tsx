@@ -14,12 +14,12 @@ export type SplitParticipantDraft = { name: string; amount: string };
 // trusting an unrecognized name is exactly what this exists to prevent).
 export function NewNameConfirm({ name, onConfirm }: { name: string; onConfirm: () => void }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-warning/10 px-3 py-2 text-xs text-warning">
       <span>🆕 「{name}」是新的分帳對象，請確認名字沒打錯</span>
       <button
         type="button"
         onClick={onConfirm}
-        className="shrink-0 rounded-full bg-amber-500/20 px-2.5 py-1 font-medium text-amber-700"
+        className="shrink-0 rounded-full bg-warning/20 px-2.5 py-1 font-medium text-warning"
       >
         確認
       </button>

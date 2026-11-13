@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { categoryIconRegistry } from "@/lib/category-icons";
-import { categoryTint } from "@/lib/category-tint";
+import { categoryInk, categoryTint } from "@/lib/category-tint";
 
 export function isImageIcon(icon: string | null): boolean {
   if (!icon) return false;
@@ -32,7 +32,7 @@ export function CategoryIcon({
     <Icon
       aria-hidden
       className={cn("inline-block", !color && "text-primary", className)}
-      style={color ? { color } : undefined}
+      style={color ? { color: categoryInk(color) } : undefined}
       strokeWidth={1.75}
     />
   );

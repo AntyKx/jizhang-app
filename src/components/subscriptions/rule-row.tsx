@@ -53,7 +53,7 @@ export function RuleRow({
         </div>
         <div className="text-right text-sm">
           <div
-            className={cn("tabular-nums", rule.type === "expense" ? "text-destructive" : "text-emerald-600")}
+            className={cn("tabular-nums", rule.type === "expense" ? "text-destructive" : "text-income")}
           >
             {rule.type === "expense" ? "-" : "+"}
             {Number(rule.amount).toLocaleString("zh-TW")}

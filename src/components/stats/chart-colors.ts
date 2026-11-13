@@ -5,7 +5,7 @@ export function getCategoryColor(c: { color: string | null; name: string }): str
 }
 
 export const OTHER_COLOR = "#898781";
-export const INCOME_COLOR = "#059669";
+export const INCOME_COLOR = "var(--income)";
 export const EXPENSE_COLOR = "var(--destructive)";
 export const SLOT_1_COLOR = "#2a78d6";
 

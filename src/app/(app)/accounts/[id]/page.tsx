@@ -1,9 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { and, desc, eq, inArray, notInArray, or, gte, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { ChevronLeft } from "lucide-react";
 import { db } from "@/db";
 import { accounts, categories, sharedExpenses, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
@@ -16,6 +14,7 @@ import { StatsRangeSwitcher } from "@/components/stats/stats-range-switcher";
 import { AccountDetailTabs } from "@/components/accounts/account-detail-tabs";
 import { accountTypeLabels } from "@/lib/account-type";
 import { transferKind, type ListItemRow } from "@/lib/transactions/list-types";
+import { PageHeader } from "@/components/page-header";
 
 export default async function AccountDetailPage({
   params,
@@ -162,18 +161,16 @@ export default async function AccountDetailPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-2">
-        <Link href="/accounts" className="text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="size-5" />
-        </Link>
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <AccountTypeIcon type={account.type} />
-        </span>
-        <div className="flex flex-col">
-          <h1 className="text-lg font-semibold leading-tight">{account.name}</h1>
-          <span className="text-muted-foreground text-xs">{accountTypeLabels[account.type]}</span>
-        </div>
-      </div>
+      <PageHeader
+        title={account.name}
+        subtitle={accountTypeLabels[account.type]}
+        back="/accounts"
+        leading={
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <AccountTypeIcon type={account.type} />
+          </span>
+        }
+      />
 
       <StatsRangeSwitcher basePath={`/accounts/${id}`} range={range} units={["month", "year"]} />
 

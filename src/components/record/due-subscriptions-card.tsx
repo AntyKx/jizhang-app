@@ -74,7 +74,7 @@ export function DueSubscriptionsCard({ rules }: { rules: DueRule[] }) {
                 className={
                   r.type === "expense"
                     ? "text-sm font-semibold text-destructive tabular-nums"
-                    : "text-sm font-semibold text-emerald-600 tabular-nums"
+                    : "text-sm font-semibold text-income tabular-nums"
                 }
               >
                 {r.type === "expense" ? "-" : "+"}

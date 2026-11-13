@@ -1,9 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, X } from "lucide-react";
+import { X } from "lucide-react";
 import { CategoryIconBadge } from "@/components/category-icon";
+import { PageHeader } from "@/components/page-header";
 
 // Shown instead of the plain "所有交易" title when /transactions was reached
 // filtered from a category on /stats. `router.back()` (not a Link to
@@ -21,32 +21,21 @@ export function TransactionsFilterHeader({
   name: string;
   label?: string;
 }) {
-  const router = useRouter();
-
   return (
-    <div className="flex items-center justify-between gap-2">
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          aria-label="返回"
-          className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+    <PageHeader
+      title={name}
+      subtitle={label}
+      back="history"
+      leading={<CategoryIconBadge icon={icon} color={color} className="h-9 w-9" iconClassName="h-4 w-4" />}
+      actions={
+        <Link
+          href="/transactions"
+          className="flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted"
         >
-          <ChevronLeft className="size-5" strokeWidth={1.75} />
-        </button>
-        <CategoryIconBadge icon={icon} color={color} className="h-9 w-9" iconClassName="h-4 w-4" />
-        <div className="flex flex-col">
-          <h1 className="text-lg font-semibold leading-tight">{name}</h1>
-          {label && <span className="text-muted-foreground text-xs">{label}</span>}
-        </div>
-      </div>
-      <Link
-        href="/transactions"
-        className="flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted"
-      >
-        <X className="size-3.5" strokeWidth={1.75} />
-        清除篩選
-      </Link>
-    </div>
+          <X className="size-3.5" strokeWidth={1.75} />
+          清除篩選
+        </Link>
+      }
+    />
   );
 }

@@ -307,7 +307,7 @@ export function QuickAddCategoryFlow({
               className="h-[54px] w-[54px]"
               iconClassName="h-[22px] w-[22px]"
             />
-            <span className="line-clamp-2 text-center text-[11.5px] font-medium leading-tight text-muted-foreground">
+            <span className="line-clamp-2 text-center text-[12.5px] font-medium leading-tight text-muted-foreground">
               {categoryDisplayName(c.name)}
             </span>
           </button>
@@ -328,7 +328,7 @@ export function QuickAddCategoryFlow({
           <span className="flex h-[54px] w-[54px] items-center justify-center rounded-full bg-muted text-muted-foreground">
             <MoreHorizontal className="h-[22px] w-[22px]" strokeWidth={1.8} />
           </span>
-          <span className="text-center text-[11.5px] font-medium leading-tight text-muted-foreground">其他</span>
+          <span className="text-center text-[12.5px] font-medium leading-tight text-muted-foreground">其他</span>
         </button>
       </StaggerList>
 
@@ -349,7 +349,7 @@ export function QuickAddCategoryFlow({
                   className="h-[54px] w-[54px]"
                   iconClassName="h-[22px] w-[22px]"
                 />
-                <span className="line-clamp-2 text-center text-[11.5px] font-medium leading-tight text-muted-foreground">
+                <span className="line-clamp-2 text-center text-[12.5px] font-medium leading-tight text-muted-foreground">
                   {categoryDisplayName(c.name)}
                 </span>
               </button>

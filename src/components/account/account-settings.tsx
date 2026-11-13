@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ThemeSetting } from "@/components/theme-setting";
 import { isFail } from "@/lib/action-result";
 import { supportedCurrencies } from "@/lib/currency";
 
@@ -224,6 +225,13 @@ export function AccountSettings({
 
       <div className="flex flex-col divide-y">
         <span className="px-1 pb-1 text-xs font-semibold text-muted-foreground">偏好設定</span>
+        <div className="flex items-center justify-between gap-3 px-1 py-3.5">
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">外觀</span>
+            <span className="text-xs text-muted-foreground">只套用在這台裝置</span>
+          </div>
+          <ThemeSetting />
+        </div>
         <div className="flex items-center justify-between gap-3 px-1 py-3.5">
           <div className="flex flex-col">
             <span className="text-sm font-medium">預設幣別</span>

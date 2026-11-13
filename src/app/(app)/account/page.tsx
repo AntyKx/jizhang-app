@@ -4,7 +4,7 @@ import { userSettings } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { listAccounts } from "@/lib/account";
 import { AccountSettings } from "@/components/account/account-settings";
-import { BackLink } from "@/components/back-link";
+import { PageHeader } from "@/components/page-header";
 
 export default async function AccountPage() {
   const userId = await requireUserId();
@@ -18,8 +18,7 @@ export default async function AccountPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6">
-      <BackLink href="/more" label="更多功能" />
-      <h1 className="text-2xl font-semibold">帳號設定</h1>
+      <PageHeader title="帳號設定" back="/more" />
       <AccountSettings
         baseCurrency={settingsRows[0]?.baseCurrency ?? "TWD"}
         defaultAccountId={settingsRows[0]?.defaultAccountId ?? null}

@@ -15,6 +15,7 @@ import { todayInTaipeiString } from "@/lib/date";
 import type { AccountType } from "@/lib/account-type";
 import { OneTimeHint } from "@/components/onboarding/gesture-hint";
 import { ArrowLeft } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
 
 export default async function AccountsPage() {
   const userId = await requireUserId();
@@ -89,17 +90,19 @@ export default async function AccountsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">帳戶管理</h1>
-        <div className="flex items-center gap-2">
-          {accounts.length > 1 && (
-            <TransferDialog
-              accounts={accounts.map((a) => ({ id: a.id, name: a.name, type: a.type, currency: a.currency }))}
-            />
-          )}
-          <CreateAccountDialog defaultCurrency={defaultCurrency} accountCount={allAccounts.length} />
-        </div>
-      </div>
+      <PageHeader
+        title="帳戶管理"
+        actions={
+          <>
+            {accounts.length > 1 && (
+              <TransferDialog
+                accounts={accounts.map((a) => ({ id: a.id, name: a.name, type: a.type, currency: a.currency }))}
+              />
+            )}
+            <CreateAccountDialog defaultCurrency={defaultCurrency} accountCount={allAccounts.length} />
+          </>
+        }
+      />
 
       {accounts.length > 0 && (
         <NetWorthSummary

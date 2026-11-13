@@ -54,7 +54,7 @@ export function SettlementGroupRow({
         </span>
         {/* `total` is the signed account effect (money in positive) — a
             group can mix refunds (money back) and expenses (money I paid). */}
-        <span className={cn("shrink-0 text-sm font-semibold tabular-nums", total >= 0 ? "text-emerald-600" : "text-destructive")}>
+        <span className={cn("shrink-0 text-sm font-semibold tabular-nums", total >= 0 ? "text-income" : "text-destructive")}>
           {total >= 0 ? "+" : "-"}
           {Math.round(Math.abs(total)).toLocaleString("zh-TW")}
         </span>

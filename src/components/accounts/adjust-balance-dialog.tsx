@@ -113,7 +113,7 @@ export function AdjustBalanceDialog({
                 <div className="flex flex-col gap-1">
                   <span>
                     將補一筆餘額校正{" "}
-                    <span className={cn("font-semibold tabular-nums", delta > 0 ? "text-emerald-600" : "text-destructive")}>
+                    <span className={cn("font-semibold tabular-nums", delta > 0 ? "text-income" : "text-destructive")}>
                       {delta > 0 ? "+" : "-"}
                       {formatAmount(Math.abs(delta))}
                     </span>

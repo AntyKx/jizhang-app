@@ -245,7 +245,7 @@ export default async function AdminAiPage() {
                 <td className="w-40">
                   <span className="block h-2 rounded-full bg-muted">
                     <span
-                      className={`block h-full rounded-full ${x.ratio >= 1 ? "bg-destructive" : x.ratio >= 0.8 ? "bg-amber-500" : "bg-primary"}`}
+                      className={`block h-full rounded-full ${x.ratio >= 1 ? "bg-destructive" : x.ratio >= 0.8 ? "bg-warning" : "bg-primary"}`}
                       style={{ width: `${Math.min(100, x.ratio * 100)}%` }}
                     />
                   </span>

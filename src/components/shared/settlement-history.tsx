@@ -83,7 +83,7 @@ function SettlementRecordRow({ record }: { record: SettlementRecord }) {
           <span className="text-xs text-muted-foreground">{record.items.length} 筆</span>
         </span>
         <span className="flex shrink-0 flex-col items-end">
-          <span className={cn("text-sm font-semibold tabular-nums", receivedByMe ? "text-emerald-600" : "text-destructive")}>
+          <span className={cn("text-sm font-semibold tabular-nums", receivedByMe ? "text-income" : "text-destructive")}>
             NT${Math.round(Math.abs(net)).toLocaleString("zh-TW")}
           </span>
           <span className="text-[11px] text-muted-foreground">{receivedByMe ? "收回" : "付出"}</span>

@@ -82,7 +82,7 @@ export function CategoryPickerSheet({
               <span className="flex h-[54px] w-[54px] items-center justify-center rounded-[30%] bg-muted text-base text-muted-foreground">
                 —
               </span>
-              <span className="text-[11.5px] font-medium text-muted-foreground">{emptyLabel}</span>
+              <span className="text-[12.5px] font-medium text-muted-foreground">{emptyLabel}</span>
             </button>
             {categories.map((c) => (
               <button
@@ -100,7 +100,7 @@ export function CategoryPickerSheet({
                   className="h-[54px] w-[54px]"
                   iconClassName="h-[22px] w-[22px]"
                 />
-                <span className="line-clamp-2 text-center text-[11.5px] font-medium leading-tight text-muted-foreground">
+                <span className="line-clamp-2 text-center text-[12.5px] font-medium leading-tight text-muted-foreground">
                   {categoryDisplayName(c.name)}
                 </span>
               </button>

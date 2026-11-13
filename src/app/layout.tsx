@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { ThemeProvider } from "next-themes";
 import { zhTW } from "@clerk/localizations";
 import { Toaster } from "@/components/ui/sonner";
 import UpdateChecker from "@/components/update-checker";
@@ -60,8 +61,12 @@ export default function RootLayout({
       <html
         lang="zh-TW"
         className={`${geistSans.variable} ${geistMono.variable} h-[100dvh] antialiased`}
+        // next-themes sets class="dark" on <html> before hydration.
+        suppressHydrationWarning
       >
         <body className="min-h-[100dvh] flex flex-col bg-background pt-[env(safe-area-inset-top)] text-foreground">
+          {/* Light by default — dark is opt-in from 帳號設定 → 外觀. */}
+          <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           <ServiceWorkerCleanup />
           <UpdateChecker />
           <GestureLock />
@@ -74,6 +79,7 @@ export default function RootLayout({
           {/* Last in the DOM so it wins any z-index tie with the update
               banner — while it's up, nothing else should show above it. */}
           <BearSplashScreen />
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>

@@ -1,5 +1,5 @@
-import { BackLink } from "@/components/back-link";
 import { GuideBody } from "@/components/guide/guide-body";
+import { PageHeader } from "@/components/page-header";
 
 export const metadata = {
   title: "使用說明 - 小熊記帳本",
@@ -8,12 +8,7 @@ export const metadata = {
 export default function GuidePage() {
   return (
     <div className="flex flex-col gap-6">
-      <BackLink href="/more" label="更多功能" />
-
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">使用說明</h1>
-        <p className="text-sm text-muted-foreground">點開需要的部分就好</p>
-      </div>
+      <PageHeader title="使用說明" subtitle="點開需要的部分就好" back="/more" />
 
       <GuideBody />
 

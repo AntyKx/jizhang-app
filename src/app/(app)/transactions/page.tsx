@@ -7,9 +7,9 @@ import { listAccounts, listArchivedAccounts } from "@/lib/account";
 import { deriveSplitFields, getFrequentSplitNames } from "@/lib/shared-expenses";
 import { TransactionsList } from "@/components/transactions/transactions-list";
 import { TransactionsFilterHeader } from "@/components/transactions/transactions-filter-header";
-import { BackLink } from "@/components/back-link";
 import { TRANSACTIONS_PAGE_SIZE, transferKind, type ListItemRow, type TransactionsFilter } from "@/lib/transactions/list-types";
 import { transactionsFilterConditions } from "@/lib/transactions/filter";
+import { PageHeader } from "@/components/page-header";
 
 export default async function TransactionsPage({
   searchParams,
@@ -156,10 +156,7 @@ export default async function TransactionsPage({
           label={sp.label}
         />
       ) : (
-        <>
-          <BackLink href="/more" label="更多功能" />
-          <h1 className="text-2xl font-semibold">所有交易</h1>
-        </>
+        <PageHeader title="所有交易" back="/more" />
       )}
       <TransactionsList
         items={items}

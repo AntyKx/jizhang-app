@@ -206,7 +206,7 @@ export default async function CalendarPage({
                     <span className="size-1 rounded-full" style={{ backgroundColor: textColor }} />
                   )}
                   {entry?.income ? (
-                    <span className="absolute top-1 right-1 size-1.5 rounded-full bg-emerald-500" />
+                    <span className="absolute top-1 right-1 size-1.5 rounded-full bg-income" />
                   ) : null}
                 </Link>
               );
@@ -231,7 +231,7 @@ export default async function CalendarPage({
               <span className="text-destructive">-{Math.round(dayTotals.expense).toLocaleString("zh-TW")}</span>
             )}
             {dayTotals.income > 0 && (
-              <span className="text-emerald-600">+{Math.round(dayTotals.income).toLocaleString("zh-TW")}</span>
+              <span className="text-income">+{Math.round(dayTotals.income).toLocaleString("zh-TW")}</span>
             )}
           </div>
         );

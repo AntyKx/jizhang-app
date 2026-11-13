@@ -14,10 +14,10 @@ import { SplitEventCard } from "@/components/shared/split-event-card";
 import { PersonGroupCard } from "@/components/shared/person-group-card";
 import { SharedMonthlyTrendChart } from "@/components/shared/monthly-trend-chart";
 import { BearIllustration } from "@/components/bear-illustration";
-import { BackLink } from "@/components/back-link";
 import type { AccountType } from "@/lib/account-type";
 import { cn } from "@/lib/utils";
 import { GuideHelpLink } from "@/components/guide/guide-help-link";
+import { PageHeader } from "@/components/page-header";
 
 type Category = { id: string; name: string; icon: string | null; color: string | null };
 type Account = { id: string; name: string; type: AccountType };
@@ -85,11 +85,7 @@ export function SharedLedgerDashboard({
 
   return (
     <div className="flex flex-col gap-6">
-      <BackLink href="/more" label="更多功能" />
-      <div className="flex items-center gap-1">
-        <h1 className="text-2xl font-semibold">分帳</h1>
-        <GuideHelpLink section="split" label="分帳" />
-      </div>
+      <PageHeader title="分帳" back="/more" titleAddon={<GuideHelpLink section="split" label="分帳" />} />
 
       <DateRangeFilter from={dateFrom} to={dateTo} />
 

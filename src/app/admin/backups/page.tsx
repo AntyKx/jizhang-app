@@ -38,11 +38,11 @@ export default async function AdminBackupsPage() {
 
       <div
         className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm ${
-          healthy ? "border-emerald-500/40 bg-emerald-500/10" : "border-destructive/40 bg-destructive/10"
+          healthy ? "border-income/40 bg-income/10" : "border-destructive/40 bg-destructive/10"
         }`}
       >
         {healthy ? (
-          <CircleCheck className="size-5 shrink-0 text-emerald-600" />
+          <CircleCheck className="size-5 shrink-0 text-income" />
         ) : (
           <CircleAlert className="size-5 shrink-0 text-destructive" />
         )}
@@ -81,7 +81,7 @@ export default async function AdminBackupsPage() {
                 <td className="tabular-nums">{formatBytes(u.backupBytes)}</td>
                 <td>
                   {ok ? (
-                    <span className="flex items-center gap-1 text-xs text-emerald-700">
+                    <span className="flex items-center gap-1 text-xs text-income">
                       <CircleCheck className="size-3.5" />
                       正常
                     </span>

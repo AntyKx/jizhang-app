@@ -170,7 +170,7 @@ export function TodayTransactionRow({
           <span
             className={
               formatSignedAmount(t).isInflow
-                ? "shrink-0 text-sm font-semibold text-emerald-600 tabular-nums"
+                ? "shrink-0 text-sm font-semibold text-income tabular-nums"
                 : "shrink-0 text-sm font-semibold text-destructive tabular-nums"
             }
           >

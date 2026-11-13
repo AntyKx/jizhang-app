@@ -23,7 +23,7 @@ export function FirstRecordPrompt({ onTry }: { onTry?: (example: string) => void
   }
 
   return (
-    <div className="flex flex-col items-center gap-3 rounded-3xl border bg-card px-5 py-6 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-2xl border bg-card px-5 py-6 text-center">
       <BearIllustration name="record" size={88} />
       <div className="flex flex-col gap-1">
         <span className="text-base font-semibold">記下第一筆吧</span>
