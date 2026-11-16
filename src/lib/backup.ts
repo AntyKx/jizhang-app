@@ -92,6 +92,11 @@ export async function buildBackup(userId: string) {
         occurredAt: transactions.occurredAt,
         recurringRuleId: transactions.recurringRuleId,
         invoiceNumber: transactions.invoiceNumber,
+        // Which split event a settlement reimbursed (keeps settlements
+        // grouped in lists after a restore), and when the row was entered
+        // (same-day ordering, and the paging tiebreaker).
+        linkedSharedExpenseId: transactions.linkedSharedExpenseId,
+        createdAt: transactions.createdAt,
       })
       .from(transactions)
       .where(eq(transactions.userId, userId)),

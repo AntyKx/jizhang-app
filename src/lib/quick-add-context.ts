@@ -40,6 +40,10 @@ async function listCategories(userId: string) {
 export const getQuickAddContext = cache(async (userId: string): Promise<{
   categories: QuickAddCategory[];
   accounts: QuickAddAccount[];
+  // Every active account, including the ones left out of `accounts` above
+  // (a fixed deposit can't take a normal expense, but moving money into it
+  // is exactly what a transfer is for).
+  transferAccounts: QuickAddAccount[];
   frequentSplitNames: string[];
 }> => {
   const [initialCategories, accountRows, settingsRows, frequentSplitNames] = await Promise.all([
@@ -67,10 +71,12 @@ export const getQuickAddContext = cache(async (userId: string): Promise<{
   // still real accounts, just not ones you'd post a normal income/expense
   // against. If that leaves no candidate at all, fall back to creating a
   // fresh default account, same as a brand-new user with zero accounts.
-  let userAccounts = accountRows.filter((a) => !a.excludeFromNetWorth);
+  let allAccounts = accountRows;
+  let userAccounts = allAccounts.filter((a) => !a.excludeFromNetWorth);
   if (userAccounts.length === 0) {
     await getDefaultAccountId(userId);
-    userAccounts = (await listAccounts(userId)).filter((a) => !a.excludeFromNetWorth);
+    allAccounts = await listAccounts(userId);
+    userAccounts = allAccounts.filter((a) => !a.excludeFromNetWorth);
   }
 
   // A user-chosen preferred account (set in /account) takes priority over
@@ -89,6 +95,12 @@ export const getQuickAddContext = cache(async (userId: string): Promise<{
   return {
     categories: userCategories,
     accounts: userAccounts.map((a) => ({ id: a.id, name: a.name, type: a.type as AccountType, currency: a.currency })),
+    transferAccounts: allAccounts.map((a) => ({
+      id: a.id,
+      name: a.name,
+      type: a.type as AccountType,
+      currency: a.currency,
+    })),
     frequentSplitNames,
   };
 });

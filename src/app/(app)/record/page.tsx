@@ -77,6 +77,7 @@ export default async function RecordPage({
         <QuickAddSection
           categories={quickAddContext.categories}
           accounts={quickAddContext.accounts}
+          transferAccounts={quickAddContext.transferAccounts}
           frequentSplitNames={quickAddContext.frequentSplitNames}
           sharedLocked={!unlocked}
           showAiTip={onboarding.neverUsedAi}

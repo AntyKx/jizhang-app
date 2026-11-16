@@ -13,8 +13,9 @@ import type { QuickAddAccount, QuickAddCategory } from "@/lib/quick-add-context"
 // sheets. Used inline on the home page by quick-add-section.tsx
 // (`initialShowText`/`initialShowScan` seed from the home page's own
 // app-shortcut query param) and also opened from the global quick-add FAB
-// on any other page (no initial-open, plain `onClose` so the FAB can
-// dismiss its own wrapping sheet once this is done or canceled).
+// on any other page (no initial-open; `onDone` lets the FAB dismiss its own
+// wrapping sheet once an entry is saved. Cancelling only closes this flow's
+// own sheet, back to the FAB sheet's category grid underneath).
 export function PersonalAiQuickAddFlow({
   categories,
   accounts,
@@ -24,7 +25,7 @@ export function PersonalAiQuickAddFlow({
   initialShowText = false,
   initialShowScan = false,
   listenForTry = false,
-  onClose,
+  onDone,
 }: {
   categories: QuickAddCategory[];
   accounts: QuickAddAccount[];
@@ -36,7 +37,7 @@ export function PersonalAiQuickAddFlow({
   // Home page only: lets the first-record prompt's example chips open the
   // quick-add sheet pre-filled (see FirstRecordPrompt).
   listenForTry?: boolean;
-  onClose?: () => void;
+  onDone?: () => void;
 }) {
   const router = useRouter();
   const [showText, setShowText] = useState(initialShowText);
@@ -80,12 +81,11 @@ export function PersonalAiQuickAddFlow({
               setShowText(false);
               setQuickText("");
               router.refresh();
-              onClose?.();
+              onDone?.();
             }}
             onCancel={() => {
               setShowText(false);
               setQuickText("");
-              onClose?.();
             }}
           />
         </BottomSheetContent>
@@ -103,11 +103,10 @@ export function PersonalAiQuickAddFlow({
             onDone={() => {
               setShowReceiptScan(false);
               router.refresh();
-              onClose?.();
+              onDone?.();
             }}
             onCancel={() => {
               setShowReceiptScan(false);
-              onClose?.();
             }}
           />
         </BottomSheetContent>

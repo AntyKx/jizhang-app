@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, notInArray } from "drizzle-orm";
+import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { categories, sharedExpenses, transactions } from "@/db/schema";
@@ -7,8 +7,16 @@ import { listAccounts, listArchivedAccounts } from "@/lib/account";
 import { deriveSplitFields, getFrequentSplitNames } from "@/lib/shared-expenses";
 import { TransactionsList } from "@/components/transactions/transactions-list";
 import { TransactionsFilterHeader } from "@/components/transactions/transactions-filter-header";
-import { TRANSACTIONS_PAGE_SIZE, transferKind, type ListItemRow, type TransactionsFilter } from "@/lib/transactions/list-types";
-import { transactionsFilterConditions } from "@/lib/transactions/filter";
+import {
+  TRANSACTIONS_PAGE_SIZE,
+  compareListRows,
+  transferKind,
+  type ListItemRow,
+  type TransactionsFilter,
+  type TransactionsTypeFilter,
+} from "@/lib/transactions/list-types";
+import { listStreamsFor, transactionsFilterConditions, transactionsListOrder } from "@/lib/transactions/filter";
+import { TransactionsFilterBar } from "@/components/transactions/transactions-filter-bar";
 import { PageHeader } from "@/components/page-header";
 
 export default async function TransactionsPage({
@@ -17,15 +25,32 @@ export default async function TransactionsPage({
   // Reached filtered from a category on /stats — categoryId "uncategorized"
   // is a real, selectable state (see TransactionsFilter), distinct from no
   // filter at all (the param simply absent).
-  searchParams: Promise<{ categoryId?: string; start?: string; end?: string; label?: string }>;
+  searchParams: Promise<{
+    categoryId?: string;
+    start?: string;
+    end?: string;
+    label?: string;
+    type?: string;
+    account?: string;
+  }>;
 }) {
   const userId = await requireUserId();
   const sp = await searchParams;
 
-  const filter: TransactionsFilter | undefined = sp.categoryId
-    ? { categoryId: sp.categoryId === "uncategorized" ? null : sp.categoryId, start: sp.start, end: sp.end }
+  const typeFilter: TransactionsTypeFilter | undefined =
+    sp.type === "expense" || sp.type === "income" || sp.type === "transfer" ? sp.type : undefined;
+  const hasFilter = Boolean(sp.categoryId || typeFilter || sp.account || sp.start || sp.end);
+  const filter: TransactionsFilter | undefined = hasFilter
+    ? {
+        ...(sp.categoryId ? { categoryId: sp.categoryId === "uncategorized" ? null : sp.categoryId } : {}),
+        start: sp.start,
+        end: sp.end,
+        type: typeFilter,
+        accountId: sp.account,
+      }
     : undefined;
   const filterConditions = transactionsFilterConditions(filter);
+  const streams = listStreamsFor(filter);
 
   // Aliased second join against the same table — the first join (below)
   // pulls a transaction's OWN split-participant data (the 分帳 toggle on the
@@ -36,7 +61,9 @@ export default async function TransactionsPage({
   const originExpense = alias(sharedExpenses, "originExpense");
 
   const [regularRows, transferRows, userCategories, userAccounts, archivedAccounts, frequentSplitNames] = await Promise.all([
-    db
+    !streams.regular
+      ? Promise.resolve([])
+      : db
       .select({
         id: transactions.id,
         type: transactions.type,
@@ -66,12 +93,9 @@ export default async function TransactionsPage({
           ...filterConditions,
         ),
       )
-      .orderBy(desc(transactions.occurredAt), desc(transactions.createdAt))
+      .orderBy(...transactionsListOrder)
       .limit(TRANSACTIONS_PAGE_SIZE),
-    // A category filter never matches a transfer (transfers have no
-    // category), so skip that stream entirely rather than querying for rows
-    // that can't come back.
-    filter?.categoryId !== undefined
+    !streams.transfers
       ? Promise.resolve([])
       : db
           .select({
@@ -87,7 +111,7 @@ export default async function TransactionsPage({
           })
           .from(transactions)
           .where(and(eq(transactions.userId, userId), inArray(transactions.type, ["transfer", "adjustment"]), ...filterConditions))
-          .orderBy(desc(transactions.occurredAt), desc(transactions.createdAt))
+          .orderBy(...transactionsListOrder)
           .limit(TRANSACTIONS_PAGE_SIZE),
     db
       .select({
@@ -124,10 +148,7 @@ export default async function TransactionsPage({
       };
     }),
     ...transferRows.map((t) => ({ ...t, ...transferKind(t.type), linkedSharedExpenseId: null, settlementGroupLabel: null })),
-  ].sort((a, b) => {
-    if (a.occurredAt !== b.occurredAt) return a.occurredAt < b.occurredAt ? 1 : -1;
-    return a.createdAt < b.createdAt ? 1 : -1;
-  });
+  ].sort(compareListRows);
 
   // Either stream hitting the page size means there could be more of that
   // type beyond this fetch, even if the merged page below is shorter.
@@ -139,26 +160,41 @@ export default async function TransactionsPage({
   const items = merged.slice(0, TRANSACTIONS_PAGE_SIZE);
   const last = items[items.length - 1];
   const initialCursor =
-    mightHaveMore && last ? { occurredAt: last.occurredAt, createdAt: last.createdAt } : null;
+    mightHaveMore && last ? { occurredAt: last.occurredAt, createdAt: last.createdAt, id: last.id } : null;
 
   const filterCategory =
     filter && filter.categoryId
       ? (userCategories.find((c) => c.id === filter.categoryId) ?? null)
       : null;
+  // Reached from a category on /stats: that view keeps its own header (and
+  // its "清除篩選" back to the plain list) instead of the filter bar.
+  const fromCategory = sp.categoryId !== undefined && sp.categoryId !== "";
 
   return (
     <div className="flex flex-col gap-6">
-      {filter ? (
+      {fromCategory ? (
         <TransactionsFilterHeader
           icon={filterCategory?.icon ?? null}
           color={filterCategory?.color}
-          name={filter.categoryId === null ? "未分類" : (filterCategory?.name ?? "分類")}
+          name={filter?.categoryId === null ? "未分類" : (filterCategory?.name ?? "分類")}
           label={sp.label}
         />
       ) : (
-        <PageHeader title="所有交易" back="/more" />
+        <>
+          <PageHeader title="所有交易" back="/more" />
+          <TransactionsFilterBar
+            accounts={[...userAccounts, ...archivedAccounts].map((a) => ({ id: a.id, name: a.name, type: a.type }))}
+            type={typeFilter}
+            accountId={sp.account}
+            start={sp.start}
+            end={sp.end}
+          />
+        </>
       )}
       <TransactionsList
+        // Remounted per filter so search text and paged-in rows from one
+        // filter never linger under another.
+        key={JSON.stringify(filter ?? {})}
         items={items}
         categories={userCategories}
         accounts={userAccounts
@@ -168,6 +204,7 @@ export default async function TransactionsPage({
         initialCursor={initialCursor}
         frequentSplitNames={frequentSplitNames}
         filter={filter}
+        emptyMessage={hasFilter ? "這個條件下沒有交易。" : undefined}
       />
     </div>
   );

@@ -30,6 +30,7 @@ export default async function AppLayout({
       <GlobalQuickAddFab
         categories={quickAddContext.categories}
         accounts={quickAddContext.accounts}
+        transferAccounts={quickAddContext.transferAccounts}
         frequentSplitNames={quickAddContext.frequentSplitNames}
         sharedLocked={!unlocked}
       />

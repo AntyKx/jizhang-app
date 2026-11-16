@@ -33,3 +33,10 @@ export function currencyAllowsDecimal(currency: string | undefined): boolean {
   if (!currency) return true;
   return !NO_DECIMAL_CURRENCIES.has(currency);
 }
+
+// "NT$120" for TWD, "USD 12.5" for anything else — for confirmation toasts,
+// which used to say NT$ whatever the account's currency was.
+export function formatMoney(amount: number, currency: string | undefined): string {
+  const text = amount.toLocaleString("zh-TW");
+  return !currency || currency === BASE_CURRENCY ? `NT$${text}` : `${currency} ${text}`;
+}

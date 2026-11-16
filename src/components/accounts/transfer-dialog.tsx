@@ -24,11 +24,31 @@ import { ArrowLeftRight } from "lucide-react";
 
 type Account = { id: string; name: string; type: AccountType; currency: string };
 
-export function TransferDialog({ accounts }: { accounts: Account[] }) {
-  const [open, setOpen] = useState(false);
-  const [fromId, setFromId] = useState(accounts[0]?.id ?? "");
+export function TransferDialog({
+  accounts,
+  open: controlledOpen,
+  onOpenChange,
+  defaultFromId,
+}: {
+  accounts: Account[];
+  // Pass both to open it from somewhere else (the quick-add 轉帳 tab) —
+  // the dialog then renders no trigger button of its own.
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  // Which account to start 從 on, e.g. the account page it was opened from.
+  defaultFromId?: string;
+}) {
+  const controlled = controlledOpen !== undefined;
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlled ? controlledOpen : uncontrolledOpen;
+  function setOpen(next: boolean) {
+    if (!controlled) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  }
+  const initialFrom = accounts.find((a) => a.id === defaultFromId) ?? accounts[0];
+  const [fromId, setFromId] = useState(initialFrom?.id ?? "");
   const [toId, setToId] = useState(
-    accounts.find((a) => a.id !== accounts[0]?.id && a.currency === accounts[0]?.currency)?.id ?? "",
+    accounts.find((a) => a.id !== initialFrom?.id && a.currency === initialFrom?.currency)?.id ?? "",
   );
   const [amount, setAmount] = useState("");
   const [fee, setFee] = useState("");
@@ -37,7 +57,7 @@ export function TransferDialog({ accounts }: { accounts: Account[] }) {
   const [pending, startTransition] = useTransition();
 
   function reset() {
-    const first = accounts[0];
+    const first = accounts.find((a) => a.id === defaultFromId) ?? accounts[0];
     setFromId(first?.id ?? "");
     setToId(accounts.find((a) => a.id !== first?.id && a.currency === first?.currency)?.id ?? "");
     setAmount("");
@@ -78,7 +98,7 @@ export function TransferDialog({ accounts }: { accounts: Account[] }) {
         if (!v) reset();
       }}
     >
-      <DialogTrigger render={<Button variant="outline" />}>轉帳</DialogTrigger>
+      {!controlled && <DialogTrigger render={<Button variant="outline" />}>轉帳</DialogTrigger>}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>帳戶轉帳</DialogTitle>

@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { eq, and, or, lt, desc, inArray, notInArray, sql } from "drizzle-orm";
+import { eq, and, inArray, notInArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { accounts, categories, sharedExpenses, transactions } from "@/db/schema";
@@ -12,12 +12,18 @@ import { getExchangeRateToTwd } from "@/lib/fx";
 import { deriveSplitFields } from "@/lib/shared-expenses";
 import {
   TRANSACTIONS_PAGE_SIZE,
+  compareListRows,
   transferKind,
   type ListItemRow,
   type TransactionsCursor,
   type TransactionsFilter,
 } from "@/lib/transactions/list-types";
-import { transactionsFilterConditions } from "@/lib/transactions/filter";
+import {
+  beforeTransactionsCursor,
+  listStreamsFor,
+  transactionsFilterConditions,
+  transactionsListOrder,
+} from "@/lib/transactions/filter";
 import { fail, isFail, type Fail } from "@/lib/action-result";
 import {
   deleteTransactionRow,
@@ -55,7 +61,7 @@ const createTransactionSchema = z.object({
   accountId: z.string().uuid(),
   note: z.string().max(200).optional(),
   merchant: z.string().max(100).optional(),
-  occurredAt: z.string().min(1),
+  occurredAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   splitParticipants: z.array(splitParticipantInputSchema).max(20).optional(),
   // Internal only — never set by any user-facing form. Written by
   // shared/actions.ts's createSettlementTransaction to mark a transaction as
@@ -188,7 +194,7 @@ const createTransferSchema = z.object({
   amount: z.coerce.number().positive(),
   fee: z.coerce.number().min(0).default(0),
   note: z.string().max(200).optional(),
-  occurredAt: z.string().min(1),
+  occurredAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
 export async function createTransfer(input: {
@@ -273,7 +279,7 @@ const updateTransactionSchema = z.object({
   accountId: z.string().uuid(),
   note: z.string().max(200).nullable(),
   merchant: z.string().max(100).nullable(),
-  occurredAt: z.string().min(1),
+  occurredAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   splitParticipants: z.array(splitParticipantInputSchema).max(20).optional(),
 });
 
@@ -441,11 +447,36 @@ export async function updateTransactionCategory(transactionId: string, categoryI
     .from(transactions)
     .where(and(eq(transactions.id, transactionId), eq(transactions.userId, userId)));
   if (!existing) return fail("找不到指定的交易");
+  // Same guards updateTransaction has — a settlement's category is the split
+  // event's own, and a split with someone already settled has a refund
+  // booked against the category as it was.
+  if (await isSettlementTransaction(userId, transactionId)) {
+    return fail("這是分帳結算交易，請到分帳頁面用「回復結清」處理");
+  }
+  const [linkedShared] = await db
+    .select({ id: sharedExpenses.id, participants: sharedExpenses.participants })
+    .from(sharedExpenses)
+    .where(and(eq(sharedExpenses.linkedTransactionId, transactionId), eq(sharedExpenses.userId, userId)));
+  if (linkedShared?.participants.some((p) => p.isSettled)) {
+    return fail("這筆交易已建立分帳結算紀錄，請先到分帳頁面處理再編輯");
+  }
 
-  await db
+  const ownedId = await ownedCategoryId(userId, categoryId);
+  const updateTx = db
     .update(transactions)
-    .set({ categoryId: await ownedCategoryId(userId, categoryId) })
+    .set({ categoryId: ownedId })
     .where(and(eq(transactions.id, transactionId), eq(transactions.userId, userId)));
+  if (linkedShared) {
+    // The split-ledger copy carries its own categoryId, which is where a
+    // later settlement books the refund — leaving it behind sent that
+    // refund to the old category.
+    await db.batch([
+      updateTx,
+      db.update(sharedExpenses).set({ categoryId: ownedId }).where(eq(sharedExpenses.id, linkedShared.id)),
+    ]);
+  } else {
+    await updateTx;
+  }
 
   revalidateTransactionPaths();
 }
@@ -547,20 +578,16 @@ export async function deleteTransaction(transactionId: string) {
 export async function loadMoreTransactions(cursor: TransactionsCursor | null, filter?: TransactionsFilter) {
   const userId = await requireUserId();
 
-  // Keyset pagination on the same (occurredAt, createdAt) sort the list
+  // Keyset pagination on the same (occurredAt, createdAt, id) sort the list
   // renders by — a `before` predicate for whichever row the client last saw.
-  const beforeCursor = cursor
-    ? or(
-        lt(transactions.occurredAt, cursor.occurredAt),
-        and(eq(transactions.occurredAt, cursor.occurredAt), lt(transactions.createdAt, cursor.createdAt)),
-      )
-    : undefined;
+  const beforeCursor = beforeTransactionsCursor(cursor);
 
   // Same category/date-range narrowing as the initial page (see
   // /transactions's page.tsx) — keeps "load more" paging through the same
   // filtered set instead of falling back to the unfiltered timeline once
   // scrolled past what the server sent on first load.
   const filterConditions = transactionsFilterConditions(filter);
+  const streams = listStreamsFor(filter);
 
   // Aliased second join against the same table — the first join (below)
   // pulls a transaction's OWN split-participant data (the 分帳 toggle on the
@@ -572,7 +599,9 @@ export async function loadMoreTransactions(cursor: TransactionsCursor | null, fi
   const originExpense = alias(sharedExpenses, "originExpense");
 
   const [regularRows, transferRows] = await Promise.all([
-    db
+    !streams.regular
+      ? Promise.resolve([])
+      : db
       .select({
         id: transactions.id,
         type: transactions.type,
@@ -603,12 +632,9 @@ export async function loadMoreTransactions(cursor: TransactionsCursor | null, fi
           ...filterConditions,
         ),
       )
-      .orderBy(desc(transactions.occurredAt), desc(transactions.createdAt))
+      .orderBy(...transactionsListOrder)
       .limit(TRANSACTIONS_PAGE_SIZE),
-    // A category filter never matches a transfer (transfers have no
-    // category), so skip that stream entirely rather than querying for rows
-    // that can't come back.
-    filter?.categoryId !== undefined
+    !streams.transfers
       ? Promise.resolve([])
       : db
           .select({
@@ -631,7 +657,7 @@ export async function loadMoreTransactions(cursor: TransactionsCursor | null, fi
               ...filterConditions,
             ),
           )
-          .orderBy(desc(transactions.occurredAt), desc(transactions.createdAt))
+          .orderBy(...transactionsListOrder)
           .limit(TRANSACTIONS_PAGE_SIZE),
   ]);
 
@@ -646,10 +672,7 @@ export async function loadMoreTransactions(cursor: TransactionsCursor | null, fi
       };
     }),
     ...transferRows.map((t) => ({ ...t, ...transferKind(t.type), linkedSharedExpenseId: null, settlementGroupLabel: null })),
-  ].sort((a, b) => {
-    if (a.occurredAt !== b.occurredAt) return a.occurredAt < b.occurredAt ? 1 : -1;
-    return a.createdAt < b.createdAt ? 1 : -1;
-  });
+  ].sort(compareListRows);
 
   // Either stream hitting the page size means there could be more of that
   // type beyond this fetch, even if the merged/sorted page below is shorter.
@@ -664,7 +687,7 @@ export async function loadMoreTransactions(cursor: TransactionsCursor | null, fi
   return {
     items: page,
     nextCursor:
-      mightHaveMore && last ? { occurredAt: last.occurredAt, createdAt: last.createdAt } : null,
+      mightHaveMore && last ? { occurredAt: last.occurredAt, createdAt: last.createdAt, id: last.id } : null,
   };
 }
 

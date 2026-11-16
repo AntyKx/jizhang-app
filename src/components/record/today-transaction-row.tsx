@@ -16,6 +16,7 @@ import { QuickCategoryDialog } from "@/components/record/quick-category-dialog";
 import { SwipeToDelete } from "@/components/transactions/swipe-to-delete";
 import { deleteTransaction, duplicateTransaction } from "@/app/(app)/transactions/actions";
 import { isFail } from "@/lib/action-result";
+import { toastDeletedTransaction } from "@/lib/transactions/undo-delete";
 import { paymentMethodLabel } from "@/lib/payment-methods";
 import { formatTimeInTaipei } from "@/lib/date";
 import { type AccountType } from "@/lib/account-type";
@@ -73,7 +74,7 @@ export function TodayTransactionRow({
       toast.error(result.error);
       return;
     }
-    toast.success("已刪除交易");
+    toastDeletedTransaction(t, () => router.refresh());
     router.refresh();
   }
 

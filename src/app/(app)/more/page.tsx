@@ -1,22 +1,42 @@
 import Link from "next/link";
-import { BookOpen, ChartNoAxesColumn, DatabaseBackup, FileText, HeartHandshake, Lock, PiggyBank, ReceiptText, RefreshCw, ShieldCheck, Sparkles, Tags, UserCog, Wrench } from "lucide-react";
+import { type LucideIcon, BookOpen, ChartNoAxesColumn, DatabaseBackup, FileText, HeartHandshake, Lock, PiggyBank, ReceiptText, RefreshCw, ShieldCheck, Sparkles, Tags, UserCog, Wrench } from "lucide-react";
 import { requireUserId } from "@/lib/auth";
 import { hasCoreAccess, isDevAdmin } from "@/lib/entitlements";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader, SectionTitle } from "@/components/page-header";
 
-const links = [
-  { href: "/guide", Icon: BookOpen, label: "使用說明", desc: "功能導覽與操作教學" },
-  { href: "/account", Icon: UserCog, label: "帳號設定", desc: "大頭貼、姓名、Email、登出" },
-  { href: "/shared", Icon: HeartHandshake, label: "分帳", desc: "跟另一半平分的支出、結算紀錄", lockable: true },
-  { href: "/categories", Icon: Tags, label: "分類管理", desc: "新增自己的記帳分類" },
-  { href: "/budgets", Icon: ChartNoAxesColumn, label: "預算", desc: "設定每月分類花費上限" },
-  { href: "/goals", Icon: PiggyBank, label: "儲蓄目標", desc: "為想要的東西存錢" },
-  { href: "/subscriptions", Icon: RefreshCw, label: "訂閱 / 定期收支", desc: "管理訂閱與現金流預測" },
-  { href: "/transactions", Icon: ReceiptText, label: "所有交易", desc: "完整交易紀錄列表" },
-  { href: "/data-export", Icon: DatabaseBackup, label: "資料與備份", desc: "匯出 CSV／Excel、備份與還原、刪除資料" },
-  { href: "/upgrade", Icon: Sparkles, label: "升級", desc: "NT$120 一次買斷，解鎖全部功能" },
-  { href: "/terms", Icon: FileText, label: "服務條款", desc: "使用本服務前應閱讀的條款" },
-  { href: "/privacy", Icon: ShieldCheck, label: "隱私權政策", desc: "個人資料蒐集與使用方式" },
+type MoreLink = { href: string; Icon: LucideIcon; label: string; desc: string; lockable?: boolean };
+
+// Grouped by what you came here to do. It used to be one flat run of twelve
+// rows where 所有交易 (the page you check your books on) sat eighth, between
+// subscriptions and backups.
+const groups: { title: string; links: MoreLink[] }[] = [
+  {
+    title: "記帳工具",
+    links: [
+      { href: "/transactions", Icon: ReceiptText, label: "所有交易", desc: "搜尋、篩選完整交易紀錄" },
+      { href: "/shared", Icon: HeartHandshake, label: "分帳", desc: "跟另一半平分的支出、結算紀錄", lockable: true },
+      { href: "/budgets", Icon: ChartNoAxesColumn, label: "預算", desc: "設定每月分類花費上限" },
+      { href: "/goals", Icon: PiggyBank, label: "儲蓄目標", desc: "為想要的東西存錢" },
+      { href: "/subscriptions", Icon: RefreshCw, label: "訂閱 / 定期收支", desc: "管理訂閱與現金流預測" },
+    ],
+  },
+  {
+    title: "設定",
+    links: [
+      { href: "/categories", Icon: Tags, label: "分類管理", desc: "新增自己的記帳分類" },
+      { href: "/account", Icon: UserCog, label: "帳號設定", desc: "大頭貼、姓名、Email、登出" },
+      { href: "/data-export", Icon: DatabaseBackup, label: "資料與備份", desc: "匯出 CSV／Excel、備份與還原、刪除資料" },
+    ],
+  },
+  {
+    title: "其他",
+    links: [
+      { href: "/guide", Icon: BookOpen, label: "使用說明", desc: "功能導覽與操作教學" },
+      { href: "/upgrade", Icon: Sparkles, label: "升級", desc: "NT$120 一次買斷，解鎖全部功能" },
+      { href: "/terms", Icon: FileText, label: "服務條款", desc: "使用本服務前應閱讀的條款" },
+      { href: "/privacy", Icon: ShieldCheck, label: "隱私權政策", desc: "個人資料蒐集與使用方式" },
+    ],
+  },
 ];
 
 export default async function MorePage() {
@@ -27,23 +47,30 @@ export default async function MorePage() {
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6">
       <PageHeader title="更多功能" />
+      {groups.map((group) => (
+        <section key={group.title} className="flex flex-col gap-1">
+          <SectionTitle>{group.title}</SectionTitle>
+          <div className="flex flex-col divide-y">
+            {group.links.map(({ href, Icon, label, desc, lockable }) => (
+              <Link
+                key={href}
+                href={href}
+                className="flex items-center gap-3 px-1 py-3.5 transition-colors hover:bg-muted/50"
+              >
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Icon className="size-5" strokeWidth={1.75} />
+                </span>
+                <div className="flex flex-1 flex-col">
+                  <span className="font-medium">{label}</span>
+                  <span className="text-xs text-muted-foreground">{desc}</span>
+                </div>
+                {lockable && !unlocked && <Lock className="size-4 shrink-0 text-muted-foreground" strokeWidth={2} />}
+              </Link>
+            ))}
+          </div>
+        </section>
+      ))}
       <div className="flex flex-col divide-y">
-        {links.map(({ href, Icon, label, desc, lockable }) => (
-          <Link
-            key={href}
-            href={href}
-            className="flex items-center gap-3 px-1 py-3.5 transition-colors hover:bg-muted/50"
-          >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Icon className="size-5" strokeWidth={1.75} />
-            </span>
-            <div className="flex flex-1 flex-col">
-              <span className="font-medium">{label}</span>
-              <span className="text-xs text-muted-foreground">{desc}</span>
-            </div>
-            {lockable && !unlocked && <Lock className="size-4 shrink-0 text-muted-foreground" strokeWidth={2} />}
-          </Link>
-        ))}
         {showDevTools && (
           <Link
             href="/dev-tools"

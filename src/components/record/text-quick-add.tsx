@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,9 +13,9 @@ import { createSplitExpense, deleteSplitExpense } from "@/app/(app)/shared/actio
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
-import { type PaymentMethod } from "@/lib/payment-methods";
+import { paymentMethodForAccount, type PaymentMethod } from "@/lib/payment-methods";
 import { accountTypeToPaymentMethod, type AccountType } from "@/lib/account-type";
-import { currencyAllowsDecimal } from "@/lib/currency";
+import { currencyAllowsDecimal, formatMoney } from "@/lib/currency";
 import { PaymentMethodField } from "@/components/record/payment-method-field";
 import {
   SplitExpenseField,
@@ -132,7 +133,15 @@ export function TextQuickAdd({
         !detectedIsTheirs && currencyAllowsDecimal(resolvedCurrency) ? result.amount : Math.round(result.amount);
       // Only the note field is shown/edited in this form — fold the AI's
       // merchant guess into it so that detail isn't silently dropped.
-      setDraft({ ...result, amount: roundedAmount, note: result.note ?? result.merchant });
+      setDraft({
+        ...result,
+        amount: roundedAmount,
+        note: result.note ?? result.merchant,
+        paymentMethod: paymentMethodForAccount(
+          accounts.find((a) => a.id === resolvedAccountId)?.type,
+          result.paymentMethod,
+        ),
+      });
       setAmountText(String(roundedAmount));
       const matchedCategory = categories.find((c) => c.name === result.categoryName);
       setCategoryId(matchedCategory?.id ?? "");
@@ -182,7 +191,7 @@ export function TextQuickAdd({
         amount: 0,
         type: "expense",
         categoryName: null,
-        paymentMethod: "cash",
+        paymentMethod: paymentMethodForAccount(accounts.find((a) => a.id === defaultAccountId)?.type, "cash"),
         accountName: null,
         merchant: null,
         note: input,
@@ -265,7 +274,7 @@ export function TextQuickAdd({
         toast.error(created.error);
         return;
       }
-      toast.success(`已新增「${draft.note || "這筆"} NT$${draft.amount.toLocaleString("zh-TW")}」`, {
+      toast.success(`已新增「${draft.note || "這筆"} ${formatMoney(draft.amount, accounts.find((a) => a.id === accountId)?.currency)}」`, {
         action: {
           label: "復原",
           onClick: async () => {
@@ -322,8 +331,9 @@ export function TextQuickAdd({
       {draft && (
         <div className="flex flex-col gap-3 rounded-2xl border bg-card p-4">
           {parseFailed ? (
-            <p className="rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
-              ⚠️ 沒解析成功，原文已保留在備註，請手動補金額和分類
+            <p className="flex items-start gap-2 rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+              沒解析成功，原文已保留在備註，請手動補金額和分類
             </p>
           ) : (
             <AiParsedNote />

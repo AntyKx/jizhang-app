@@ -21,6 +21,7 @@ import type { QuickAddAccount, QuickAddCategory } from "@/lib/quick-add-context"
 export function QuickAddSection({
   categories,
   accounts,
+  transferAccounts,
   frequentSplitNames,
   sharedLocked,
   showAiTip = false,
@@ -29,6 +30,7 @@ export function QuickAddSection({
 }: {
   categories: QuickAddCategory[];
   accounts: QuickAddAccount[];
+  transferAccounts: QuickAddAccount[];
   frequentSplitNames: string[];
   sharedLocked: boolean;
   // Records by hand but has never used one-line quick-add — point at the
@@ -102,6 +104,7 @@ export function QuickAddSection({
           frequentSplitNames={frequentSplitNames}
           enableSharedTab
           sharedLocked={sharedLocked}
+          transferAccounts={transferAccounts}
         />
       </div>
     </div>

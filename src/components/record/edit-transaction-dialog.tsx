@@ -2,17 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { BottomSheet, BottomSheetContent, BottomSheetTitle } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
-import { DeleteConfirmFooter } from "@/components/ui/delete-confirm-footer";
 import { deleteTransaction, updateTransaction } from "@/app/(app)/transactions/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
@@ -162,11 +156,12 @@ export function EditTransactionDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>編輯交易</DialogTitle>
-        </DialogHeader>
+    // A bottom sheet, same as the one a transaction is entered in — this
+    // used to be a centred Dialog with the keypad squeezed in between the
+    // fields, so editing looked and worked differently from adding.
+    <BottomSheet open={open} onOpenChange={onOpenChange}>
+      <BottomSheetContent>
+        <BottomSheetTitle>編輯交易</BottomSheetTitle>
 
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-3">
@@ -189,7 +184,6 @@ export function EditTransactionDialog({
                 value={amount}
                 onChange={setAmount}
                 allowDecimal={currencyAllowsDecimal(accounts.find((a) => a.id === accountId)?.currency)}
-                inline
               />
             </div>
           </div>
@@ -249,29 +243,42 @@ export function EditTransactionDialog({
           </div>
         </div>
 
-        <DeleteConfirmFooter
-          confirming={confirmingDelete}
-          onConfirmingChange={setConfirmingDelete}
-          confirmMessage="確定要刪除這筆交易嗎？"
-          onDelete={handleDelete}
-          pending={pending}
-        >
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            取消
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={
-              pending ||
-              !amount ||
-              Number(amount) <= 0 ||
-              (type === "expense" && isSharedExpense && computeSplitOverflow(amount, splitParticipants) > 0)
-            }
-          >
-            {pending ? "儲存中…" : "儲存"}
-          </Button>
-        </DeleteConfirmFooter>
-      </DialogContent>
-    </Dialog>
+        {confirmingDelete ? (
+          <div className="flex items-center justify-between gap-2 pb-2">
+            <span className="text-sm text-destructive">確定要刪除這筆交易嗎？</span>
+            <div className="flex shrink-0 gap-2">
+              <Button variant="outline" size="sm" disabled={pending} onClick={() => setConfirmingDelete(false)}>
+                取消
+              </Button>
+              <Button variant="destructive" size="sm" disabled={pending} onClick={handleDelete}>
+                {pending ? "處理中…" : "確定"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2 pb-2">
+            <Button variant="destructive" disabled={pending} onClick={() => setConfirmingDelete(true)}>
+              刪除
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                取消
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={
+                  pending ||
+                  !amount ||
+                  Number(amount) <= 0 ||
+                  (type === "expense" && isSharedExpense && computeSplitOverflow(amount, splitParticipants) > 0)
+                }
+              >
+                {pending ? "儲存中…" : "儲存"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </BottomSheetContent>
+    </BottomSheet>
   );
 }

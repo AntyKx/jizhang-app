@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { toast } from "sonner";
-import { Camera, QrCode, ScanLine } from "lucide-react";
+import { Camera, QrCode, ScanLine, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,9 +12,9 @@ import { createTransaction, deleteTransaction } from "@/app/(app)/transactions/a
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
 import { CategoryPickerSheet } from "@/components/categories/category-picker-sheet";
-import { type PaymentMethod } from "@/lib/payment-methods";
+import { paymentMethodForAccount, type PaymentMethod } from "@/lib/payment-methods";
 import { accountTypeToPaymentMethod, type AccountType } from "@/lib/account-type";
-import { currencyAllowsDecimal } from "@/lib/currency";
+import { currencyAllowsDecimal, formatMoney } from "@/lib/currency";
 import { PaymentMethodField } from "@/components/record/payment-method-field";
 import { SplitExpenseField, computeSplitOverflow, type SplitParticipantDraft } from "@/components/record/split-expense-field";
 import { compressImageToBase64 } from "@/lib/compress-image";
@@ -128,7 +128,15 @@ export function ReceiptScanQuickAdd({
       // the keypad displays) need the same rounded value.
       const resolvedCurrency = accounts.find((a) => a.id === resolvedAccountId)?.currency;
       const roundedAmount = currencyAllowsDecimal(resolvedCurrency) ? result.amount : Math.round(result.amount);
-      setDraft({ ...result, amount: roundedAmount, type: "expense" });
+      setDraft({
+        ...result,
+        amount: roundedAmount,
+        type: "expense",
+        paymentMethod: paymentMethodForAccount(
+          accounts.find((a) => a.id === resolvedAccountId)?.type,
+          result.paymentMethod,
+        ),
+      });
       setAmountText(String(roundedAmount));
       const matchedCategory = categories.find((c) => c.name === result.categoryName);
       setCategoryId(matchedCategory?.id ?? "");
@@ -146,7 +154,7 @@ export function ReceiptScanQuickAdd({
         amount: 0,
         type: "expense",
         categoryName: null,
-        paymentMethod: "cash",
+        paymentMethod: paymentMethodForAccount(accounts.find((a) => a.id === defaultAccountId)?.type, "cash"),
         accountName: null,
         merchant: null,
         note: null,
@@ -183,7 +191,7 @@ export function ReceiptScanQuickAdd({
           toast.error(created.error);
           return;
         }
-        toast.success(`已新增「${draft.merchant || draft.note || "這筆"} NT$${draft.amount.toLocaleString("zh-TW")}」`, {
+        toast.success(`已新增「${draft.merchant || draft.note || "這筆"} ${formatMoney(draft.amount, accounts.find((a) => a.id === accountId)?.currency)}」`, {
           action: {
             label: "復原",
             onClick: async () => {
@@ -307,8 +315,9 @@ export function ReceiptScanQuickAdd({
       {draft && !parsing && (
         <div className="flex flex-col gap-3 rounded-2xl border bg-card p-4">
           {parseFailed ? (
-            <p className="rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
-              ⚠️ 沒解析成功，請對照照片手動補金額和分類
+            <p className="flex items-start gap-2 rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+              沒解析成功，請對照照片手動補金額和分類
             </p>
           ) : (
             <AiParsedNote fields={invoiceNumber ? "分類" : undefined} />

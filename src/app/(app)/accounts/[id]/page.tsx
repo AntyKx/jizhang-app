@@ -179,6 +179,8 @@ export default async function AccountDetailPage({
         accountType={account.type}
         isArchived={account.isArchived}
         periodLabel={range.label}
+        periodStart={range.startStr}
+        periodEnd={range.endStr}
         monthlyBreakdown={monthlyBreakdown}
         currentBalance={account.currentBalance}
         currency={account.currency}

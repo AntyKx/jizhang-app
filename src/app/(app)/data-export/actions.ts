@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
@@ -136,7 +136,26 @@ async function applyBackup(userId: string, parsed: Backup) {
     ops.push(db.insert(recurringRules).values(parsed.recurringRules.map((r) => ({ ...r, userId }))));
   }
   if (parsed.transactions.length > 0) {
-    ops.push(db.insert(transactions).values(parsed.transactions.map((t) => ({ ...t, userId }))));
+    // One INSERT gives every row the same default createdAt, which loses
+    // same-day ordering and leaves the paged list's tiebreaker with nothing
+    // to break ties on. Rows keep their own createdAt when the backup has
+    // one; older backups get distinct, file-ordered timestamps instead.
+    const restoredAt = Date.now();
+    ops.push(
+      db.insert(transactions).values(
+        parsed.transactions.map((t, i) => {
+          // linkedSharedExpenseId points at a shared_expenses row that isn't
+          // inserted yet (the two tables reference each other) — it's set
+          // by the updates after that insert, below.
+          return {
+            ...t,
+            linkedSharedExpenseId: undefined,
+            userId,
+            createdAt: t.createdAt ? new Date(t.createdAt) : new Date(restoredAt + i),
+          };
+        }),
+      ),
+    );
   }
   if (parsed.budgets.length > 0) {
     ops.push(db.insert(budgets).values(parsed.budgets.map((b) => ({ ...b, userId }))));
@@ -146,6 +165,26 @@ async function applyBackup(userId: string, parsed: Backup) {
   }
   if (parsed.sharedExpenses.length > 0) {
     ops.push(db.insert(sharedExpenses).values(parsed.sharedExpenses.map((s) => ({ ...s, userId }))));
+  }
+  // Re-link settlement transactions to the split event they reimbursed, now
+  // that both sides exist. Grouped per event so it's one update per event,
+  // and a link to an event that isn't in this backup is dropped rather than
+  // failing the foreign key and aborting the whole restore.
+  const restoredSharedIds = new Set(parsed.sharedExpenses.map((s) => s.id));
+  const settlementIdsByEvent = new Map<string, string[]>();
+  for (const t of parsed.transactions) {
+    if (!t.linkedSharedExpenseId || !restoredSharedIds.has(t.linkedSharedExpenseId)) continue;
+    const ids = settlementIdsByEvent.get(t.linkedSharedExpenseId) ?? [];
+    ids.push(t.id);
+    settlementIdsByEvent.set(t.linkedSharedExpenseId, ids);
+  }
+  for (const [sharedExpenseId, transactionIds] of settlementIdsByEvent) {
+    ops.push(
+      db
+        .update(transactions)
+        .set({ linkedSharedExpenseId: sharedExpenseId })
+        .where(and(eq(transactions.userId, userId), inArray(transactions.id, transactionIds))),
+    );
   }
 
   if (parsed.settings) {

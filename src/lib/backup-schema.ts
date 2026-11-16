@@ -77,6 +77,9 @@ export const backupSchema = z.object({
       recurringRuleId: z.string().uuid().nullable(),
       // Optional: backups made before invoice scanning don't have it.
       invoiceNumber: z.string().nullable().optional(),
+      // Optional: absent in backups made before these were exported.
+      linkedSharedExpenseId: z.string().uuid().nullable().optional(),
+      createdAt: z.string().datetime().optional(),
     }),
   ),
   budgets: z.array(

@@ -16,7 +16,20 @@ import type { QuickAddAccount, QuickAddCategory } from "@/lib/quick-add-context"
 import { getOnboardingState } from "@/lib/onboarding";
 import { FirstRecordPrompt } from "@/components/onboarding/first-record-prompt";
 import { OneTimeHint } from "@/components/onboarding/gesture-hint";
-import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, ChevronRight } from "lucide-react";
+
+function AllTransactionsLink({ label }: { label: string }) {
+  return (
+    <Link
+      href="/transactions"
+      className="flex items-center gap-0.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+    >
+      {label}
+      <ChevronRight className="size-3.5" strokeWidth={2} />
+    </Link>
+  );
+}
 
 // Independent Suspense island on /record — deliberately fetches its own
 // full transaction row list rather than reusing anything from
@@ -98,6 +111,9 @@ export async function TodayTransactionsSection({
       <Reveal className="flex flex-col items-center gap-3 py-8 text-center">
         <BearIllustration name="record" size={64} />
         <span className="text-sm text-muted-foreground">今天還沒有記帳，來記第一筆吧！</span>
+        {/* The home page only ever lists today, so yesterday's entries had
+            no way in from here short of the calendar or 更多 → 所有交易. */}
+        <AllTransactionsLink label="查看之前的紀錄" />
       </Reveal>
     );
   }
@@ -106,7 +122,10 @@ export async function TodayTransactionsSection({
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-medium text-muted-foreground">今天記了 {todayTransactions.length} 筆</span>
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-muted-foreground">今天記了 {todayTransactions.length} 筆</span>
+        <AllTransactionsLink label="查看全部" />
+      </div>
       <StaggerList className="flex flex-col divide-y">
         {nodes.map((node) =>
           isSettlementGroup(node) ? (

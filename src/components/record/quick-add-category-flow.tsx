@@ -13,7 +13,7 @@ import { createTransaction, deleteTransaction } from "@/app/(app)/transactions/a
 import { createSplitExpense, deleteSplitExpense } from "@/app/(app)/shared/actions";
 import { isFail } from "@/lib/action-result";
 import { AmountKeypadField } from "@/components/record/amount-keypad-field";
-import { currencyAllowsDecimal } from "@/lib/currency";
+import { currencyAllowsDecimal, formatMoney } from "@/lib/currency";
 import { SplitExpenseField, computeSplitOverflow, type SplitParticipantDraft } from "@/components/record/split-expense-field";
 import { CategoryIconBadge } from "@/components/category-icon";
 import { categoryDisplayName } from "@/lib/category-display-name";
@@ -26,6 +26,7 @@ import { todayInTaipeiString } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import type { QuickAddAccount, QuickAddCategory } from "@/lib/quick-add-context";
 import { AccountChips } from "@/components/accounts/account-chips";
+import { TransferDialog } from "@/components/accounts/transfer-dialog";
 
 function bounceDown(e: React.PointerEvent<HTMLElement>) {
   gsap.to(e.currentTarget, { scale: 0.94, duration: 0.12, ease: "power2.out" });
@@ -57,6 +58,7 @@ export function QuickAddCategoryFlow({
   onDone,
   enableSharedTab = false,
   sharedLocked = false,
+  transferAccounts,
 }: {
   categories: QuickAddCategory[];
   accounts: QuickAddAccount[];
@@ -75,6 +77,10 @@ export function QuickAddCategoryFlow({
   // separate entry flow.
   enableSharedTab?: boolean;
   sharedLocked?: boolean;
+  // With two or more accounts, adds a 轉帳 segment that opens the transfer
+  // dialog — moving money between accounts (an ATM withdrawal, paying off a
+  // card) used to be reachable only from the 帳戶 tab.
+  transferAccounts?: QuickAddAccount[];
 }) {
   const router = useRouter();
   const toggleRef = useRef<HTMLDivElement>(null);
@@ -87,6 +93,8 @@ export function QuickAddCategoryFlow({
   const [selected, setSelected] = useState<QuickAddCategory | null>(null);
   const [amountSheetOpen, setAmountSheetOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const canTransfer = (transferAccounts?.length ?? 0) > 1;
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [isSharedExpense, setIsSharedExpense] = useState(false);
@@ -165,7 +173,7 @@ export function QuickAddCategoryFlow({
   }
 
   function handleSave() {
-    if (!selected || !amount || Number(amount) <= 0) return;
+    if (pending || !selected || !amount || Number(amount) <= 0) return;
     const savedAmount = amount;
 
     // 對方付的 — no real transaction at all (money never left my account),
@@ -224,7 +232,7 @@ export function QuickAddCategoryFlow({
         toast.error(created.error);
         return;
       }
-      toast.success(`已新增「${selected.name} NT$${Number(savedAmount).toLocaleString("zh-TW")}」`, {
+      toast.success(`已新增「${selected.name} ${formatMoney(Number(savedAmount), accounts.find((a) => a.id === accountId)?.currency)}」`, {
         action: {
           label: "復原",
           onClick: async () => {
@@ -288,7 +296,30 @@ export function QuickAddCategoryFlow({
             {sharedLocked && <Lock className="size-3" strokeWidth={2} />}
           </button>
         )}
+        {canTransfer && (
+          // Not a tab of its own (no data-key, so the sliding indicator
+          // never lands on it): a transfer has no category grid to show.
+          <button
+            type="button"
+            onClick={() => setTransferOpen(true)}
+            className="flex h-full flex-1 items-center justify-center rounded-lg text-sm font-medium text-muted-foreground transition-colors"
+          >
+            轉帳
+          </button>
+        )}
       </div>
+
+      {canTransfer && (
+        <TransferDialog
+          accounts={transferAccounts!}
+          open={transferOpen}
+          onOpenChange={(next) => {
+            setTransferOpen(next);
+            if (!next) router.refresh();
+          }}
+          defaultFromId={defaultAccountId}
+        />
+      )}
 
       <StaggerList key={tab} className="grid grid-cols-5 gap-x-1 gap-y-4">
         {previewCategories.map((c) => (
@@ -384,6 +415,12 @@ export function QuickAddCategoryFlow({
                   // matching the old standalone split dialog's own fixed
                   // allowDecimal={false}.
                   allowDecimal={isTheirs ? false : currencyAllowsDecimal(accounts.find((a) => a.id === accountId)?.currency)}
+                  // Pick a category, type the amount, save — the keypad's
+                  // own button is the save, instead of a 完成 that only put
+                  // the keypad away in front of a second 完成 underneath.
+                  // Not on the 分帳 tab: there the people and their shares
+                  // still have to be filled in after the amount.
+                  {...(tab === "shared" ? {} : { confirmLabel: pending ? "儲存中…" : "儲存", onConfirm: handleSave })}
                 />
               </div>
 
@@ -461,7 +498,7 @@ export function QuickAddCategoryFlow({
                   }
                   onClick={handleSave}
                 >
-                  {pending ? "儲存中…" : "完成"}
+                  {pending ? "儲存中…" : "儲存"}
                 </Button>
               </div>
             </>

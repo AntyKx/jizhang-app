@@ -2,19 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Plus, Sparkles, SquarePen, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import { BottomSheet, BottomSheetContent, BottomSheetTitle } from "@/components/ui/bottom-sheet";
 import { QuickAddCategoryFlow } from "@/components/record/quick-add-category-flow";
 import { PersonalAiQuickAddFlow } from "@/components/record/personal-ai-quick-add-flow";
-import { cn } from "@/lib/utils";
 import type { QuickAddAccount, QuickAddCategory } from "@/lib/quick-add-context";
-
-type Mode = "general" | "ai";
-
-const choices: { mode: Mode; label: string; desc: string; Icon: typeof SquarePen }[] = [
-  { mode: "general", label: "一般記帳", desc: "分類格 → 金額輸入（含分帳）", Icon: SquarePen },
-  { mode: "ai", label: "一句話記帳", desc: "打字或用說的", Icon: Sparkles },
-];
 
 // Renders on every page except the home page (mounted alongside MainNav in
 // the (app) layout) so a transaction can be logged from anywhere without
@@ -22,29 +14,28 @@ const choices: { mode: Mode; label: string; desc: string; Icon: typeof SquarePen
 // because that page already shows the category grid and the AI text/voice
 // bar inline — showing "+" there just pops up the exact same flow again
 // on top of itself, which read as a duplicate rather than a shortcut.
-// Tapping "+" never navigates — it opens a chooser sheet, then the picked
-// flow opens in its own sheet on top of whatever page is currently
-// showing, and closing it returns you right where you were.
 //
-// 分帳記帳 used to be its own third choice here (a separate
-// AddSharedExpenseDialog form). It's now just the 分帳 tab inside "一般記帳"
-// (QuickAddCategoryFlow's enableSharedTab) — same merge as the home page,
-// so there's only one shared-expense entry flow app-wide instead of two.
+// Tapping "+" opens one sheet holding the same two things the home page
+// shows — the 一句話記帳 bar on top, the category grid under it — and
+// closing it returns you right where you were. It used to open a chooser
+// first ("一般記帳 / 一句話記帳"), which was an extra tap and an extra
+// decision before every entry made away from the home page.
 export function GlobalQuickAddFab({
   categories,
   accounts,
+  transferAccounts,
   frequentSplitNames,
   sharedLocked,
 }: {
   categories: QuickAddCategory[];
   accounts: QuickAddAccount[];
+  transferAccounts: QuickAddAccount[];
   frequentSplitNames: string[];
   sharedLocked: boolean;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [chooserOpen, setChooserOpen] = useState(false);
-  const [mode, setMode] = useState<Mode | null>(null);
+  const [open, setOpen] = useState(false);
 
   // Context defaults derived straight from the URL, not lifted state — the
   // FAB is mounted once in (app)/layout.tsx, a sibling of every page rather
@@ -69,86 +60,39 @@ export function GlobalQuickAddFab({
 
   if (pathname.startsWith("/record")) return null;
 
-  function pick(next: Mode) {
-    setChooserOpen(false);
-    setMode(next);
-  }
-
   return (
     <>
       <button
         type="button"
-        onClick={() => setChooserOpen(true)}
+        onClick={() => setOpen(true)}
         aria-label="快速記帳"
-        className="fixed right-4 z-40 flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-95"
+        className="fixed right-4 z-40 flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-95"
         style={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom))" }}
       >
         <Plus className="size-5" strokeWidth={2.5} />
       </button>
 
-      <BottomSheet open={chooserOpen} onOpenChange={setChooserOpen}>
+      <BottomSheet open={open} onOpenChange={setOpen}>
         <BottomSheetContent>
-          <div className="flex items-center justify-between">
-            <BottomSheetTitle className="text-sm font-semibold text-muted-foreground">
-              要用哪種方式記帳？
-            </BottomSheetTitle>
-            <button
-              type="button"
-              onClick={() => setChooserOpen(false)}
-              aria-label="關閉"
-              className="text-muted-foreground"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-          {choices.map(({ mode: choiceMode, label, desc, Icon }) => (
-            <button
-              key={choiceMode}
-              type="button"
-              onClick={() => pick(choiceMode)}
-              className={cn(
-                "flex items-center gap-3 rounded-2xl border bg-background px-4 py-3 text-left transition-colors hover:bg-muted",
-              )}
-            >
-              <Icon className="size-5 text-primary" strokeWidth={1.75} />
-              <span className="flex flex-1 flex-col">
-                <span className="text-sm font-medium">{label}</span>
-                <span className="text-xs text-muted-foreground">{desc}</span>
-              </span>
-            </button>
-          ))}
-          <p className="pb-2 text-center text-xs text-muted-foreground">
-            在任何分頁按「+」都會直接彈出這個選單。
-          </p>
-        </BottomSheetContent>
-      </BottomSheet>
-
-      <BottomSheet open={mode === "general"} onOpenChange={(open) => !open && setMode(null)}>
-        <BottomSheetContent>
-          <BottomSheetTitle className="sr-only">一般記帳</BottomSheetTitle>
-          <QuickAddCategoryFlow
-            categories={categories}
-            accounts={accounts}
-            frequentSplitNames={frequentSplitNames}
-            defaultAccountId={contextAccountId}
-            defaultDate={defaultDate}
-            onDone={() => setMode(null)}
-            enableSharedTab
-            sharedLocked={sharedLocked}
-          />
-        </BottomSheetContent>
-      </BottomSheet>
-
-      <BottomSheet open={mode === "ai"} onOpenChange={(open) => !open && setMode(null)}>
-        <BottomSheetContent>
-          <BottomSheetTitle className="sr-only">一句話記帳</BottomSheetTitle>
+          <BottomSheetTitle className="sr-only">快速記帳</BottomSheetTitle>
           <PersonalAiQuickAddFlow
             categories={categories}
             accounts={accounts}
             defaultAccountId={contextAccountId ?? accounts[0]?.id ?? ""}
             defaultDate={defaultDate}
             frequentSplitNames={frequentSplitNames}
-            onClose={() => setMode(null)}
+            onDone={() => setOpen(false)}
+          />
+          <QuickAddCategoryFlow
+            categories={categories}
+            accounts={accounts}
+            frequentSplitNames={frequentSplitNames}
+            defaultAccountId={contextAccountId}
+            defaultDate={defaultDate}
+            onDone={() => setOpen(false)}
+            enableSharedTab
+            sharedLocked={sharedLocked}
+            transferAccounts={transferAccounts}
           />
         </BottomSheetContent>
       </BottomSheet>

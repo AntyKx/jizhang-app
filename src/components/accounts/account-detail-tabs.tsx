@@ -21,6 +21,8 @@ export function AccountDetailTabs({
   accountType,
   isArchived,
   periodLabel,
+  periodStart,
+  periodEnd,
   monthlyBreakdown,
   currentBalance,
   currency,
@@ -36,6 +38,10 @@ export function AccountDetailTabs({
   accountType: AccountType;
   isArchived: boolean;
   periodLabel: string;
+  // yyyy-MM-dd bounds of the period being shown — handed to the list so its
+  // search stays inside this account and this period.
+  periodStart: string;
+  periodEnd: string;
   // Non-null only in year view.
   monthlyBreakdown: AccountMonthPoint[] | null;
   currentBalance: string;
@@ -163,6 +169,9 @@ export function AccountDetailTabs({
           accountsById={accountsById}
           initialCursor={null}
           frequentSplitNames={frequentSplitNames}
+          // Without this the search box re-queried every account and every
+          // date: typing a word here listed other accounts' rows too.
+          filter={{ accountId, start: periodStart, end: periodEnd }}
           collapsibleMonths={monthlyBreakdown !== null}
         />
       )}

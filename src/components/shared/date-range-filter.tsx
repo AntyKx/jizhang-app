@@ -25,6 +25,11 @@ import { cn } from "@/lib/utils";
 
 const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
 
+function defaultHref(range: { from: string; to: string } | null): string {
+  if (!range) return "/shared";
+  return `/shared?${new URLSearchParams({ from: range.from, to: range.to })}`;
+}
+
 // Booking-site style range picker: 1st tap starts a fresh range, 2nd tap
 // closes it (auto-swapping if the 2nd tap lands before the 1st), a 3rd tap
 // starts over instead of nudging whichever edge is "closer" — less
@@ -33,7 +38,20 @@ const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
 // browser navigation on submit (full reload flash, scroll reset), which is
 // what this component's router.push (client-side, same route) exists to
 // avoid.
-export function DateRangeFilter({ from, to }: { from?: string; to?: string }) {
+//
+// `buildHref` lets another page reuse it with its own URL shape (it defaults
+// to /shared's ?from=&to=); `className` restyles the trigger row.
+export function DateRangeFilter({
+  from,
+  to,
+  buildHref = defaultHref,
+  className,
+}: {
+  from?: string;
+  to?: string;
+  buildHref?: (range: { from: string; to: string } | null) => string;
+  className?: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(() => (from ? parseISO(from) : getTodayInTaipei()));
@@ -56,17 +74,14 @@ export function DateRangeFilter({ from, to }: { from?: string; to?: string }) {
 
   function apply() {
     if (!start) return;
-    const params = new URLSearchParams();
-    params.set("from", format(start, "yyyy-MM-dd"));
-    params.set("to", format(end ?? start, "yyyy-MM-dd"));
-    router.push(`/shared?${params}`);
+    router.push(buildHref({ from: format(start, "yyyy-MM-dd"), to: format(end ?? start, "yyyy-MM-dd") }));
     setOpen(false);
   }
 
   function clear() {
     setStart(undefined);
     setEnd(undefined);
-    router.push("/shared");
+    router.push(buildHref(null));
     setOpen(false);
   }
 
@@ -78,14 +93,14 @@ export function DateRangeFilter({ from, to }: { from?: string; to?: string }) {
 
   return (
     <>
-      <div className="flex items-center gap-2 rounded-2xl border bg-card p-2.5">
+      <div className={cn("flex items-center gap-2 rounded-2xl border bg-card p-2.5", className)}>
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="flex h-9 flex-1 items-center gap-2 rounded-lg bg-muted/60 px-3 text-sm text-foreground hover:bg-muted"
+          className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg bg-muted/60 px-3 text-sm text-foreground hover:bg-muted"
         >
           <CalendarRange className="size-4 shrink-0 text-muted-foreground" />
-          <span className={cn(!from && "text-muted-foreground")}>{label}</span>
+          <span className={cn("truncate", !from && "text-muted-foreground")}>{label}</span>
         </button>
         {(from || to) && (
           <button

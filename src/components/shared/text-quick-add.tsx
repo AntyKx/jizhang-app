@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
+import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -155,8 +156,9 @@ export function SharedTextQuickAdd({
       {draft && (
         <div className="flex flex-col gap-3 rounded-2xl border bg-card p-4">
           {parseFailed ? (
-            <p className="rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
-              ⚠️ 沒解析成功，原文已保留在項目名稱，請手動補金額與分帳對象
+            <p className="flex items-start gap-2 rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+              沒解析成功，原文已保留在項目名稱，請手動補金額與分帳對象
             </p>
           ) : (
             <AiParsedNote fields="金額和分帳對象" />

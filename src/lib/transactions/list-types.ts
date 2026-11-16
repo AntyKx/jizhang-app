@@ -59,7 +59,11 @@ export type ListItem = RegularItem | TransferListItem;
 // since the UI never displays it, but carried alongside for pagination.
 export type ListItemRow = ListItem & { createdAt: Date };
 
-export type TransactionsCursor = { occurredAt: string; createdAt: Date };
+// `id` breaks ties between rows sharing one (occurredAt, createdAt) — every
+// row a restore inserted in one statement, or a batch settlement, has the
+// same createdAt, and without a third key "load more" skipped whichever of
+// them fell after a page boundary.
+export type TransactionsCursor = { occurredAt: string; createdAt: Date; id: string };
 
 // Optional narrowing for the /transactions page reached by tapping a
 // category on /stats — `categoryId: null` means "uncategorized" (a real,
@@ -67,7 +71,34 @@ export type TransactionsCursor = { occurredAt: string; createdAt: Date };
 // simply absent).
 // `search` is the list's search box — matched server-side so it reaches
 // rows that haven't been paged in yet (see transactionsFilterConditions).
-export type TransactionsFilter = { categoryId?: string | null; start?: string; end?: string; search?: string };
+// `accountId` narrows to one account (either side of a transfer) — an
+// account's own detail list, and /transactions' account filter. `type`
+// narrows to one kind of row ("transfer" also covers 餘額校正, which rides
+// the same list stream).
+export type TransactionsTypeFilter = "expense" | "income" | "transfer";
+export type TransactionsFilter = {
+  categoryId?: string | null;
+  start?: string;
+  end?: string;
+  search?: string;
+  accountId?: string;
+  type?: TransactionsTypeFilter;
+};
+
+// The (occurredAt, createdAt, id) ordering every paged transaction list
+// sorts by — shared so the server's first page, "load more", and the merge
+// of the two row streams can't drift apart.
+export function compareListRows(
+  a: { occurredAt: string; createdAt: Date; id: string },
+  b: { occurredAt: string; createdAt: Date; id: string },
+): number {
+  if (a.occurredAt !== b.occurredAt) return a.occurredAt < b.occurredAt ? 1 : -1;
+  const at = a.createdAt.getTime();
+  const bt = b.createdAt.getTime();
+  if (at !== bt) return at < bt ? 1 : -1;
+  if (a.id === b.id) return 0;
+  return a.id < b.id ? 1 : -1;
+}
 
 // Narrows a raw transactions.type (the enum) to TransferListItem's fields —
 // for rows fetched by the transfer/adjustment list queries.

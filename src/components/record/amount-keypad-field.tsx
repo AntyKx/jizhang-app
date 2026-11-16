@@ -1,16 +1,32 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Delete } from "lucide-react";
 import { gsap } from "@/lib/gsap";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const KEYS_WITH_DECIMAL = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "backspace"] as const;
+type Key = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "00" | "." | "backspace" | "+" | "-" | "=";
+
+const KEYS_WITH_DECIMAL: Key[] = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "backspace"];
 // No "." key — 0 takes its place and spans both columns, backspace stays
 // last. Used for currencies where a fractional amount is never meaningful
 // (see lib/currency.ts's currencyAllowsDecimal).
-const KEYS_NO_DECIMAL = ["7", "8", "9", "4", "5", "6", "1", "2", "3", "0", "backspace"] as const;
+const KEYS_NO_DECIMAL: Key[] = ["7", "8", "9", "4", "5", "6", "1", "2", "3", "0", "backspace"];
+// Calculator layout: a fourth column of ⌫ + − =, and a "00" key. Lets
+// "120 + 85" or a bill minus someone's share be typed straight in instead
+// of worked out in your head first.
+const CALC_KEYS_WITH_DECIMAL: Key[] = ["7", "8", "9", "backspace", "4", "5", "6", "+", "1", "2", "3", "-", "00", "0", ".", "="];
+const CALC_KEYS_NO_DECIMAL: Key[] = ["7", "8", "9", "backspace", "4", "5", "6", "+", "1", "2", "3", "-", "00", "0", "="];
+
+const KEY_LABELS: Partial<Record<Key, string>> = {
+  backspace: "刪除",
+  ".": "小數點",
+  "+": "加",
+  "-": "減",
+  "=": "等於",
+};
 
 // Thousands-separate the integer part only, so a partial/trailing decimal
 // (e.g. "12." while still typing, or "1234.5") is never mangled — plain
@@ -50,6 +66,7 @@ export function AmountKeypadField({
   onConfirm,
   inline = false,
   allowNegative = false,
+  calculator = !allowNegative,
   className,
 }: {
   value: string;
@@ -90,8 +107,16 @@ export function AmountKeypadField({
   // The sign lives as a leading "-" in the value string; a lone "-" means
   // "negative, no digits yet".
   allowNegative?: boolean;
+  // The + − = column. Off by default only where the sign toggle is on (the
+  // two would fight over what a minus means).
+  calculator?: boolean;
 }) {
   const [open, setOpen] = useState(autoOpen);
+  // A pending "left operand + operator" while the right operand is being
+  // typed. `value` (the caller's string) is always just the operand on
+  // screen; the sum is only written back through onChange once it's
+  // resolved — by "=", by the bottom button, or by the keypad closing.
+  const [pendingOp, setPendingOp] = useState<{ left: number; op: "+" | "-" } | null>(null);
   const displayRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   // Height of the overlay panel, measured so room can be made for it.
@@ -148,17 +173,78 @@ export function AmountKeypadField({
     return () => clearTimeout(timer);
   }, [open, panelHeight]);
 
-  const KEYS = allowDecimal ? KEYS_WITH_DECIMAL : KEYS_NO_DECIMAL;
+  const KEYS = calculator
+    ? allowDecimal
+      ? CALC_KEYS_WITH_DECIMAL
+      : CALC_KEYS_NO_DECIMAL
+    : allowDecimal
+      ? KEYS_WITH_DECIMAL
+      : KEYS_NO_DECIMAL;
 
   const negative = value.startsWith("-");
 
-  function press(key: (typeof KEYS)[number]) {
+  // The pending sum as a value string. Rounded to what this field can hold;
+  // a result at or below zero clears the field rather than writing a
+  // negative amount no caller expects.
+  function resolvePending(): string {
+    if (!pendingOp) return value;
+    const right = Number(value) || 0;
+    const raw = pendingOp.op === "+" ? pendingOp.left + right : pendingOp.left - right;
+    const factor = 10 ** (allowDecimal ? maxDecimals : 0);
+    const rounded = Math.round(raw * factor) / factor;
+    return rounded > 0 ? String(rounded) : "";
+  }
+
+  // Writes any pending sum back before the keypad goes away, so a half
+  // typed "120 +" never leaves the caller holding only one operand.
+  function settle(): string {
+    if (!pendingOp) return value;
+    const result = resolvePending();
+    setPendingOp(null);
+    onChange(result);
+    return result;
+  }
+
+  function close() {
+    settle();
+    setOpen(false);
+  }
+
+  function press(key: Key) {
     const sign = negative ? "-" : "";
     const digits = negative ? value.slice(1) : value;
+    if (key === "+" || key === "-") {
+      if (pendingOp && digits === "") {
+        // Operator tapped twice in a row: just switch it.
+        setPendingOp({ left: pendingOp.left, op: key });
+        return;
+      }
+      if (!pendingOp && (digits === "" || Number(digits) === 0)) return;
+      setPendingOp({ left: Number(resolvePending()) || 0, op: key });
+      onChange("");
+      return;
+    }
+    if (key === "=") {
+      settle();
+      return;
+    }
     if (key === "backspace") {
+      if (pendingOp && digits === "") {
+        // Nothing typed after the operator yet: take the operator back.
+        setPendingOp(null);
+        onChange(String(pendingOp.left));
+        return;
+      }
       // Keep the sign once digits run out, so clearing a negative amount
       // doesn't silently flip it positive; the toggle removes it.
       onChange(sign + digits.slice(0, -1));
+      return;
+    }
+    if (key === "00") {
+      // Only ever extends a whole number already started: "00" on an empty
+      // field or after a decimal point would just be noise.
+      if (digits === "" || digits === "0" || digits.includes(".") || digits.length > 10) return;
+      onChange(sign + digits + "00");
       return;
     }
     if (key === ".") {
@@ -168,6 +254,8 @@ export function AmountKeypadField({
     }
     const decimalIndex = digits.indexOf(".");
     if (decimalIndex !== -1 && digits.length - decimalIndex - 1 >= maxDecimals) return;
+    // numeric(14,2) tops out at 12 integer digits.
+    if (decimalIndex === -1 && digits.length >= 12) return;
     if (digits === "0") {
       onChange(sign + key);
       return;
@@ -180,7 +268,7 @@ export function AmountKeypadField({
   }
 
   const keys = (
-    <div className="grid grid-cols-3 gap-2">
+    <div className={cn("grid gap-2", calculator ? "grid-cols-4" : "grid-cols-3")}>
       {KEYS.map((key) => (
         <button
           key={key}
@@ -194,46 +282,95 @@ export function AmountKeypadField({
             // Shorter keys inline, so the Dialog grows as little as possible.
             inline ? "h-11 text-lg" : "h-14 text-xl",
             key === "backspace" && "text-muted-foreground",
+            (key === "+" || key === "-" || key === "=") && "bg-primary/10 text-primary active:bg-primary/20",
+            pendingOp?.op === key && "bg-primary text-primary-foreground active:bg-primary",
             // 0 takes the "." key's old grid spot in no-decimal mode —
             // span it across both so it doesn't leave a lone empty
             // cell at the end of the grid.
             !allowDecimal && key === "0" && "col-span-2",
           )}
-          aria-label={key === "backspace" ? "刪除" : key === "." ? "小數點" : `數字 ${key}`}
+          aria-label={KEY_LABELS[key] ?? `數字 ${key}`}
         >
-          {key === "backspace" ? <Delete className="size-5" /> : key}
+          {key === "backspace" ? <Delete className="size-5" /> : key === "-" ? "−" : key}
         </button>
       ))}
     </div>
   );
+  // With a sum still pending, the bottom button resolves it first (and
+  // says so) instead of confirming: onConfirm callers read their own state,
+  // which only has the final number after that onChange has been rendered.
   const confirmButton = (
     <Button
       type="button"
-      disabled={onConfirm ? !value || Number(value) <= 0 : false}
+      disabled={pendingOp ? false : onConfirm ? !value || Number(value) <= 0 : false}
       onClick={() => {
+        if (pendingOp) {
+          settle();
+          return;
+        }
         onConfirm?.();
         setOpen(false);
       }}
     >
-      {confirmLabel}
+      {pendingOp ? "計算" : confirmLabel}
     </Button>
   );
+
+  // "120 + 85" while a sum is pending, otherwise just the value.
+  const expression = pendingOp
+    ? `${formatAmount(String(pendingOp.left))} ${pendingOp.op === "+" ? "+" : "−"}${value ? ` ${formatAmount(value)}` : ""}`
+    : formatAmount(value);
+
+  // A tap outside the keypad closes it. When that tap landed on another
+  // control of the same form (an account chip, 備註, the save button) it's
+  // passed on as well, so reaching for the next field is one tap instead of
+  // "tap to dismiss, tap again". Anything else (the dimmed backdrop, empty
+  // space) only closes the keypad, as before, so a stray tap can't dismiss
+  // the whole sheet with a half-entered record in it.
+  function handleOutsideTap(e: React.MouseEvent<HTMLDivElement>) {
+    // flushSync: the control being passed the tap (say, the save button)
+    // must already see a just-resolved sum, not the render from before it.
+    flushSync(close);
+    const overlay = e.currentTarget;
+    overlay.style.pointerEvents = "none";
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    overlay.style.pointerEvents = "";
+    const scope = displayRef.current?.closest('[data-slot="bottom-sheet-body"], [data-slot="dialog-content"]');
+    if (!(under instanceof HTMLElement) || !scope?.contains(under)) return;
+    const target = under.closest<HTMLElement>("button, a, input, textarea, select, [role='button']");
+    if (!target || !scope.contains(target) || displayRef.current?.contains(target)) return;
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
+      target.focus();
+      if (target instanceof HTMLInputElement && target.type === "date") {
+        try {
+          target.showPicker();
+        } catch {
+          // Not supported here; the focus above is enough to tap it open.
+        }
+      }
+      return;
+    }
+    target.click();
+  }
 
   const displayButton = (
     <button
       ref={displayRef}
       type="button"
-      onClick={() => setOpen(inline ? !open : true)}
+      onClick={() => {
+        if (inline && open) close();
+        else setOpen(true);
+      }}
       className={cn(
         "flex h-16 items-center justify-center rounded-2xl border bg-card text-3xl font-semibold tabular-nums transition-colors",
         allowNegative && "min-w-0 flex-1",
-        (!value || value === "-") && "text-muted-foreground",
+        (!value || value === "-") && !pendingOp && "text-muted-foreground",
         negative && value !== "-" && "text-destructive",
         open && "border-primary ring-2 ring-ring",
         className,
       )}
     >
-      {formatAmount(value)}
+      <span className="truncate px-2">{expression}</span>
     </button>
   );
   const display = allowNegative ? (
@@ -285,7 +422,7 @@ export function AmountKeypadField({
           "fixed inset-0 z-[60] transition-opacity duration-300",
           open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
         )}
-        onClick={() => setOpen(false)}
+        onClick={handleOutsideTap}
       >
         <div
           ref={panelRef}
@@ -308,11 +445,11 @@ export function AmountKeypadField({
           {label && <div className="text-center text-sm text-muted-foreground">{label}</div>}
           <div
             className={cn(
-              "text-center text-3xl font-semibold tabular-nums",
-              !value && "text-muted-foreground",
+              "truncate text-center text-3xl font-semibold tabular-nums",
+              !value && !pendingOp && "text-muted-foreground",
             )}
           >
-            {formatAmount(value)}
+            {expression}
           </div>
 
           {keys}

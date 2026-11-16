@@ -26,6 +26,7 @@ import { deleteTransaction, loadMoreTransactions } from "@/app/(app)/transaction
 import { isFail } from "@/lib/action-result";
 import { AccountTypeIcon } from "@/components/accounts/account-type-icon";
 import { cn } from "@/lib/utils";
+import { toastDeletedTransaction, toastDeletedTransfer } from "@/lib/transactions/undo-delete";
 import type {
   Account,
   AccountInfo,
@@ -39,7 +40,9 @@ import type {
 
 export type { Account, AccountInfo, Category, ListItem, RegularItem, TransferListItem };
 
-function TransferRow({
+// Also used by the calendar's day list, so a transfer or 餘額校正 reads (and
+// can be deleted) the same way there as in every other list.
+export function TransferRow({
   item,
   accountsById,
 }: {
@@ -58,7 +61,8 @@ function TransferRow({
       toast.error(result.error);
       return;
     }
-    toast.success(isAdjustment ? "已刪除餘額校正，餘額已還原" : "已刪除轉帳紀錄");
+    if (isAdjustment) toast.success("已刪除餘額校正，餘額已還原");
+    else toastDeletedTransfer(item, () => router.refresh());
     router.refresh();
   }
 
@@ -235,6 +239,7 @@ export function TransactionsList({
   frequentSplitNames,
   filter,
   collapsibleMonths = false,
+  emptyMessage = "還沒有任何交易紀錄。",
 }: {
   items: ListItem[];
   categories: Category[];
@@ -250,6 +255,7 @@ export function TransactionsList({
   // toggle with that month's subtotal, and only the newest month starts
   // open. Searching opens every month so matches aren't hidden.
   collapsibleMonths?: boolean;
+  emptyMessage?: string;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -264,12 +270,52 @@ export function TransactionsList({
   // left this list frozen on whatever it first loaded. Render-phase reset
   // (same pattern as EditTransactionDialog/AddSharedExpenseDialog) rather
   // than useEffect, so there's no stale-data flash before the sync runs.
+  //
+  // With extra pages already paged in, snapping back to the first page here
+  // threw away the user's place — edit a row from three months back and the
+  // list collapsed to the newest 50. Those pages are re-fetched instead (see
+  // the effect below) and swapped in together, so the list keeps its length
+  // and scroll position; the old rows stay on screen until then.
+  const [extraPages, setExtraPages] = useState(0);
+  const [resyncToken, setResyncToken] = useState(0);
   const [prevInitialItems, setPrevInitialItems] = useState(initialItems);
   if (initialItems !== prevInitialItems) {
     setPrevInitialItems(initialItems);
-    setItems(initialItems);
-    setCursor(initialCursor);
+    if (extraPages === 0) {
+      setItems(initialItems);
+      setCursor(initialCursor);
+    } else {
+      setResyncToken((n) => n + 1);
+    }
   }
+
+  const filterKey = JSON.stringify(filter ?? {});
+  useEffect(() => {
+    if (resyncToken === 0) return;
+    let cancelled = false;
+    (async () => {
+      let nextItems = initialItems;
+      let nextCursor = initialCursor;
+      for (let i = 0; i < extraPages && nextCursor; i++) {
+        const page = await loadMoreTransactions(nextCursor, JSON.parse(filterKey));
+        if (cancelled) return;
+        nextItems = [...nextItems, ...page.items];
+        nextCursor = page.nextCursor;
+      }
+      setItems(nextItems);
+      setCursor(nextCursor);
+    })().catch(() => {
+      if (cancelled) return;
+      setItems(initialItems);
+      setCursor(initialCursor);
+      setExtraPages(0);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Only a new server result (resyncToken) should re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resyncToken]);
 
   // Searching re-queries the server (filter.search) instead of only
   // filtering the pages already loaded — otherwise an older transaction
@@ -281,7 +327,6 @@ export function TransactionsList({
   const [searchResults, setSearchResults] = useState<ListItem[] | null>(null);
   const [searchCursor, setSearchCursor] = useState<TransactionsCursor | null>(null);
   const searchSeq = useRef(0);
-  const filterKey = JSON.stringify(filter ?? {});
   useEffect(() => {
     const seq = ++searchSeq.current;
     if (!trimmedQuery) return;
@@ -314,6 +359,7 @@ export function TransactionsList({
       const page = await loadMoreTransactions(activeCursor, filter);
       setItems((prev) => [...prev, ...page.items]);
       setCursor(page.nextCursor);
+      setExtraPages((n) => n + 1);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "載入更多交易失敗");
     } finally {
@@ -321,15 +367,38 @@ export function TransactionsList({
     }
   }
 
-  async function handleDeleteRegular(id: string) {
-    const result = await deleteTransaction(id);
+  async function handleDeleteRegular(item: RegularItem) {
+    const result = await deleteTransaction(item.id);
     if (isFail(result)) {
       toast.error(result.error);
       return;
     }
-    toast.success("已刪除交易");
+    toastDeletedTransaction(item, () => router.refresh());
     router.refresh();
   }
+
+  // Reaching the bottom loads the next page on its own; the button below
+  // stays as the visible state (and a fallback if the observer never fires).
+  const hasMore = Boolean(trimmedQuery ? searchResults !== null && searchCursor : cursor);
+  const loadMoreRef = useRef(handleLoadMore);
+  useEffect(() => {
+    loadMoreRef.current = handleLoadMore;
+  });
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const loadedCount = (trimmedQuery ? searchResults?.length : items.length) ?? 0;
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMoreRef.current();
+      },
+      { rootMargin: "400px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+    // Re-observed after each page so a still-visible sentinel fires again.
+  }, [hasMore, loadedCount]);
 
   const searchableText = (item: ListItem) =>
     item.kind === "transaction"
@@ -364,7 +433,7 @@ export function TransactionsList({
     return (
       <div className="flex flex-col items-center gap-2 py-8 text-center">
         <BearIllustration name="spending" size={96} />
-        <p className="text-muted-foreground text-sm">還沒有任何交易紀錄。</p>
+        <p className="text-muted-foreground text-sm">{emptyMessage}</p>
       </div>
     );
   }
@@ -397,7 +466,7 @@ export function TransactionsList({
           setSearchResults(null);
           setSearchCursor(null);
         }}
-        placeholder="搜尋商家、備註、分類或帳戶"
+        placeholder="搜尋商家、備註、分類、帳戶或金額"
       />
 
       {filtered.length === 0 ? (
@@ -440,7 +509,7 @@ export function TransactionsList({
                             key={item.id}
                             item={item}
                             onSelect={() => setSelected(item)}
-                            onDelete={() => handleDeleteRegular(item.id)}
+                            onDelete={() => handleDeleteRegular(item)}
                           />
                         ),
                       )}
@@ -452,7 +521,7 @@ export function TransactionsList({
                       key={node.id}
                       item={node}
                       onSelect={() => setSelected(node)}
-                      onDelete={() => handleDeleteRegular(node.id)}
+                      onDelete={() => handleDeleteRegular(node)}
                     />
                   ),
                 )}
@@ -488,15 +557,12 @@ export function TransactionsList({
         </StaggerList>
       )}
 
-      {(trimmedQuery ? searchResults !== null && searchCursor : cursor) && (
-        <Button
-          variant="outline"
-          disabled={loadingMore}
-          onClick={handleLoadMore}
-          className="self-center"
-        >
-          {loadingMore ? "載入中…" : "載入更多"}
-        </Button>
+      {hasMore && (
+        <div ref={sentinelRef} className="flex justify-center">
+          <Button variant="outline" disabled={loadingMore} onClick={handleLoadMore}>
+            {loadingMore ? "載入中…" : "載入更多"}
+          </Button>
+        </div>
       )}
 
       <EditTransactionDialog

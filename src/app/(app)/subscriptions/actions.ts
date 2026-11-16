@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, lte, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, recurringRules, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
@@ -12,6 +12,7 @@ import { advanceOccurrence, anchorDayOf } from "@/lib/recurrence";
 import { createTransaction } from "@/app/(app)/transactions/actions";
 import { deleteTransactionUnchecked } from "@/lib/transactions/delete-row";
 import { fail, isFail, type Fail } from "@/lib/action-result";
+import { todayInTaipeiString } from "@/lib/date";
 
 // Shared ownership check for a user-supplied accountId — the create/edit
 // dialogs now let the user pick which account a rule draws from, so a
@@ -264,6 +265,52 @@ export async function postRecurringOccurrence(ruleId: string) {
   revalidateOccurrencePaths();
 
   return created;
+}
+
+// "全部入帳" — posts every occurrence that's already due, for every rule,
+// until each rule's next date is in the future. A rule left alone for three
+// months would otherwise take three separate taps (the card shows a rule
+// once; after posting it reappears with the next overdue date). Stops at a
+// rule's first failure (an archived account, say) and reports how many went
+// in, so one stuck rule doesn't block the rest.
+export async function postAllDueOccurrences() {
+  const userId = await requireUserId();
+  const today = todayInTaipeiString();
+
+  const dueRules = await db
+    .select({ id: recurringRules.id, name: recurringRules.name })
+    .from(recurringRules)
+    .where(
+      and(
+        eq(recurringRules.userId, userId),
+        eq(recurringRules.isActive, true),
+        ne(recurringRules.type, "transfer"),
+        lte(recurringRules.nextOccurrence, today),
+      ),
+    )
+    .orderBy(recurringRules.nextOccurrence);
+
+  let posted = 0;
+  const errors: string[] = [];
+  for (const due of dueRules) {
+    // Capped: a daily rule neglected for a year is 365 rows, which is past
+    // "catch up" and into "this rule is probably dead" — the rest stay due.
+    for (let i = 0; i < 36; i++) {
+      const [rule] = await db
+        .select({ nextOccurrence: recurringRules.nextOccurrence, isActive: recurringRules.isActive })
+        .from(recurringRules)
+        .where(and(eq(recurringRules.id, due.id), eq(recurringRules.userId, userId)));
+      if (!rule || !rule.isActive || rule.nextOccurrence > today) break;
+      const result = await postRecurringOccurrence(due.id);
+      if (isFail(result)) {
+        errors.push(`${due.name}：${result.error}`);
+        break;
+      }
+      posted++;
+    }
+  }
+
+  return { posted, errors };
 }
 
 // Marks a due occurrence as "not happening" without recording a

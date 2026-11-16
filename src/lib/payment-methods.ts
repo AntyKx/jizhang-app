@@ -1,4 +1,4 @@
-import type { AccountType } from "@/lib/account-type";
+import { accountTypeToPaymentMethod, type AccountType } from "@/lib/account-type";
 
 export type PaymentMethod =
   | "cash"
@@ -41,6 +41,19 @@ export const paymentMethodsForAccountType: Record<AccountType, PaymentMethod[]> 
   investment: ["other", "auto_debit"],
   loan: ["auto_debit", "other"],
 };
+
+// Fits an AI-guessed payment method to the account the entry lands on. The
+// model answers "cash" whenever the text doesn't say how it was paid, and
+// knows nothing about which account gets picked, so its guess is only kept
+// when that account could actually have paid that way (LINE Pay off a
+// credit card); otherwise the account's own method wins. Without this, every
+// one-line entry on a bank or credit-card account was saved as 現金.
+export function paymentMethodForAccount(accountType: AccountType | undefined, guessed: PaymentMethod): PaymentMethod {
+  if (!accountType) return guessed;
+  return guessed !== "other" && paymentMethodsForAccountType[accountType].includes(guessed)
+    ? guessed
+    : accountTypeToPaymentMethod[accountType];
+}
 
 export function paymentMethodLabel(value: string): string {
   return paymentMethods.find((p) => p.value === value)?.label ?? "其他";
