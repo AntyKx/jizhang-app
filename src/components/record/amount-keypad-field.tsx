@@ -7,25 +7,40 @@ import { gsap } from "@/lib/gsap";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type Key = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "00" | "." | "backspace" | "+" | "-" | "=";
+type Op = "+" | "-" | "×" | "÷";
+type Key = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "00" | "." | "backspace" | "C" | "=" | Op;
+
+const OPS: readonly Key[] = ["+", "-", "×", "÷"];
+function isOp(key: Key): key is Op {
+  return OPS.includes(key);
+}
 
 const KEYS_WITH_DECIMAL: Key[] = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "backspace"];
 // No "." key — 0 takes its place and spans both columns, backspace stays
 // last. Used for currencies where a fractional amount is never meaningful
 // (see lib/currency.ts's currencyAllowsDecimal).
 const KEYS_NO_DECIMAL: Key[] = ["7", "8", "9", "4", "5", "6", "1", "2", "3", "0", "backspace"];
-// Calculator layout: a fourth column of ⌫ + − =, and a "00" key. Lets
-// "120 + 85" or a bill minus someone's share be typed straight in instead
-// of worked out in your head first.
-const CALC_KEYS_WITH_DECIMAL: Key[] = ["7", "8", "9", "backspace", "4", "5", "6", "+", "1", "2", "3", "-", "00", "0", ".", "="];
-const CALC_KEYS_NO_DECIMAL: Key[] = ["7", "8", "9", "backspace", "4", "5", "6", "+", "1", "2", "3", "-", "00", "0", "="];
+// Calculator layout, 5 columns × 4 rows (a 5th column rather than a 5th
+// row: on a 360dp Android phone keys stay ~59px wide, while another row
+// would make the panel ~65px taller and cover more of the form):
+//    7   8   9   ÷   ⌫
+//    4   5   6   ×   C
+//    1   2   3   −   =
+//    00  0   .   +   =     ("=" spans the last two rows)
+// Lets "120 + 85", "65 × 3" or "1200 ÷ 4" be typed straight in instead of
+// worked out in your head first.
+const CALC_KEYS_WITH_DECIMAL: Key[] = ["7", "8", "9", "÷", "backspace", "4", "5", "6", "×", "C", "1", "2", "3", "-", "=", "00", "0", ".", "+"];
+const CALC_KEYS_NO_DECIMAL: Key[] = ["7", "8", "9", "÷", "backspace", "4", "5", "6", "×", "C", "1", "2", "3", "-", "=", "00", "0", "+"];
 
 const KEY_LABELS: Partial<Record<Key, string>> = {
   backspace: "刪除",
   ".": "小數點",
   "+": "加",
   "-": "減",
+  "×": "乘",
+  "÷": "除",
   "=": "等於",
+  C: "全部清除",
 };
 
 // Thousands-separate the integer part only, so a partial/trailing decimal
@@ -116,7 +131,10 @@ export function AmountKeypadField({
   // typed. `value` (the caller's string) is always just the operand on
   // screen; the sum is only written back through onChange once it's
   // resolved — by "=", by the bottom button, or by the keypad closing.
-  const [pendingOp, setPendingOp] = useState<{ left: number; op: "+" | "-" } | null>(null);
+  // Evaluated strictly left to right like a basic phone calculator
+  // ("100 + 20 × 3" = 360): the screen only ever shows "left op right", so
+  // what's being computed is always visible.
+  const [pendingOp, setPendingOp] = useState<{ left: number; op: Op } | null>(null);
   const displayRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   // Height of the overlay panel, measured so room can be made for it.
@@ -183,16 +201,29 @@ export function AmountKeypadField({
 
   const negative = value.startsWith("-");
 
-  // The pending sum as a value string. Rounded to what this field can hold;
-  // a result at or below zero clears the field rather than writing a
-  // negative amount no caller expects.
+  // The pending result, rounded to what this field can hold. With nothing
+  // typed after the operator yet (or a ÷ 0) the left side is kept as is.
+  function computePending(): number {
+    if (!pendingOp) return Number(value) || 0;
+    const { left, op } = pendingOp;
+    if (value === "" || value === "-") return left;
+    const right = Number(value) || 0;
+    let raw: number;
+    if (op === "+") raw = left + right;
+    else if (op === "-") raw = left - right;
+    else if (op === "×") raw = left * right;
+    else raw = right === 0 ? left : left / right;
+    const factor = 10 ** (allowDecimal ? maxDecimals : 0);
+    return Math.round(raw * factor) / factor;
+  }
+
+  // The pending result as a value string. A result at or below zero clears
+  // the field rather than writing a negative amount no caller expects (a
+  // negative in the middle of a chain is fine — see press()).
   function resolvePending(): string {
     if (!pendingOp) return value;
-    const right = Number(value) || 0;
-    const raw = pendingOp.op === "+" ? pendingOp.left + right : pendingOp.left - right;
-    const factor = 10 ** (allowDecimal ? maxDecimals : 0);
-    const rounded = Math.round(raw * factor) / factor;
-    return rounded > 0 ? String(rounded) : "";
+    const result = computePending();
+    return result > 0 ? String(result) : "";
   }
 
   // Writes any pending sum back before the keypad goes away, so a half
@@ -213,14 +244,19 @@ export function AmountKeypadField({
   function press(key: Key) {
     const sign = negative ? "-" : "";
     const digits = negative ? value.slice(1) : value;
-    if (key === "+" || key === "-") {
+    if (isOp(key)) {
       if (pendingOp && digits === "") {
         // Operator tapped twice in a row: just switch it.
         setPendingOp({ left: pendingOp.left, op: key });
         return;
       }
       if (!pendingOp && (digits === "" || Number(digits) === 0)) return;
-      setPendingOp({ left: Number(resolvePending()) || 0, op: key });
+      setPendingOp({ left: computePending(), op: key });
+      onChange("");
+      return;
+    }
+    if (key === "C") {
+      setPendingOp(null);
       onChange("");
       return;
     }
@@ -232,7 +268,7 @@ export function AmountKeypadField({
       if (pendingOp && digits === "") {
         // Nothing typed after the operator yet: take the operator back.
         setPendingOp(null);
-        onChange(String(pendingOp.left));
+        onChange(pendingOp.left > 0 ? String(pendingOp.left) : "");
         return;
       }
       // Keep the sign once digits run out, so clearing a negative amount
@@ -268,7 +304,7 @@ export function AmountKeypadField({
   }
 
   const keys = (
-    <div className={cn("grid gap-2", calculator ? "grid-cols-4" : "grid-cols-3")}>
+    <div className={cn("grid gap-2", calculator ? "grid-cols-5" : "grid-cols-3")}>
       {KEYS.map((key) => (
         <button
           key={key}
@@ -281,9 +317,11 @@ export function AmountKeypadField({
             "flex items-center justify-center rounded-2xl bg-muted font-semibold shadow-sm transition-colors active:bg-secondary",
             // Shorter keys inline, so the Dialog grows as little as possible.
             inline ? "h-11 text-lg" : "h-14 text-xl",
-            key === "backspace" && "text-muted-foreground",
-            (key === "+" || key === "-" || key === "=") && "bg-primary/10 text-primary active:bg-primary/20",
+            (key === "backspace" || key === "C") && "text-muted-foreground",
+            (isOp(key) || key === "=") && "bg-primary/10 text-primary active:bg-primary/20",
             pendingOp?.op === key && "bg-primary text-primary-foreground active:bg-primary",
+            // Fills the empty cell under C in the bottom-right corner.
+            key === "=" && "row-span-2 h-auto",
             // 0 takes the "." key's old grid spot in no-decimal mode —
             // span it across both so it doesn't leave a lone empty
             // cell at the end of the grid.
@@ -318,7 +356,7 @@ export function AmountKeypadField({
 
   // "120 + 85" while a sum is pending, otherwise just the value.
   const expression = pendingOp
-    ? `${formatAmount(String(pendingOp.left))} ${pendingOp.op === "+" ? "+" : "−"}${value ? ` ${formatAmount(value)}` : ""}`
+    ? `${formatAmount(String(pendingOp.left))} ${pendingOp.op === "-" ? "−" : pendingOp.op}${value ? ` ${formatAmount(value)}` : ""}`
     : formatAmount(value);
 
   // A tap outside the keypad closes it. When that tap landed on another
