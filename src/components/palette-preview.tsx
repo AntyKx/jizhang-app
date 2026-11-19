@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 // PREVIEW ONLY. Color themes are tried out from /design-preview/themes,
 // which stores the choice in localStorage and sets html[data-palette]
@@ -44,12 +45,56 @@ export function readPalette(): PaletteKey {
   return PALETTES.find((p) => p.key === stored)?.key ?? "default";
 }
 
+// Brand orange from layout.tsx's viewport.themeColor — what Chrome / an
+// installed PWA paints the system status bar with.
+const DEFAULT_THEME_COLOR = "#e2874f";
+
+// Any CSS color (oklch included) → #rrggbb, via the canvas, since not every
+// browser accepts oklch() in <meta name="theme-color">.
+function toHex(color: string): string | null {
+  const ctx = document.createElement("canvas").getContext("2d");
+  if (!ctx) return null;
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, 1, 1);
+  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+  return `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+// With a palette on, the browser/PWA status bar takes the banner color
+// (--secondary) instead of the fixed orange, so it reads as part of the
+// page like it does in the Android app (where the bar is transparent and
+// the page itself shows through).
+function syncThemeColor() {
+  const root = document.documentElement;
+  const color = root.dataset.palette
+    ? toHex(getComputedStyle(root).getPropertyValue("--secondary").trim())
+    : DEFAULT_THEME_COLOR;
+  if (!color) return;
+  for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+    if (meta.content !== color) meta.content = color;
+  }
+}
+
 export function PalettePreviewApplier() {
+  const pathname = usePathname();
+
   useEffect(() => {
     const stored = localStorage.getItem(PALETTE_STORAGE_KEY);
     if (stored && PALETTES.some((p) => p.key === stored)) {
       document.documentElement.dataset.palette = stored;
     }
+    syncThemeColor();
+    // Palette picked, or light/dark switched (next-themes toggles the
+    // html class).
+    const observer = new MutationObserver(syncThemeColor);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-palette"] });
+    return () => observer.disconnect();
   }, []);
+
+  // Route changes can re-render the head's theme-color back to the default.
+  useEffect(() => {
+    if (document.documentElement.dataset.palette) syncThemeColor();
+  }, [pathname]);
+
   return null;
 }
