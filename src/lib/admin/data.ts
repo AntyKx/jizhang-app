@@ -4,6 +4,7 @@ import { list } from "@vercel/blob";
 import { sql } from "drizzle-orm";
 import { startOfMonth } from "date-fns";
 import { db } from "@/db";
+import { activeBudget } from "@/lib/budgets";
 import {
   accounts,
   aiUsageEvents,
@@ -138,7 +139,7 @@ export const getAdminData = cache(async () => {
       })
       .from(aiUsageEvents)
       .groupBy(aiUsageEvents.userId),
-    db.select({ userId: budgets.userId, n: sql<number>`count(*)::int` }).from(budgets).groupBy(budgets.userId),
+    db.select({ userId: budgets.userId, n: sql<number>`count(*)::int` }).from(budgets).where(activeBudget).groupBy(budgets.userId),
     db.select({ userId: savingsGoals.userId, n: sql<number>`count(*)::int` }).from(savingsGoals).groupBy(savingsGoals.userId),
     db
       .select({ userId: recurringRules.userId, n: sql<number>`count(*)::int` })

@@ -2,6 +2,7 @@ import { eachDayOfInterval, format } from "date-fns";
 import { and, eq, gte, isNull, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { budgets, transactions } from "@/db/schema";
+import { activeBudget } from "@/lib/budgets";
 import { bucketLabel, shiftAnchor, unitBounds, type StatsRange } from "@/lib/stats/range";
 
 export type PeriodTotals = { income: number; expense: number };
@@ -111,7 +112,9 @@ export async function getCumulativeSpending(userId: string, range: StatsRange): 
     db
       .select({ limitAmount: budgets.limitAmount })
       .from(budgets)
-      .where(and(eq(budgets.userId, userId), isNull(budgets.categoryId), eq(budgets.month, range.startStr))),
+      .where(
+        and(eq(budgets.userId, userId), isNull(budgets.categoryId), eq(budgets.month, range.startStr), activeBudget),
+      ),
   ]);
 
   const byDay = new Map<string, number>();

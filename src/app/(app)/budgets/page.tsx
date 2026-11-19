@@ -8,6 +8,7 @@ import { BudgetsList } from "@/components/budgets/budgets-list";
 import { BudgetMonthSummary } from "@/components/budgets/budget-month-summary";
 import { BearIllustration } from "@/components/bear-illustration";
 import { getTodayInTaipei } from "@/lib/date";
+import { activeBudget, ensureMonthBudgets } from "@/lib/budgets";
 import { GuideHelpLink } from "@/components/guide/guide-help-link";
 import { PageHeader } from "@/components/page-header";
 
@@ -15,6 +16,7 @@ export default async function BudgetsPage() {
   const userId = await requireUserId();
   const monthStart = format(startOfMonth(getTodayInTaipei()), "yyyy-MM-dd");
   const monthEnd = format(endOfMonth(getTodayInTaipei()), "yyyy-MM-dd");
+  await ensureMonthBudgets(userId, monthStart);
 
   const [monthBudgets, expenseCategories, monthExpenses] = await Promise.all([
     db
@@ -26,7 +28,7 @@ export default async function BudgetsPage() {
       })
       .from(budgets)
       .leftJoin(categories, eq(budgets.categoryId, categories.id))
-      .where(and(eq(budgets.userId, userId), eq(budgets.month, monthStart))),
+      .where(and(eq(budgets.userId, userId), eq(budgets.month, monthStart), activeBudget)),
     db
       .select({ id: categories.id, name: categories.name, icon: categories.icon, color: categories.color })
       .from(categories)
@@ -72,6 +74,11 @@ export default async function BudgetsPage() {
   const totalLimit = overallBudget
     ? Number(overallBudget.limitAmount)
     : budgetsWithSpent.reduce((sum, b) => sum + Number(b.limitAmount), 0);
+  // Measured against the same thing as the limit: with no overall budget
+  // the limit is the per-category limits added up, so only those
+  // categories' spending counts — rent or shopping with no budget of their
+  // own used to be counted too, showing 超支 while every budget was fine.
+  const summarySpent = overallBudget ? totalSpent : budgetsWithSpent.reduce((sum, b) => sum + b.spent, 0);
   const daysInMonth = Number(format(endOfMonth(today), "d"));
   const dayOfMonth = Number(format(today, "d"));
 
@@ -86,7 +93,7 @@ export default async function BudgetsPage() {
 
       {budgetsWithSpent.length > 0 && totalLimit > 0 && (
         <BudgetMonthSummary
-          spent={totalSpent}
+          spent={summarySpent}
           limit={totalLimit}
           dayOfMonth={dayOfMonth}
           daysInMonth={daysInMonth}

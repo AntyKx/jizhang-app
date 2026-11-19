@@ -23,17 +23,21 @@ export function HomeSummary({
   todayExpense,
   monthExpense,
   budgetLimit,
+  budgetSpent,
 }: {
   userName: string | null;
   todayExpense: number;
   monthExpense: number;
   budgetLimit: number | null;
+  // What the budget bar measures: the whole month's spending with an
+  // overall budget, only the budgeted categories' without one.
+  budgetSpent: number;
 }) {
   const now = getNowInTaipei();
   const greeting = getGreeting(now.getHours());
   const dateLabel = `${format(now, "M月d日", { locale: zhTW })}・${format(now, "EEEE", { locale: zhTW })}`;
-  const budgetPct = budgetLimit ? Math.min(100, (monthExpense / budgetLimit) * 100) : null;
-  const remaining = budgetLimit != null ? budgetLimit - monthExpense : null;
+  const budgetPct = budgetLimit ? Math.min(100, (budgetSpent / budgetLimit) * 100) : null;
+  const remaining = budgetLimit != null ? budgetLimit - budgetSpent : null;
   const overBudget = remaining != null && remaining < 0;
 
   return (

@@ -3,6 +3,7 @@ import { and, eq, gte, isNull, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { budgets, savingsGoals, transactions } from "@/db/schema";
 import type { StatsRange } from "@/lib/stats/range";
+import { activeBudget } from "@/lib/budgets";
 
 export type BudgetVsActualPoint = {
   monthKey: string;
@@ -54,6 +55,7 @@ export async function getBudgetVsActualTrend(
           categoryId ? eq(budgets.categoryId, categoryId) : isNull(budgets.categoryId),
           gte(budgets.month, earliestStr),
           lte(budgets.month, latestStr),
+          activeBudget,
         ),
       ),
   ]);

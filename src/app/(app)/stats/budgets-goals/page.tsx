@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { budgets, categories, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { hasCoreAccess } from "@/lib/entitlements";
+import { activeBudget, ensureMonthBudgets } from "@/lib/budgets";
 import { LockedPreview } from "@/components/upgrade/locked-preview";
 import { resolveStatsRange } from "@/lib/stats/range";
 import { getBudgetVsActualTrend, getSavingsGoalsSnapshot } from "@/lib/stats/budget-goal-queries";
@@ -25,6 +26,7 @@ export default async function StatsBudgetsGoalsPage({
   // card (LockedPreview), which sells it far better than a feature list.
   const unlocked = await hasCoreAccess(userId);
   const range = resolveStatsRange(params);
+  await ensureMonthBudgets(userId, range.startStr);
 
   const [rangeTransactions, monthBudgets, goals, budgetTrend] = await Promise.all([
     db
@@ -51,7 +53,7 @@ export default async function StatsBudgetsGoalsPage({
       })
       .from(budgets)
       .leftJoin(categories, eq(budgets.categoryId, categories.id))
-      .where(and(eq(budgets.userId, userId), eq(budgets.month, range.startStr))),
+      .where(and(eq(budgets.userId, userId), eq(budgets.month, range.startStr), activeBudget)),
     getSavingsGoalsSnapshot(userId),
     getBudgetVsActualTrend(userId, range),
   ]);

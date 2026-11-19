@@ -3,12 +3,11 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
-import { format, startOfMonth } from "date-fns";
 import { db } from "@/db";
 import { budgets } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { ownedCategoryId } from "@/lib/category";
-import { getTodayInTaipei } from "@/lib/date";
+import { currentBudgetMonth, ensureMonthBudgets } from "@/lib/budgets";
 import { fail } from "@/lib/action-result";
 
 function revalidateBudgetPaths() {
@@ -29,7 +28,11 @@ export async function createBudget(formData: FormData) {
     limitAmount: formData.get("limitAmount"),
   });
   const categoryId = await ownedCategoryId(userId, parsed.categoryId);
-  const month = format(startOfMonth(getTodayInTaipei()), "yyyy-MM-dd");
+  const month = currentBudgetMonth();
+  // Carry last month's budgets over first: adding one budget on the 1st
+  // before anything else ran would otherwise leave the month with just
+  // that one, and the rest would never be copied.
+  await ensureMonthBudgets(userId, month);
 
   // Upsert rather than insert — setting a budget for a category that
   // already has one this month means "change it to this", not "add a
@@ -61,7 +64,27 @@ export async function updateBudget(id: string, limitAmount: number) {
 export async function deleteBudget(id: string) {
   const userId = await requireUserId();
 
-  await db.delete(budgets).where(and(eq(budgets.id, id), eq(budgets.userId, userId)));
+  const [deleted] = await db
+    .delete(budgets)
+    .where(and(eq(budgets.id, id), eq(budgets.userId, userId)))
+    .returning({ month: budgets.month });
+
+  // Deleted the month's last budget: leave a cleared marker (limit 0, see
+  // lib/budgets.ts) so the month isn't refilled from last month on the
+  // next page load.
+  if (deleted) {
+    const [remaining] = await db
+      .select({ id: budgets.id })
+      .from(budgets)
+      .where(and(eq(budgets.userId, userId), eq(budgets.month, deleted.month)))
+      .limit(1);
+    if (!remaining) {
+      await db
+        .insert(budgets)
+        .values({ userId, categoryId: null, month: deleted.month, limitAmount: "0" })
+        .onConflictDoNothing();
+    }
+  }
 
   revalidateBudgetPaths();
 }
