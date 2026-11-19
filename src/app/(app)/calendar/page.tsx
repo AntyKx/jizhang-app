@@ -122,7 +122,14 @@ export default async function CalendarPage({
     // flow content left to scroll, with no JS touching body's own
     // styles this time — that's what broke env(safe-area-inset-bottom)
     // for the fixed bottom nav previously.
+    // data-scroll-lock: the (app) shell underneath (min-h-100dvh plus body's
+    // safe-area padding) is still a little taller than the screen, so the
+    // document itself could be dragged up with nothing below — and with a
+    // color theme the page pattern visibly slid. globals.css stops the
+    // document scrolling while this page is mounted (CSS on <html>, no JS on
+    // body — see above).
     <div
+      data-scroll-lock
       className="fixed inset-0 mx-auto flex w-full max-w-md flex-col overflow-hidden px-4"
       // Being fixed/viewport-relative means this no longer sits inside
       // <main>'s own py-6 + body's safe-area-inset-top padding — without

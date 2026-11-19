@@ -226,7 +226,9 @@ export function CalendarView({
     ) : (
       // Keyed by day so each day's rows get their own entrance instead of
       // StaggerList reusing the previous day's already-shown nodes.
-      <div key={selectedDay} className="flex flex-col divide-y">
+      // A card, not bare rows, so the list reads as one block over a theme's
+      // page pattern instead of strips floating on it.
+      <div key={selectedDay} className="flex flex-col divide-y overflow-hidden rounded-2xl border bg-card">
         {editableTransactions.length > 0 && (
           <StaggerList className="flex flex-col divide-y">
             {groupSettlements(editableTransactions).map((node) =>
