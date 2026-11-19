@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useCoreUnlocked } from "@/components/core-access-context";
+import { useCoreTrialing, useCoreUnlocked } from "@/components/core-access-context";
 import { PALETTES } from "@/components/theme-palette";
 import { ThemedBear } from "@/components/themed-bear";
 import { BottomSheet, BottomSheetContent, BottomSheetTitle } from "@/components/ui/bottom-sheet";
@@ -72,6 +72,7 @@ const BEAR_TILE_BG: Record<string, string> = {
 // itself.
 export function ThemesAnnouncement() {
   const unlocked = useCoreUnlocked();
+  const trialing = useCoreTrialing();
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -111,7 +112,11 @@ export function ThemesAnnouncement() {
           ))}
         </div>
         <p className="text-center text-xs text-muted-foreground">
-          {unlocked ? "到「帳號設定」就能換。" : "焦糖免費使用，其他主題包含在 NT$120 解鎖中。"}
+          {!unlocked
+            ? "焦糖免費使用，其他主題包含在 NT$120 解鎖中。"
+            : trialing
+              ? "試用期間全部都能用，到「帳號設定」就能換；試用結束後會換回焦糖，解鎖就能繼續使用。"
+              : "到「帳號設定」就能換。"}
         </p>
         <div className="flex flex-col gap-2">
           <Button

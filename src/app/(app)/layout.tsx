@@ -3,7 +3,7 @@ import { GlobalQuickAddFab } from "@/components/global-quick-add-fab";
 import { ScrollResetOnNavigate } from "@/components/scroll-reset-on-navigate";
 import { CoreAccessProvider } from "@/components/core-access-context";
 import { requireUserId } from "@/lib/auth";
-import { hasCoreAccess } from "@/lib/entitlements";
+import { getCoreAccess } from "@/lib/entitlements";
 import { getQuickAddContext } from "@/lib/quick-add-context";
 import { getOnboardingState } from "@/lib/onboarding";
 import { WelcomeGate } from "@/components/onboarding/welcome-gate";
@@ -16,14 +16,14 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const userId = await requireUserId();
-  const [unlocked, quickAddContext, onboarding] = await Promise.all([
-    hasCoreAccess(userId),
+  const [{ unlocked, trialing }, quickAddContext, onboarding] = await Promise.all([
+    getCoreAccess(userId),
     getQuickAddContext(userId),
     getOnboardingState(userId),
   ]);
 
   return (
-    <CoreAccessProvider unlocked={unlocked}>
+    <CoreAccessProvider unlocked={unlocked} trialing={trialing}>
     {/* body (src/app/layout.tsx) already pads the top by the safe area, so
         a full 100dvh here made every page that much taller than the screen
         — short pages could still be dragged up with nothing below. */}

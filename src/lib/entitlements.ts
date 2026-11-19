@@ -63,6 +63,13 @@ export function isDevAdmin(userId: string): boolean {
 }
 
 export async function hasCoreAccess(userId: string): Promise<boolean> {
+  return (await getCoreAccess(userId)).unlocked;
+}
+
+// hasCoreAccess plus *why*: `trialing` = unlocked only by the one-time trial
+// (not purchased), for UI that should mention the trial ends (e.g. themes
+// revert to 焦糖). Same side effects as hasCoreAccess.
+export async function getCoreAccess(userId: string): Promise<{ unlocked: boolean; trialing: boolean }> {
   const [row] = await db
     .select({ hasPurchasedCore: userSettings.hasPurchasedCore, trialEndsAt: userSettings.trialEndsAt })
     .from(userSettings)
@@ -74,11 +81,14 @@ export async function hasCoreAccess(userId: string): Promise<boolean> {
     // another request creating the same row concurrently; whichever insert
     // wins, the trial window is the same to within milliseconds.
     await db.insert(userSettings).values({ userId, trialEndsAt: newTrialEndsAt() }).onConflictDoNothing();
-    return true;
+    return { unlocked: true, trialing: true };
   }
 
-  if (row.hasPurchasedCore) return true;
-  if (row.trialEndsAt) return isTrialActive(row.trialEndsAt);
+  if (row.hasPurchasedCore) return { unlocked: true, trialing: false };
+  if (row.trialEndsAt) {
+    const active = isTrialActive(row.trialEndsAt);
+    return { unlocked: active, trialing: active };
+  }
 
   // Pre-existing free account from before the trial feature shipped —
   // backfill its one-time trial retroactively, once, right now. Guarded on
@@ -87,7 +97,7 @@ export async function hasCoreAccess(userId: string): Promise<boolean> {
     .update(userSettings)
     .set({ trialEndsAt: newTrialEndsAt() })
     .where(and(eq(userSettings.userId, userId), isNull(userSettings.trialEndsAt)));
-  return true;
+  return { unlocked: true, trialing: true };
 }
 
 // Read-only variant of hasCoreAccess for background jobs (the nightly backup
