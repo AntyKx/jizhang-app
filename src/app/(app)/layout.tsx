@@ -23,7 +23,10 @@ export default async function AppLayout({
 
   return (
     <CoreAccessProvider unlocked={unlocked}>
-    <div className="flex min-h-[100dvh] flex-col">
+    {/* body (src/app/layout.tsx) already pads the top by the safe area, so
+        a full 100dvh here made every page that much taller than the screen
+        — short pages could still be dragged up with nothing below. */}
+    <div className="flex min-h-[calc(100dvh-env(safe-area-inset-top))] flex-col">
       <ScrollResetOnNavigate />
       <ThemePaletteApplier />
       <main className="mx-auto w-full max-w-md flex-1 px-4 py-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))]">

@@ -126,7 +126,9 @@ export async function TodayTransactionsSection({
         <span className="text-sm font-medium text-muted-foreground">今天記了 {todayTransactions.length} 筆</span>
         <AllTransactionsLink label="查看全部" />
       </div>
-      <StaggerList className="flex flex-col divide-y">
+      {/* A card (same as the calendar's day list) so the rows read as one
+          block over a color theme's page pattern. */}
+      <StaggerList className="flex flex-col divide-y overflow-hidden rounded-2xl border bg-card">
         {nodes.map((node) =>
           isSettlementGroup(node) ? (
             <SettlementGroupRow
