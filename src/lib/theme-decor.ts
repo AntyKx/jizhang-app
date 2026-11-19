@@ -1,7 +1,7 @@
 // LINE-style theme decoration: each palette gets a motif (paw, leaf,
 // bubble, flower, sparkle, star) drawn as SVG and turned into CSS image
 // URLs — one for the home banner, one as a faint tiling page pattern.
-// PalettePreviewApplier writes them to --theme-hero-deco / --theme-pattern
+// ThemePaletteApplier writes them to --theme-hero-deco / --theme-pattern
 // on <html>; globals.css only uses them under html[data-palette].
 
 type Motif = "paw" | "leaf" | "bubble" | "flower" | "sparkle" | "star";

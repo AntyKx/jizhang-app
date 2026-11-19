@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { readPalette, subscribePalette } from "@/components/palette-preview";
+import { readPalette, subscribePalette } from "@/components/theme-palette";
 import { themedBearSvg, type BearVariant } from "@/lib/themed-bear";
 import { cn } from "@/lib/utils";
 

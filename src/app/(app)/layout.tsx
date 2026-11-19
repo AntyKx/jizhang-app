@@ -7,7 +7,7 @@ import { hasCoreAccess } from "@/lib/entitlements";
 import { getQuickAddContext } from "@/lib/quick-add-context";
 import { getOnboardingState } from "@/lib/onboarding";
 import { WelcomeGate } from "@/components/onboarding/welcome-gate";
-import { PalettePreviewApplier } from "@/components/palette-preview";
+import { ThemePaletteApplier } from "@/components/theme-palette";
 
 export default async function AppLayout({
   children,
@@ -25,7 +25,7 @@ export default async function AppLayout({
     <CoreAccessProvider unlocked={unlocked}>
     <div className="flex min-h-[100dvh] flex-col">
       <ScrollResetOnNavigate />
-      <PalettePreviewApplier />
+      <ThemePaletteApplier />
       <main className="mx-auto w-full max-w-md flex-1 px-4 py-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))]">
         {children}
       </main>

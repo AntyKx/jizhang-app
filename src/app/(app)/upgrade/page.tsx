@@ -18,6 +18,7 @@ const featureFromLabel: Record<string, string> = {
   shared: "新增分帳",
   accounts: "多個帳戶",
   "monthly-report": "小熊月報分析",
+  themes: "主題配色",
 };
 
 // The three things the unlock changes day to day — shown above the
@@ -43,6 +44,8 @@ const comparisonRows: { label: string; free: string | boolean; unlocked: string 
   { label: "一句話記帳（文字／語音）", free: "每月 20 次", unlocked: "每月 120 次" },
   { label: "收據辨識", free: "每月 5 張", unlocked: "每月 30 張" },
   { label: "雲端備份還原", free: "近 7 天", unlocked: "近 30 天" },
+  // Gate: useCoreUnlocked in components/theme-palette.tsx (client-only, per device).
+  { label: "主題配色（6 款小熊主題）", free: "預設焦糖", unlocked: true },
 ];
 
 function ComparisonCell({ value }: { value: string | boolean }) {

@@ -129,8 +129,8 @@
   --sidebar-ring: oklch(0.74 0.18 40 / 50%);
 }
 
-/* Color themes (PREVIEW — only applied via /design-preview/themes, which
-   sets html[data-palette]). Each overrides the palette tokens for light and
+/* Color themes (NT$120 unlock; picked in 帳號設定 › 主題配色, applied by
+   ThemePaletteApplier as html[data-palette]). Each overrides the palette tokens for light and
    dark; semantic money colors (--destructive, --income, --warning) stay the
    same everywhere unless they'd clash with the theme's own primary.
    Specificity: html[data-palette] beats :root, html.dark[data-palette]
@@ -402,10 +402,10 @@ html[data-palette="night"] {
   --sidebar-ring: rgb(242 193 78 / 50%);
 }
 
-/* LINE-style theme dressing (PREVIEW). Home banner colors per palette, the
+/* LINE-style theme dressing. Home banner colors per palette, the
    motif art (--theme-hero-deco) and the faint page pattern
    (--theme-pattern) — the last two are SVG URLs set on <html> by
-   PalettePreviewApplier from src/lib/theme-decor.ts. The default 焦糖
+   ThemePaletteApplier from src/lib/theme-decor.ts. The default 焦糖
    theme (no data-palette) is untouched. */
 html[data-palette="matcha"] { --hero-a: #b9d69a; --hero-b: #e9f2da; }
 html.dark[data-palette="matcha"] { --hero-a: #3a5230; --hero-b: #26331f; }

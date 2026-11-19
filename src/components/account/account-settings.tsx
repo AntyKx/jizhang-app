@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeSetting } from "@/components/theme-setting";
+import { ThemePicker } from "@/components/account/theme-picker";
 import { isFail } from "@/lib/action-result";
 import { supportedCurrencies } from "@/lib/currency";
 
@@ -231,6 +232,13 @@ export function AccountSettings({
             <span className="text-xs text-muted-foreground">只套用在這台裝置</span>
           </div>
           <ThemeSetting />
+        </div>
+        <div className="flex flex-col gap-3 px-1 py-3.5">
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">主題配色</span>
+            <span className="text-xs text-muted-foreground">換掉整個 App 的顏色、首頁小熊和圖樣，只套用在這台裝置</span>
+          </div>
+          <ThemePicker />
         </div>
         <div className="flex items-center justify-between gap-3 px-1 py-3.5">
           <div className="flex flex-col">
