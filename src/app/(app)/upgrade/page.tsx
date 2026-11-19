@@ -6,7 +6,7 @@ import { isTrialActive, trialDaysRemaining } from "@/lib/entitlements";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { CoreUnlockCta } from "@/components/upgrade/core-unlock-cta";
 import { cn } from "@/lib/utils";
-import { Check, Mic, Minus, TrendingUp, Wallet } from "lucide-react";
+import { Check, Mic, Minus, Palette, TrendingUp, Wallet } from "lucide-react";
 import { createAllInOneCheckoutSession, createBillingPortalSession } from "./actions";
 import { TRIAL_DAYS } from "@/lib/trial";
 import { PageHeader } from "@/components/page-header";
@@ -21,12 +21,13 @@ const featureFromLabel: Record<string, string> = {
   themes: "主題配色",
 };
 
-// The three things the unlock changes day to day — shown above the
+// The things the unlock changes day to day — shown above the
 // comparison table, which stays as the full reference.
 const highlights = [
   { icon: Wallet, title: "帳戶分開記", body: "現金、銀行、信用卡各自算餘額，淨資產一眼看清" },
   { icon: TrendingUp, title: "看懂長期變化", body: "趨勢、儲蓄率、預算目標統計，每月還有小熊月報幫你分析" },
   { icon: Mic, title: "一句話記帳更夠用", body: "打字、用說的每月 120 次，拍收據每月 30 張" },
+  { icon: Palette, title: "6 款小熊主題", body: "整個 App 換配色，首頁小熊也跟著換裝" },
 ];
 
 // What the free tier vs the NT$120 unlock actually gets — keep in sync with

@@ -20,7 +20,11 @@ export function ScrollResetOnNavigate() {
   const pathname = usePathname();
 
   useEffect(() => {
-    window.scrollTo(0, 0);
+    // A #anchor link (e.g. /account#themes from the themes announcement)
+    // lands on its section instead of the top.
+    const target = window.location.hash ? document.getElementById(window.location.hash.slice(1)) : null;
+    if (target) target.scrollIntoView({ block: "start" });
+    else window.scrollTo(0, 0);
   }, [pathname]);
 
   return null;

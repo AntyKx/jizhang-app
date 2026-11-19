@@ -434,7 +434,8 @@ html[data-palette="night"] { --hero-a: #2d3a78; --hero-b: #1a2248; }
    theme tint instead of near-white, no grey outline, a soft shadow in the
    theme's own color, and row dividers tinted to match. Applies to the
    shadcn Card and to the "border + bg-card" list blocks (today list,
-   calendar day list, …). 焦糖 (no data-palette) is untouched. */
+   calendar day list, …). Extended to the default 焦糖 theme too. */
+html:not([data-palette]):not(.dark) { --card: oklch(0.975 0.022 75); }
 html[data-palette="matcha"] { --card: oklch(0.975 0.022 125); }
 html[data-palette="ocean"] { --card: oklch(0.975 0.018 230); }
 html[data-palette="sakura"] { --card: oklch(0.975 0.018 355); }
@@ -442,13 +443,13 @@ html[data-palette="lavender"] { --card: oklch(0.975 0.018 295); }
 /* (Dark mode keeps each palette's own --card: html.dark[...] is more specific.) */
 html[data-palette="night"] { --card: #212a50; }
 
-html[data-palette] {
+:root {
   --themed-card-shadow:
     0 8px 22px -10px color-mix(in oklch, var(--primary) 50%, transparent),
     0 1px 2px color-mix(in oklch, var(--primary) 12%, transparent);
   --themed-card-divider: color-mix(in oklch, var(--primary) 14%, transparent);
 }
-html.dark[data-palette] {
+.dark {
   --themed-card-shadow:
     0 8px 22px -10px rgb(0 0 0 / 55%),
     0 0 0 1px color-mix(in oklch, var(--primary) 16%, transparent);
@@ -458,8 +459,8 @@ html[data-palette="night"] {
   --themed-card-shadow: 0 8px 22px -10px rgb(127 162 255 / 45%), 0 0 0 1px rgb(127 162 255 / 12%);
   --themed-card-divider: rgb(127 162 255 / 14%);
 }
-html[data-palette] .bg-card.border,
-html[data-palette] [data-slot="card"] {
+.bg-card.border,
+[data-slot="card"] {
   border-color: transparent;
   --tw-ring-color: transparent;
   box-shadow: var(--themed-card-shadow);

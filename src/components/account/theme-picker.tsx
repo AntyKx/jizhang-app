@@ -1,6 +1,7 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { markThemesSeen } from "@/components/themes-news";
 import { useRouter } from "next/navigation";
 import { Check, Lock } from "lucide-react";
 import { useCoreUnlocked } from "@/components/core-access-context";
@@ -14,6 +15,16 @@ export function ThemePicker() {
   const unlocked = useCoreUnlocked();
   const router = useRouter();
   const selected = useSyncExternalStore(subscribePalette, readPalette, () => null);
+
+  // Opening the picker clears the "new feature" dot/badge (themes-news.tsx).
+  // Arriving via /account#themes: the page may still have been loading when
+  // the navigation's own scroll ran, so scroll to this section once it's here.
+  useEffect(() => {
+    markThemesSeen();
+    if (window.location.hash === "#themes") {
+      document.getElementById("themes")?.scrollIntoView({ block: "start" });
+    }
+  }, []);
 
   return (
     <div className="grid grid-cols-3 gap-2.5">

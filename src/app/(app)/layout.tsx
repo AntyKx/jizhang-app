@@ -8,6 +8,7 @@ import { getQuickAddContext } from "@/lib/quick-add-context";
 import { getOnboardingState } from "@/lib/onboarding";
 import { WelcomeGate } from "@/components/onboarding/welcome-gate";
 import { ThemePaletteApplier } from "@/components/theme-palette";
+import { ThemesAnnouncement } from "@/components/themes-news";
 
 export default async function AppLayout({
   children,
@@ -40,7 +41,7 @@ export default async function AppLayout({
         sharedLocked={!unlocked}
       />
       <MainNav />
-      {onboarding.needsWelcome && <WelcomeGate />}
+      {onboarding.needsWelcome ? <WelcomeGate /> : <ThemesAnnouncement />}
     </div>
     </CoreAccessProvider>
   );

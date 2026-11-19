@@ -233,7 +233,7 @@ export function AccountSettings({
           </div>
           <ThemeSetting />
         </div>
-        <div className="flex flex-col gap-3 px-1 py-3.5">
+        <div id="themes" className="flex scroll-mt-20 flex-col gap-3 px-1 py-3.5">
           <div className="flex flex-col">
             <span className="text-sm font-medium">主題配色</span>
             <span className="text-xs text-muted-foreground">換掉整個 App 的顏色、首頁小熊和圖樣，只套用在這台裝置</span>

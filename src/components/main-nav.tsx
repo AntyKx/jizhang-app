@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Calendar, LineChart, MoreHorizontal, SquarePen, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SlidingIndicator } from "@/components/motion/sliding-indicator";
+import { ThemesNewDot } from "@/components/themes-news";
 
 const links = [
   { href: "/record", label: "首頁", Icon: SquarePen },
@@ -46,12 +47,13 @@ export function MainNav() {
               // It also promotes these to the `static` client-cache TTL.
               prefetch
               className={cn(
-                "flex flex-col items-center gap-0.5 rounded-xl px-4 py-1.5 text-xs transition-colors",
+                "relative flex flex-col items-center gap-0.5 rounded-xl px-4 py-1.5 text-xs transition-colors",
                 isActive ? "text-primary" : "text-muted-foreground hover:text-foreground",
               )}
             >
               <Icon className="size-5" strokeWidth={isActive ? 2.25 : 1.75} />
               {label}
+              {href === "/more" && <ThemesNewDot />}
             </Link>
           );
         })}

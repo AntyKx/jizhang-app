@@ -3,6 +3,7 @@ import { type LucideIcon, BookOpen, ChartNoAxesColumn, DatabaseBackup, FileText,
 import { requireUserId } from "@/lib/auth";
 import { hasCoreAccess, isDevAdmin } from "@/lib/entitlements";
 import { PageHeader, SectionTitle } from "@/components/page-header";
+import { ThemesNewBadge } from "@/components/themes-news";
 
 type MoreLink = { href: string; Icon: LucideIcon; label: string; desc: string; lockable?: boolean };
 
@@ -24,7 +25,7 @@ const groups: { title: string; links: MoreLink[] }[] = [
     title: "設定",
     links: [
       { href: "/categories", Icon: Tags, label: "分類管理", desc: "新增自己的記帳分類" },
-      { href: "/account", Icon: UserCog, label: "帳號設定", desc: "大頭貼、姓名、Email、登出" },
+      { href: "/account", Icon: UserCog, label: "帳號設定", desc: "姓名、主題配色、淺色／深色、登出" },
       { href: "/data-export", Icon: DatabaseBackup, label: "資料與備份", desc: "匯出 CSV／Excel、備份與還原、刪除資料" },
     ],
   },
@@ -61,7 +62,10 @@ export default async function MorePage() {
                   <Icon className="size-5" strokeWidth={1.75} />
                 </span>
                 <div className="flex flex-1 flex-col">
-                  <span className="font-medium">{label}</span>
+                  <span className="flex items-center gap-1.5 font-medium">
+                    {label}
+                    {href === "/account" && <ThemesNewBadge />}
+                  </span>
                   <span className="text-xs text-muted-foreground">{desc}</span>
                 </div>
                 {lockable && !unlocked && <Lock className="size-4 shrink-0 text-muted-foreground" strokeWidth={2} />}
