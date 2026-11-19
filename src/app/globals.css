@@ -2,7 +2,8 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* The 星空夜 palette is dark in both modes, so it opts into dark: too. */
+@custom-variant dark (&:is(.dark *, [data-palette="night"] *));
 
 @theme inline {
   --color-background: var(--background);
@@ -257,7 +258,7 @@ html[data-palette="sakura"] {
   --card-foreground: oklch(0.27 0.035 355);
   --popover: oklch(0.995 0.007 355);
   --popover-foreground: oklch(0.27 0.035 355);
-  --primary: oklch(0.66 0.15 355);
+  --primary: oklch(0.6 0.14 350);
   --primary-foreground: oklch(0.99 0.005 355);
   --secondary: oklch(0.94 0.035 350);
   --secondary-foreground: oklch(0.4 0.06 355);
@@ -267,17 +268,19 @@ html[data-palette="sakura"] {
   --accent-foreground: oklch(0.3 0.06 300);
   --border: oklch(0.91 0.025 355);
   --input: oklch(0.91 0.025 355);
-  --ring: oklch(0.66 0.15 355 / 50%);
-  --chart-1: oklch(0.66 0.15 355);
+  --ring: oklch(0.6 0.14 350 / 50%);
+  --chart-1: oklch(0.6 0.14 350);
   --chart-5: oklch(0.6 0.16 35);
+  /* Deeper brick red so expenses don't read as the rose primary. */
+  --destructive: oklch(0.55 0.17 32);
   --sidebar: oklch(0.995 0.007 355);
   --sidebar-foreground: oklch(0.27 0.035 355);
-  --sidebar-primary: oklch(0.66 0.15 355);
+  --sidebar-primary: oklch(0.6 0.14 350);
   --sidebar-primary-foreground: oklch(0.99 0.005 355);
   --sidebar-accent: oklch(0.94 0.035 350);
   --sidebar-accent-foreground: oklch(0.4 0.06 355);
   --sidebar-border: oklch(0.91 0.025 355);
-  --sidebar-ring: oklch(0.66 0.15 355 / 50%);
+  --sidebar-ring: oklch(0.6 0.14 350 / 50%);
 }
 html.dark[data-palette="sakura"] {
   --background: oklch(0.23 0.025 355);
@@ -358,6 +361,90 @@ html.dark[data-palette="lavender"] {
   --sidebar-accent: oklch(0.32 0.04 290);
   --sidebar-accent-foreground: oklch(0.95 0.01 295);
   --sidebar-ring: oklch(0.75 0.12 290 / 50%);
+}
+
+/* 星空夜: always dark (navy + gold), whatever the light/dark setting. */
+html[data-palette="night"] {
+  color-scheme: dark;
+  --background: #121830;
+  --foreground: #eef0fa;
+  --card: #1e2646;
+  --card-foreground: #eef0fa;
+  --popover: #1e2646;
+  --popover-foreground: #eef0fa;
+  --primary: #f2c14e;
+  --primary-foreground: #2a2208;
+  --secondary: #26305a;
+  --secondary-foreground: #eef0fa;
+  --muted: #26305a;
+  --muted-foreground: #a3abd0;
+  --accent: #3b4a9e;
+  --accent-foreground: #eef0fa;
+  --destructive: #ff8a7a;
+  --income: #5fd3a8;
+  --warning: #f2c14e;
+  --category-ink-lift: 40%;
+  --border: #2c3560;
+  --input: #34406e;
+  --ring: rgb(242 193 78 / 50%);
+  --chart-1: #f2c14e;
+  --chart-2: #7fa2ff;
+  --chart-3: #5fd3c4;
+  --chart-4: #c08bff;
+  --chart-5: #ff8a7a;
+  --sidebar: #1e2646;
+  --sidebar-foreground: #eef0fa;
+  --sidebar-primary: #f2c14e;
+  --sidebar-primary-foreground: #2a2208;
+  --sidebar-accent: #26305a;
+  --sidebar-accent-foreground: #eef0fa;
+  --sidebar-border: #2c3560;
+  --sidebar-ring: rgb(242 193 78 / 50%);
+}
+
+/* LINE-style theme dressing (PREVIEW). Home banner colors per palette, the
+   motif art (--theme-hero-deco) and the faint page pattern
+   (--theme-pattern) — the last two are SVG URLs set on <html> by
+   PalettePreviewApplier from src/lib/theme-decor.ts. The default 焦糖
+   theme (no data-palette) is untouched. */
+html[data-palette="matcha"] { --hero-a: #b9d69a; --hero-b: #e9f2da; }
+html.dark[data-palette="matcha"] { --hero-a: #3a5230; --hero-b: #26331f; }
+html[data-palette="ocean"] { --hero-a: #8ec5ec; --hero-b: #dcEFfb; }
+html.dark[data-palette="ocean"] { --hero-a: #24476b; --hero-b: #1a2a40; }
+html[data-palette="sakura"] { --hero-a: #f5b8ca; --hero-b: #fde7ee; }
+html.dark[data-palette="sakura"] { --hero-a: #5c3343; --hero-b: #33222b; }
+html[data-palette="lavender"] { --hero-a: #c9b6f0; --hero-b: #eee8fb; }
+html.dark[data-palette="lavender"] { --hero-a: #463a72; --hero-b: #2a2442; }
+html[data-palette="night"] { --hero-a: #2d3a78; --hero-b: #1a2248; }
+
+html[data-palette] body {
+  background-image: var(--theme-pattern);
+  background-size: 72px 72px;
+}
+html[data-palette] .theme-hero {
+  background-image: linear-gradient(160deg, var(--hero-a), var(--hero-b));
+}
+/* Themed bears are the theme's character, so they get more room. */
+html[data-palette] .theme-bear {
+  width: 4.75rem;
+  height: 4.75rem;
+  margin: -0.5rem -0.25rem -1.5rem 0;
+}
+html[data-palette] .theme-hero-blob {
+  display: none;
+}
+.theme-hero-deco {
+  display: none;
+}
+html[data-palette] .theme-hero-deco {
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--theme-hero-deco);
+  background-repeat: no-repeat;
+  background-position: right top;
+  background-size: 344px 210px;
 }
 
 @keyframes splash-progress-slide {

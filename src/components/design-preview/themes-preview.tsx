@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { CategoryPill } from "@/components/transactions/category-pill";
 import { PALETTES, applyPalette, readPalette, subscribePalette } from "@/components/palette-preview";
 import { cn } from "@/lib/utils";
+import { ThemedBear } from "@/components/themed-bear";
 
 const SAMPLE_ROWS = [
   { name: "午餐", category: "餐飲", color: "#f97316", amount: -120 },
@@ -34,7 +35,7 @@ export function ThemesPreview() {
       <PageHeader title="主題預覽" back="/more" />
 
       <p className="text-sm text-muted-foreground">
-        這是預覽頁，只有知道網址的人看得到。選一套主題，整個 App 會一起換色，可以到首頁、統計、帳戶頁看看實際效果；選回「焦糖」就恢復原本的顏色。
+        這是預覽頁，只有知道網址的人看得到。選一套主題，整個 App 會一起換色，可以到首頁、統計、帳戶頁看看實際效果；選回「焦糖」就恢復原本的顏色。主題會換掉首頁小熊、頂部圖樣和頁面底紋；「星空夜」不分淺色深色，一律是深色。正式推出時，買了解鎖的人才能使用。
       </p>
 
       <section className="flex flex-col gap-3">
@@ -53,16 +54,21 @@ export function ThemesPreview() {
                   active && "border-primary ring-2 ring-ring",
                 )}
               >
-                {/* A tiny phone: background, banner strip, primary button. */}
+                {/* A tiny phone: banner with the theme's bear, rows, primary button. */}
                 <span
-                  className="relative flex h-20 w-12 flex-col overflow-hidden rounded-lg border"
+                  className="relative flex h-24 w-full flex-col overflow-hidden rounded-xl border"
                   style={{ backgroundColor: p.colors[0] }}
                 >
-                  <span className="h-6 w-full" style={{ backgroundColor: p.colors[2] }} />
-                  <span className="mx-auto mt-2 h-1.5 w-8 rounded-full" style={{ backgroundColor: p.colors[3] }} />
-                  <span className="mx-auto mt-1 h-1.5 w-6 rounded-full" style={{ backgroundColor: p.colors[2] }} />
                   <span
-                    className="absolute right-1 bottom-1 size-3.5 rounded-full"
+                    className="flex h-12 w-full items-center justify-center rounded-b-xl"
+                    style={{ backgroundColor: p.colors[2] }}
+                  >
+                    <ThemedBear variant={p.key} className="size-11" />
+                  </span>
+                  <span className="mx-2 mt-2 h-1.5 w-3/4 rounded-full" style={{ backgroundColor: p.colors[3] }} />
+                  <span className="mx-2 mt-1 h-1.5 w-1/2 rounded-full" style={{ backgroundColor: p.colors[2] }} />
+                  <span
+                    className="absolute right-1.5 bottom-1.5 size-4 rounded-full"
                     style={{ backgroundColor: p.colors[1] }}
                   />
                 </span>
@@ -84,16 +90,18 @@ export function ThemesPreview() {
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-muted-foreground">首頁上方</h2>
-        <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-secondary via-secondary/45 to-transparent">
-          <div className="absolute -top-20 -right-8 size-[150px] rounded-full bg-[color-mix(in_oklch,var(--secondary)_70%,transparent)]" />
+        <div className="theme-hero relative overflow-hidden rounded-[28px] bg-gradient-to-br from-secondary via-secondary/45 to-transparent">
+          <div className="theme-hero-blob absolute -top-20 -right-8 size-[150px] rounded-full bg-[color-mix(in_oklch,var(--secondary)_70%,transparent)]" />
+          <div className="theme-hero-deco" />
           <div className="relative flex flex-col gap-4 px-5 py-5">
             <div className="flex items-start justify-between">
               <div className="flex flex-col gap-0.5">
                 <span className="text-sm font-bold">午安</span>
                 <span className="text-xs text-muted-foreground">11月19日・星期四</span>
               </div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/icons/bear-mark-v2.png" alt="" className="size-12 object-contain" />
+              <span className="theme-bear flex size-12 shrink-0">
+                <ThemedBear className="size-full" />
+              </span>
             </div>
             <div className="flex items-stretch">
               <div className="flex-1">

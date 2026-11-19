@@ -5,6 +5,7 @@ import { zhTW } from "date-fns/locale";
 import { getNowInTaipei } from "@/lib/date";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { ThemedBear } from "@/components/themed-bear";
 
 function getGreeting(hour: number): string {
   if (hour < 5) return "夜深了";
@@ -42,7 +43,7 @@ export function HomeSummary({
 
   return (
     <div
-      className="relative -mx-4 overflow-hidden rounded-b-[28px] bg-gradient-to-br from-secondary via-secondary/45 to-transparent"
+      className="theme-hero relative -mx-4 overflow-hidden rounded-b-[28px] bg-gradient-to-br from-secondary via-secondary/45 to-transparent"
       // -mt-6 alone only cancels <main>'s own py-6 — body (src/app/layout.tsx)
       // separately carries its own pt-[env(safe-area-inset-top)], which
       // -mt-6 never touched, so the banner's top edge sat one safe-area's
@@ -54,7 +55,9 @@ export function HomeSummary({
       // one env(safe-area-inset-top) inside is the only place it's paid.
       style={{ marginTop: "calc(-1.5rem - env(safe-area-inset-top))" }}
     >
-      <div className="absolute -top-20 -right-8 size-[150px] rounded-full bg-[color-mix(in_oklch,var(--secondary)_70%,transparent)]" />
+      <div className="theme-hero-blob absolute -top-20 -right-8 size-[150px] rounded-full bg-[color-mix(in_oklch,var(--secondary)_70%,transparent)]" />
+      {/* Theme motif art — only shown with a color theme on (globals.css). */}
+      <div className="theme-hero-deco" />
 
       {/* +1rem below the safe area: iOS 27 draws a soft blur ("scroll edge
           effect") under the status bar that reaches a little past it, so the
@@ -69,9 +72,8 @@ export function HomeSummary({
             </span>
             <span className="text-xs text-muted-foreground">{dateLabel}</span>
           </div>
-          <span className="flex size-12 shrink-0 items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/bear-mark-v2.png" alt="" className="size-full object-contain" />
+          <span className="theme-bear flex size-12 shrink-0 items-center justify-center">
+            <ThemedBear className="size-full" />
           </span>
         </div>
 
