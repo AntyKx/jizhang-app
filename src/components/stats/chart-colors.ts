@@ -18,13 +18,10 @@ export const SLOT_1_COLOR = "#2a78d6";
 // Index 0 (no data) is a deliberately pale-but-visible cream, not
 // transparent — every day cell reads as one coherent grid of squares
 // instead of "colored blobs floating over blank holes".
-export const SEQUENTIAL_HEATMAP_STEPS = [
-  "oklch(0.96 0.015 60)",
-  "oklch(0.92 0.05 40)",
-  "oklch(0.8 0.11 40)",
-  "oklch(0.58 0.17 37)",
-  "oklch(0.38 0.13 34)",
-];
+// The actual stops are CSS vars (--heat-0…4 in globals.css) so each color
+// theme can swap in its own hue; the default values are the warm ramp
+// described above.
+export const SEQUENTIAL_HEATMAP_STEPS = [0, 1, 2, 3, 4].map((i) => `var(--heat-${i})`);
 
 // Text color for a number/label sitting on top of the matching
 // SEQUENTIAL_HEATMAP_STEPS index. Explicit per step rather than derived
@@ -33,7 +30,7 @@ export const SEQUENTIAL_HEATMAP_STEPS = [
 // light text in BOTH light and dark mode; inheriting the theme's default
 // foreground (which flips light/dark on its own) got this wrong in dark
 // mode, where the low-intensity steps' text was nearly unreadable.
-export const SEQUENTIAL_HEATMAP_TEXT = ["#6b5847", "#4a2f18", "#3a2410", "white", "white"];
+export const SEQUENTIAL_HEATMAP_TEXT = [0, 1, 2, 3, 4].map((i) => `var(--heat-text-${i})`);
 
 export function heatmapLevel(amount: number, max: number): 0 | 1 | 2 | 3 | 4 {
   if (amount <= 0 || max <= 0) return 0;
