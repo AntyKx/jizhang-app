@@ -2,9 +2,9 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, recurringRules, transactions } from "@/db/schema";
+import { accounts, categories, recurringRules, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { pickCategoryColor } from "@/lib/category-color";
 import { supportedCurrencies } from "@/lib/currency";
@@ -258,4 +258,53 @@ export async function adjustAccountBalance(input: { accountId: string; actualBal
   revalidateTransactionPaths();
   revalidatePath(`/accounts/${parsed.accountId}`);
   return { delta };
+}
+
+// Back of a wallet card on /accounts (accounts-wallet.tsx): this month's
+// income/expense on the account and its latest 3 income/expense rows.
+// Transfers and balance adjustments are left out — the card's "本月收入/支出"
+// should match what the stats pages call income and expense. Amounts are in
+// the account's own currency. Fetched on flip, so the page itself pays nothing.
+export async function getAccountCardSummary(accountId: string) {
+  const userId = await requireUserId();
+  const id = z.string().uuid().parse(accountId);
+  const monthStart = `${todayInTaipeiString().slice(0, 7)}-01`;
+  const own = and(eq(transactions.userId, userId), eq(transactions.accountId, id));
+  const incomeOrExpense = inArray(transactions.type, ["income", "expense"]);
+
+  const [[totals], recent] = await Promise.all([
+    db
+      .select({
+        income: sql<string>`coalesce(sum(case when ${transactions.type} = 'income' then ${transactions.amount} end), 0)`,
+        expense: sql<string>`coalesce(sum(case when ${transactions.type} = 'expense' then ${transactions.amount} end), 0)`,
+      })
+      .from(transactions)
+      .where(and(own, incomeOrExpense, gte(transactions.occurredAt, monthStart))),
+    db
+      .select({
+        id: transactions.id,
+        type: transactions.type,
+        amount: transactions.amount,
+        occurredAt: transactions.occurredAt,
+        merchant: transactions.merchant,
+        note: transactions.note,
+        categoryName: categories.name,
+      })
+      .from(transactions)
+      .leftJoin(categories, eq(transactions.categoryId, categories.id))
+      .where(and(own, incomeOrExpense))
+      .orderBy(desc(transactions.occurredAt), desc(transactions.createdAt))
+      .limit(3),
+  ]);
+
+  return {
+    monthIncome: Number(totals?.income ?? 0),
+    monthExpense: Number(totals?.expense ?? 0),
+    recent: recent.map((r) => ({
+      id: r.id,
+      label: r.merchant || r.categoryName || r.note || (r.type === "income" ? "收入" : "支出"),
+      amount: r.type === "income" ? Number(r.amount) : -Number(r.amount),
+      date: r.occurredAt,
+    })),
+  };
 }

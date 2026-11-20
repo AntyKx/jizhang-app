@@ -16,9 +16,13 @@ import type { AccountType } from "@/lib/account-type";
 import { OneTimeHint } from "@/components/onboarding/gesture-hint";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { AccountsViewSwitch, WALLET_FOR_EVERYONE } from "@/components/accounts/accounts-wallet";
+import { isDevAdmin } from "@/lib/entitlements";
 
 export default async function AccountsPage() {
   const userId = await requireUserId();
+  // Wallet-card view is being tried on the dev account first.
+  const walletEnabled = WALLET_FOR_EVERYONE || isDevAdmin(userId);
   // Transfers are fetched unconditionally so all three reads share one round
   // trip — with fewer than two accounts the result is empty anyway, which the
   // render already handles.
@@ -88,6 +92,25 @@ export default async function AccountsPage() {
     groupSubtotals = {};
   }
 
+  const activeAccountProps = accounts.map((a) => ({
+    id: a.id,
+    name: a.name,
+    type: a.type,
+    currency: a.currency,
+    currentBalance: a.currentBalance,
+    excludeFromNetWorth: a.excludeFromNetWorth,
+    initialBalance: a.initialBalance,
+    statementDay: a.statementDay,
+  }));
+  const accountsList = (
+    <div className="flex flex-col gap-6">
+      <AccountsList groupSubtotals={groupSubtotals} accounts={activeAccountProps} />
+      <OneTimeHint id="account-swipe" icon={<ArrowLeft className="size-4" />} className="-mt-2">
+        左滑編輯或封存，長按拖曳排序
+      </OneTimeHint>
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -118,25 +141,10 @@ export default async function AccountsPage() {
           <BearIllustration name="empty" size={96} />
           <p className="text-muted-foreground text-sm">還沒有任何帳戶。</p>
         </div>
+      ) : walletEnabled ? (
+        <AccountsViewSwitch accounts={activeAccountProps} list={accountsList} />
       ) : (
-        <AccountsList
-          groupSubtotals={groupSubtotals}
-          accounts={accounts.map((a) => ({
-            id: a.id,
-            name: a.name,
-            type: a.type,
-            currency: a.currency,
-            currentBalance: a.currentBalance,
-            excludeFromNetWorth: a.excludeFromNetWorth,
-            initialBalance: a.initialBalance,
-            statementDay: a.statementDay,
-          }))}
-        />
-      )}
-      {accounts.length > 0 && (
-        <OneTimeHint id="account-swipe" icon={<ArrowLeft className="size-4" />} className="-mt-2">
-          左滑編輯或封存，長按拖曳排序
-        </OneTimeHint>
+        accountsList
       )}
 
       {archivedAccounts.length > 0 && (
