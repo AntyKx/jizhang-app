@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { Check, Plus, RotateCcw, Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -117,6 +117,7 @@ export function WalletPreview() {
 function WalletSection() {
   const [selected, setSelected] = useState<string | null>(null);
   const [flipped, setFlipped] = useState(false);
+  const [themed, setThemed] = useState(true);
   const net = ACCOUNTS.reduce((s, a) => s + a.balance, 0);
   const selIndex = ACCOUNTS.findIndex((a) => a.id === selected);
   const stackH = selected ? CARD_H + 24 + (ACCOUNTS.length - 1) * 12 : PEEK * (ACCOUNTS.length - 1) + CARD_H;
@@ -152,11 +153,33 @@ function WalletSection() {
         )}
       </div>
 
+      <div className="flex rounded-full bg-muted p-0.5 text-xs">
+        {(
+          [
+            [true, "A：跟著主題"],
+            [false, "原本：固定彩色"],
+          ] as const
+        ).map(([v, label]) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => setThemed(v)}
+            className={cn(
+              "flex-1 rounded-full py-1.5 font-medium transition-colors",
+              themed === v ? "bg-card shadow-sm" : "text-muted-foreground"
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex items-baseline justify-between px-1">
         <span className="text-xs text-muted-foreground">淨資產</span>
         <span className="text-xl font-bold tabular-nums">{fmt(net)}</span>
       </div>
 
+      <ThemedCardsContext.Provider value={themed}>
       <div className="relative transition-[height] duration-500" style={{ height: stackH }}>
         {ACCOUNTS.map((a, i) => {
           const isSel = a.id === selected;
@@ -193,15 +216,42 @@ function WalletSection() {
           );
         })}
       </div>
+      </ThemedCardsContext.Provider>
+      <p className="text-xs text-muted-foreground">
+        到「帳號設定」換主題再回來，整疊卡會換成那個主題的顏色。
+      </p>
     </section>
   );
 }
 
+const ThemedCardsContext = createContext(true);
+
+// Option A: every card is a tone of the active theme's --primary (relative
+// color syntax), so the stack belongs to whichever theme is on. Lightness
+// is fixed per tone (not taken from the theme) so white text always reads,
+// even on themes whose primary is pale (星空夜's gold).
+// [lightness start, lightness end, chroma factor, hue shift]
+const TONES: Record<AccountType, [number, number, number, number]> = {
+  bank: [0.64, 0.5, 1, 0], // 主色
+  cash: [0.72, 0.58, 0.85, -18], // 淺、偏暖
+  credit_card: [0.48, 0.34, 0.7, 12], // 深
+  e_wallet: [0.66, 0.52, 0.95, 32], // 鄰近色
+  investment: [0.6, 0.46, 0.4, 0], // 低彩度（奶茶）
+  loan: [0.42, 0.3, 0.5, -10],
+};
+
+function themedCardBg(type: AccountType) {
+  const [l1, l2, c, h] = TONES[type];
+  const tone = (l: number) => `oklch(from var(--primary) ${l} calc(c * ${c}) calc(h + ${h}))`;
+  return `linear-gradient(135deg, ${tone(l1)}, ${tone(l2)})`;
+}
+
 function CardFront({ a }: { a: DemoAccount }) {
+  const themed = useContext(ThemedCardsContext);
   return (
     <div
       className="absolute inset-0 flex flex-col justify-between overflow-hidden rounded-2xl p-4 text-left text-white shadow-[0_-2px_10px_rgba(0,0,0,0.12),0_10px_24px_-10px_rgba(0,0,0,0.45)] [backface-visibility:hidden]"
-      style={{ background: a.bg }}
+      style={{ background: themed ? themedCardBg(a.type) : a.bg }}
     >
       {/* soft shine */}
       <span className="pointer-events-none absolute -top-16 -right-10 size-48 rounded-full bg-white/15" />
