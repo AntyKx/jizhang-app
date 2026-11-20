@@ -652,13 +652,6 @@ html[data-palette] .theme-hero-deco {
 .jz-wave { animation: jz-wave 3.2s linear infinite; }
 .jz-wave-back { animation-duration: 5s; animation-direction: reverse; }
 .jz-bubble { animation: jz-bubble 3.3s ease-in infinite; }
-/* Line chart drawing in (paths use pathLength="1"). */
-@keyframes jz-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
-@keyframes jz-fade-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes jz-pop { 0% { transform: scale(0); } 70% { transform: scale(1.35); } 100% { transform: scale(1); } }
-.jz-draw { stroke-dasharray: 1; animation: jz-draw 1.4s cubic-bezier(.45,.05,.3,1) both; }
-.jz-draw-fill { animation: jz-fade-in .8s ease-out 1s both; }
-.jz-draw-dot { transform-box: fill-box; transform-origin: center; animation: jz-pop .4s ease-out both; }
 @media (prefers-reduced-motion: reduce) {
-  .jz-wave, .jz-bubble, .jz-draw, .jz-draw-fill, .jz-draw-dot { animation: none; }
+  .jz-wave, .jz-bubble { animation: none; }
 }
